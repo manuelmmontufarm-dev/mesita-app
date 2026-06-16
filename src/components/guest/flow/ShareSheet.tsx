@@ -1,0 +1,154 @@
+"use client";
+
+/**
+ * ShareSheet — bottom sheet to split a single dish between selected diners.
+ * Ported from `design_handoff_customer/customer/sheets.jsx`.
+ */
+
+import { useState } from "react";
+
+import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
+import { fmt, lineTotal, round2 } from "@/lib/guest-billing/split-math";
+import type {
+  BillItem,
+  MemberId,
+  TableMember,
+} from "@/lib/guest-billing/types";
+
+import { Avatar, Ic } from "./_shared";
+
+type Flow = ReturnType<typeof useGuestPaymentFlow>;
+
+export interface ShareSheetProps {
+  flow: Flow;
+  items: readonly BillItem[];
+  members: readonly TableMember[];
+}
+
+export function ShareSheet({ flow, items, members }: ShareSheetProps) {
+  const itemId = flow.state.shareItem;
+  const item = itemId ? items.find((i) => i.id === itemId) ?? null : null;
+
+  const existing = item ? flow.state.claims[item.id] ?? {} : {};
+  const initial: MemberId[] = Object.keys(existing).length
+    ? Object.keys(existing)
+    : [flow.youId];
+
+  const [sel, setSel] = useState<MemberId[]>(initial);
+
+  if (!item) return null;
+  const qty = item.qty;
+
+  const toggle = (id: MemberId) =>
+    setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+
+  const resolve = (): Record<MemberId, number> => {
+    const out: Record<MemberId, number> = {};
+    if (sel.length === 0) return out;
+    const u = round2(qty / sel.length);
+    sel.forEach((id, i) => {
+      out[id] = i === sel.length - 1 ? round2(qty - u * (sel.length - 1)) : u;
+    });
+    return out;
+  };
+  const units = resolve();
+  const pct = (id: MemberId) =>
+    units[id] ? Math.round((units[id] / qty) * 100) : 0;
+
+  const save = () => {
+    flow.replaceClaim(item.id, units);
+    flow.closeShareItem();
+  };
+
+  return (
+    <>
+      <div className="sheet-scrim" onClick={() => flow.closeShareItem()} />
+      <div
+        className="sheet glassx"
+        role="dialog"
+        aria-label="Compartir plato"
+        data-testid="share-sheet"
+      >
+        <div className="sheet-grab" />
+        <div className="sheet-head">
+          <div className="sheet-title">
+            <span style={{ fontSize: 24 }}>{item.emoji}</span> Compartir plato
+          </div>
+          <div className="sheet-sub">
+            {item.name} · {fmt(lineTotal(item))} · se reparte en partes
+            iguales entre quienes elijas
+          </div>
+        </div>
+
+        <div className="sheet-body">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {members.map((m) => {
+              const on = sel.includes(m.id);
+              return (
+                <div
+                  key={m.id}
+                  className={"pick" + (on ? " on" : "")}
+                  onClick={() => toggle(m.id)}
+                  role="button"
+                  data-testid={`share-pick-${m.id}`}
+                >
+                  <Avatar member={m} size={36} />
+                  <span className="nm">{m.isYou ? "Tú" : m.name}</span>
+                  <span className="c-tick tick">
+                    {on && <Ic.check s={14} w={2.6} />}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {sel.length > 0 && (
+            <div>
+              <div className="sec-label" style={{ marginBottom: 9 }}>
+                Así queda ·{" "}
+                {sel.length === 1 ? "para 1" : `entre ${sel.length}`}
+              </div>
+              <div className="portion-chips">
+                {sel.map((id) => {
+                  const m = members.find((mm) => mm.id === id) ?? null;
+                  return (
+                    <span key={id} className="pchip">
+                      <Avatar member={m} size={22} />
+                      {m?.isYou ? "Tú" : m?.name ?? "?"}
+                      <b className="pp">{pct(id)}%</b>
+                      <span
+                        style={{
+                          color: "var(--c-ink-2)",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {fmt((units[id] ?? 0) * item.unitPrice)}
+                      </span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="sheet-foot">
+          <button
+            className="sheet-btn"
+            disabled={sel.length === 0}
+            onClick={save}
+            data-testid="share-save"
+          >
+            <Ic.check s={18} w={2.6} /> Guardar reparto
+          </button>
+          <button
+            className="sheet-btn ghost"
+            onClick={() => flow.closeShareItem()}
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}

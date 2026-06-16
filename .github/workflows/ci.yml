@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  ci:
+    name: Typecheck, Lint & Test
+    runs-on: ubuntu-latest
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+      NEXTAUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_NAME: MesaQR
+      ADMIN_SECRET: test-admin-secret
+      ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+      CRON_SECRET: test-cron-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # NOTE: Lint step disabled — ESLint is not configured in this repo.
+      # `next lint` enters an interactive setup wizard in newer Next.js versions
+      # which cannot complete in CI. Re-enable after setting up ESLint properly
+      # (see: npx @next/codemod@canary next-lint-to-eslint-cli .).
+      # - name: Lint
+      #   run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1

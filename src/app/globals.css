@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.safe-area-top    { padding-top:    env(safe-area-inset-top); }
+.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 16px); }
+
+/* ============================================================
+   MesaQR / PagaYa — Design System
+   Tokens match the landing page (landing/src/index.css)
+   ============================================================
+
+   Landing palette reference:
+     --ink-900  #0b0a09   rich warm black
+     --paper    #f6f3ee   warm white page bg
+     --emerald  #2fb37e   green accent
+     --surface  #fdfbf7   card white
+*/
+
+@layer base {
+  :root {
+    /* ---- shadcn tokens mapped to MesaQR palette ---- */
+    --background:           38 31% 95%;   /* #f6f3ee paper */
+    --foreground:           36 10% 10%;   /* #1b1916 ink-800 */
+
+    --card:                 40 60% 98%;   /* #fdfbf7 surface */
+    --card-foreground:      36 10% 10%;
+
+    --popover:              40 60% 98%;
+    --popover-foreground:   36 10% 10%;
+
+    --primary:              30  5%  4%;   /* #0b0a09 ink-900 */
+    --primary-foreground:   42 31% 94%;   /* #f4f1ea on-dark */
+
+    --secondary:            37 29% 91%;   /* #efeae2 paper-2 */
+    --secondary-foreground: 36 10% 10%;
+
+    --muted:                37 29% 91%;
+    --muted-foreground:     35 17% 39%;   /* #6c655b on-light-mut */
+
+    --accent:              156 58% 44%;   /* #2fb37e emerald */
+    --accent-foreground:     0  0% 98%;
+
+    --destructive:           0 64% 55%;   /* #d64545 */
+    --destructive-foreground: 0 0% 98%;
+
+    --border:               37 20% 88%;
+    --input:                37 20% 88%;
+    --ring:                156 58% 44%;   /* emerald focus ring */
+
+    --radius: 1rem;                       /* landing --r-sm 16px */
+
+    /* ---- raw brand tokens (for inline styles / non-shadcn usage) ---- */
+    --ink-900:    #0b0a09;
+    --ink-800:    #1b1916;
+    --ink-700:    #2a2723;
+    --paper:      #f6f3ee;
+    --paper-2:    #efeae2;
+    --surface:    #fdfbf7;
+    /* DEPRECATED — coral palette removed. Green is the primary accent. */
+    /* --coral:      #ff5a4f; */
+    /* --coral-dark: #e8432f; */
+    /* --coral-soft: #ffd7d0; */
+    --emerald:    #2fb37e;  /* primary green accent */
+    --emerald-soft: #cdf2e1;
+    --on-dark:    #f4f1ea;
+    --on-dark-mut: #a39d92;
+    --on-light:   #1b1916;
+    --on-light-mut: #6c655b;
+    --error:      #d64545;
+    --warning:    #f2a93b;
+
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --font-mesita: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+
+  .dark {
+    --background:           30  5%  4%;
+    --foreground:           42 31% 94%;
+
+    --card:                 30  8% 10%;
+    --card-foreground:      42 31% 94%;
+
+    --popover:              30  8% 10%;
+    --popover-foreground:   42 31% 94%;
+
+    --primary:              42 31% 94%;
+    --primary-foreground:   30  5%  4%;
+
+    --secondary:            30  8% 14%;
+    --secondary-foreground: 42 31% 94%;
+
+    --muted:                30  8% 14%;
+    --muted-foreground:     39  8% 60%;
+
+    --accent:              156 58% 44%;
+    --accent-foreground:     0  0% 98%;
+
+    --destructive:           0 64% 55%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border:               30  8% 18%;
+    --input:                30  8% 18%;
+    --ring:                156 58% 44%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-mesita);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    letter-spacing: -0.011em;
+  }
+}
+
+/* ---- Landing-matched utility classes ---- */
+@layer components {
+  /* Small caps eyebrow label — matches landing .eyebrow */
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--emerald);
+  }
+
+  /* Glass card surface — matches landing .glass treatment */
+  .glass-card {
+    background: rgba(253, 251, 247, 0.72);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 4px 24px -6px rgba(11, 10, 9, 0.12),
+                0 1px 4px -1px rgba(11, 10, 9, 0.08);
+  }
+
+  /* Dark glass — for overlays on dark sections */
+  .glass-dark {
+    background: rgba(11, 10, 9, 0.65);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+  }
+
+  /* Pill badge — matches landing .pill */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .pill-success {
+    background: var(--emerald-soft);
+    color: #1a7a52;
+  }
+
+  .pill-muted {
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Smooth hover lift — matches landing btn hover */
+  .hover-lift {
+    transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease);
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -8px rgba(11, 10, 9, 0.18);
+  }
+}
