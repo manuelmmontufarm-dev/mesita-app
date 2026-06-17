@@ -1,5 +1,19 @@
 # PagaYa Frontend Skill Set
 
+> ## 📓 REGLA OBLIGATORIA — Bitácora `TODAY.md`
+>
+> **Antes de editar cualquier cosa en este repo, LEE primero [`TODAY.md`](./TODAY.md)**
+> para saber en qué estado está el proyecto y qué hay que tener cuidado.
+>
+> **Después de cada cambio (edit), REGÍSTRALO en `TODAY.md`** en la sección
+> *"🗂️ Registro de cambios"* (lo más nuevo arriba), respondiendo siempre:
+> - **QUÉ** se cambió (archivo/área),
+> - **POR QUÉ** se cambió (el problema o el objetivo),
+> - **QUÉ HACE** el cambio (el efecto concreto).
+>
+> No omitas esto aunque el cambio parezca pequeño. El formato exacto de cada
+> entrada está descrito dentro de `TODAY.md`.
+
 ## Product Context
 PagaYa es una app de pagos para restaurantes.
 
