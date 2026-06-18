@@ -79,6 +79,21 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-18 — Anillo Gracias: % pagado + celebración
+- **Qué:** `WaitingSuccessStage.tsx`, `customer.css`.
+- **Por qué:** El anillo mostraba % por pagar (confuso); texto descentrado; faltaba un toque festivo post-pago.
+- **Qué hace:** Muestra % pagado con anillo verde proporcional; "Faltan $X" como subtítulo; mini animación 🕺💃🎉 debajo; centrado corregido con `.ws-mesa-ring-dial`.
+
+### 2026-06-18 — Gracias con anillo de progreso + layout dock/recibo
+- **Qué:** `WaitingSuccessStage.tsx`, `ReceiptDrawer.tsx`, `GuestBillFlow.tsx`, `customer.css`.
+- **Por qué:** Pantalla Gracias confusa y dock/recibo tapaban el botón pagar.
+- **Qué hace:** "Un pago registrado" + anillo % por pagar; dock sube sobre peek; scroll con padding correcto.
+
+### 2026-06-18 — Recibo acumulativo, drawer global y volver a pagar
+- **Qué:** `ReceiptDrawer.tsx`, `GuestBillFlow.tsx`, `WaitingSuccessStage.tsx`, `customer.css`, `useGuestPaymentFlow.ts` (receipts[]), `receipt-pdf.ts`.
+- **Por qué:** Unificar confirm, soportar pagos parciales con varios comprobantes, y permitir volver a la cuenta sin perder el recibo.
+- **Qué hace:** Drawer con total acumulado + badge N pagos en todos los stages; PDF descargable; botón "Volver a la cuenta" en Gracias; ítems pagados persisten al regresar.
+
 > Lo más nuevo arriba. Lo reciente con detalle; lo viejo, resumido.
 
 ### 2026-06-17 — Se creó la bitácora TODAY.md y la regla de registro
