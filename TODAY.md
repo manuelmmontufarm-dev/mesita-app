@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-18 — Home abre la app demo
+- **Qué:** `src/app/page.tsx`.
+- **Por qué:** El dominio principal abría la landing estática en vez del flujo real de la app.
+- **Qué hace:** Redirige `/` hacia `/pay/demo` para que el deploy abra directamente la experiencia demo de pago.
+
 ### 2026-06-18 — Arreglo build Vercel en pantalla Gracias
 - **Qué:** `WaitingSuccessStage.tsx`, `package.json`, `package-lock.json`.
 - **Por qué:** El deploy fallaba por imports inexistentes (`latestReceipt`, `bill-display`) y por usar `canvas-confetti` sin declararlo como dependencia.
