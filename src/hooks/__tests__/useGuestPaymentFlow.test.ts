@@ -55,7 +55,7 @@ describe("createInitialState", () => {
     expect(s.people).toBe(4);
     expect(s.claims).toEqual({});
     expect(s.paidIds).toEqual([]);
-    expect(s.receipt).toBeNull();
+    expect(s.receipts).toEqual([]);
     expect(s.lastMethod).toBe("datafast");
   });
 
@@ -204,7 +204,7 @@ describe("flowReducer — payment/complete", () => {
     expect(s.stage).toBe("waiting");
     expect(s.paidIds).toEqual(["ana", "you"]);
     expect(s.paidItemIds.sort()).toEqual(["loc", "sec"]);
-    expect(s.receipt).toBe(receipt);
+    expect(s.receipts).toEqual([receipt]);
 
     const again = flowReducer(s, {
       type: "payment/complete",
@@ -214,6 +214,7 @@ describe("flowReducer — payment/complete", () => {
     });
     expect(again.paidIds).toEqual(["ana", "you"]);
     expect(again.paidItemIds.sort()).toEqual(["cev", "loc", "sec"]);
+    expect(again.receipts).toHaveLength(2);
   });
 });
 
@@ -241,7 +242,7 @@ describe("deriveTotals", () => {
     expect(d.canPay).toBe(true);
   });
 
-  it("equal mode: subtotal = remainingSub / people", () => {
+  it("equal mode: subtotal = remainingSub / remainingPeople", () => {
     const d = deriveTotals(
       withState({ mode: "equal", people: 4, paidItemIds: ["loc"] }),
       items,

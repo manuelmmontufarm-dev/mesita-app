@@ -19,9 +19,10 @@
  *   - otherwise                  → "equal"
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { type useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
+import { latestReceipt, type useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
+import { expandRepeatedItems } from "@/lib/guest-billing/bill-display";
 import {
   billSubtotal,
   computeTotals,
@@ -348,7 +349,11 @@ export function WaitingSuccessStage({
     return itemAmt;
   };
 
-  const displayName = state.name.trim() || state.receipt?.name || "tú";
+  const displayName = state.name.trim() || latestReceipt(state)?.name || "tú";
+
+  /* ── expanded items for per-diner item list ───────────────────────────── */
+
+  const expandedItems = useMemo(() => expandRepeatedItems(items), [items]);
 
   /* ── pending members list (for waiting phase) ─────────────────────────── */
 
@@ -374,7 +379,7 @@ export function WaitingSuccessStage({
       return `${fractionLabel(Math.max(1, people))} de la cuenta`;
     }
     // item mode — build compact item list
-    const claimed = items.filter(
+    const claimed = expandedItems.filter(
       (it) => unitsOf(claims, it.id, memberId) > 0,
     );
     if (claimed.length === 0) return "Sin consumo";

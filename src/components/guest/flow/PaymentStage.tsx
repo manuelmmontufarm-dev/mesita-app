@@ -1,35 +1,22 @@
 "use client";
 
 /**
- * PaymentStage — método de pago + tarjeta + factura electrónica.
- * Ported from `design_handoff_customer/customer/payment.jsx`.
+ * PaymentStage — pago exclusivo con Kushki.
+ * El selector de método fue eliminado; siempre se usa Kushki.
  */
 
 import { useState, type InputHTMLAttributes } from "react";
 
+import type { CameraCardData } from "@/components/guest/CameraScanner";
+import { CameraScanner } from "@/components/guest/CameraScanner";
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
-import type {
-  EInvoicePayload,
-  PaidPayload,
-  PaymentMethod,
-} from "@/hooks/useGuestPaymentFlow";
+import type { EInvoicePayload, PaidPayload } from "@/hooks/useGuestPaymentFlow";
 import { fmt, round2 } from "@/lib/guest-billing/split-math";
 import type { RestaurantConfig } from "@/lib/guest-billing/types";
 
 import { Ic } from "./_shared";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
-
-const PAY_METHODS: {
-  k: PaymentMethod;
-  label: string;
-  sub: string;
-  hue: number;
-}[] = [
-  { k: "datafast", label: "Datafast", sub: "Visa · Mastercard · débito", hue: 211 },
-  { k: "diners", label: "Diners Club", sub: "Diners · Discover", hue: 268 },
-  { k: "kushki", label: "Kushki", sub: "Pago en línea seguro", hue: 158 },
-];
 
 const TEST_CARD = {
   num: "4242 4242 4242 4242",
@@ -82,7 +69,6 @@ export function PaymentStage({ flow, config: _config }: PaymentStageProps) {
   const yourTotal = flow.derived.totals.total;
   const isLastPayer = flow.derived.isLastPayer;
 
-  const [method, setMethod] = useState<PaymentMethod>("datafast");
   const [card, setCard] = useState({
     num: "",
     holder: "",
@@ -140,6 +126,19 @@ export function PaymentStage({ flow, config: _config }: PaymentStageProps) {
     setShowErrors(false);
   };
 
+  const applyScannedCard = (data: CameraCardData) => {
+    const rawNum = data.number.replace(/\D/g, "").slice(0, 16);
+    const formattedNum = rawNum.replace(/(.{4})/g, "$1 ").trim();
+    const month = data.expiryMonth.padStart(2, "0");
+    const year = data.expiryYear.slice(-2);
+    setCard({
+      num: formattedNum,
+      holder: data.name ?? "",
+      exp: `${month}/${year}`,
+      cvv: data.cvv ?? "",
+    });
+  };
+
   const pay = () => {
     if (!canPay) {
       setShowErrors(true);
@@ -153,7 +152,7 @@ export function PaymentStage({ flow, config: _config }: PaymentStageProps) {
     }
     setBusy(true);
     const payload: PaidPayload = {
-      method,
+      method: "kushki",
       amount: round2(yourTotal),
       card: { last4: card.num.replace(/\s/g, "").slice(-4) },
       eInvoice: wantBilling ? { ...bill } : null,
@@ -228,35 +227,6 @@ export function PaymentStage({ flow, config: _config }: PaymentStageProps) {
             </span>
             <Ic.chevron s={16} />
           </button>
-
-          <div className="sec-label">¿Cómo quieres pagar?</div>
-          <div className="pay-methods">
-            {PAY_METHODS.map((m) => (
-              <button
-                key={m.k}
-                className={"pay-method" + (method === m.k ? " on" : "")}
-                onClick={() => setMethod(m.k)}
-                data-testid={`payment-method-${m.k}`}
-              >
-                <span
-                  className="pm-mark"
-                  style={{
-                    background: `hsl(${m.hue} 70% 96%)`,
-                    color: `hsl(${m.hue} 62% 42%)`,
-                  }}
-                >
-                  <Ic.card s={20} />
-                </span>
-                <span className="pm-text">
-                  <span className="pm-name">{m.label}</span>
-                  <span className="pm-sub">{m.sub}</span>
-                </span>
-                <span className="pm-tick">
-                  {method === m.k && <Ic.check s={14} w={3} />}
-                </span>
-              </button>
-            ))}
-          </div>
 
           <div className="pay-block surfx">
             <div className="pay-block-head">
@@ -420,41 +390,16 @@ export function PaymentStage({ flow, config: _config }: PaymentStageProps) {
           </button>
         </div>
 
-        {scanOpen && (
-          <>
-            <div
-              className="sheet-scrim"
-              onClick={() => setScanOpen(false)}
-            />
-            <div
-              className="scan-modal glassx"
-              role="dialog"
-              aria-label="Escanear tarjeta"
-            >
-              <div className="scan-frame">
-                <span className="scan-corner tl" />
-                <span className="scan-corner tr" />
-                <span className="scan-corner bl" />
-                <span className="scan-corner br" />
-                <div className="scan-line" />
-                <Ic.camera s={34} />
-              </div>
-              <div className="scan-title">Apunta a tu tarjeta</div>
-              <div className="scan-sub">
-                Encuádrala dentro del marco y la leemos automáticamente.
-              </div>
-              <div className="scan-demo">
-                Demo · el escaneo aún no está activo
-              </div>
-              <button
-                className="sheet-btn ghost"
-                onClick={() => setScanOpen(false)}
-              >
-                Cerrar y escribir a mano
-              </button>
-            </div>
-          </>
-        )}
+        <CameraScanner
+          isOpen={scanOpen}
+          onCardDetected={(data) => {
+            applyScannedCard(data);
+            setScanOpen(false);
+          }}
+          onClose={() => setScanOpen(false)}
+          language="es"
+          allowManual={false}
+        />
       </div>
     </div>
   );
