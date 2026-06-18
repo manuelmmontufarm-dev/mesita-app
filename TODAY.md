@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-18 — Arreglo build Vercel en pantalla Gracias
+- **Qué:** `WaitingSuccessStage.tsx`, `package.json`, `package-lock.json`.
+- **Por qué:** El deploy fallaba por imports inexistentes (`latestReceipt`, `bill-display`) y por usar `canvas-confetti` sin declararlo como dependencia.
+- **Qué hace:** Usa `state.receipt?.name` como fallback del nombre, calcula etiquetas de ítems con los datos existentes y agrega `canvas-confetti` + sus tipos para que `npm run build` compile en Vercel.
+
 ### 2026-06-18 — Anillo Gracias: % pagado + celebración
 - **Qué:** `WaitingSuccessStage.tsx`, `customer.css`.
 - **Por qué:** El anillo mostraba % por pagar (confuso); texto descentrado; faltaba un toque festivo post-pago.
