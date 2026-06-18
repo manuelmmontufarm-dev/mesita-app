@@ -122,12 +122,14 @@ function NameField({
 
 function BillItemRow({
   item,
+  index,
   flow,
   members,
   mode,
   paid,
 }: {
   item: BillItem;
+  index: number;
   flow: Flow;
   members: readonly TableMember[];
   mode: "item" | "equal" | "todo";
@@ -159,21 +161,27 @@ function BillItemRow({
       data-testid={`bill-item-${item.id}`}
     >
       {paid ? (
-        <span className="c-tick paid-tick">
-          <Ic.check s={16} w={2.8} />
+        <span className="c-tick paid-tick on">
+          <span className="c-tick-num">{index}</span>
         </span>
-      ) : mode === "item" ? (
-        <span className="c-tick">{mine && <Ic.check s={16} w={2.7} />}</span>
       ) : (
-        <span className="c-item-emoji">{item.emoji}</span>
+        <span className={"c-tick" + (mine ? " on" : "")}>
+          <span className="c-tick-num">{index}</span>
+        </span>
       )}
       <div className="c-item-main">
-        <div className="c-item-name">{item.name}</div>
+        <div className="c-item-name">
+          {item.name}{" "}
+          <span className="c-item-emoji-inline" aria-hidden="true">
+            {item.emoji}
+          </span>
+        </div>
         <div className="c-item-sub">
           {paid ? (
             <span className="paid-tag">Pagado</span>
           ) : mode === "item" ? (
             <>
+              {mine && <span className="tag-you">Tú</span>}
               {others.length > 0 && (
                 <AvatarStack
                   ids={
@@ -541,10 +549,11 @@ export function BillStage({
         </div>
         {mode === "item" ? (
           <div className="surfx c-items">
-            {items.map((it) => (
+            {items.map((it, i) => (
               <BillItemRow
                 key={it.id}
                 item={it}
+                index={i + 1}
                 flow={flow}
                 members={members}
                 mode={mode}

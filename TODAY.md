@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-18 — Restaurar items numerados en la cuenta del guest
+- **Qué:** `src/components/guest/flow/BillStage.tsx`.
+- **Por qué:** En Vercel la lista "Escoge tus platos" salía como checkboxes vacíos sin numerar; localhost ya tenía la versión correcta numerada. El JSX no usaba las clases `.c-item-emoji-inline` y `.c-tick-num` que sí existen en `customer.css`.
+- **Qué hace:** Cada `BillItemRow` ahora recibe `index` y muestra el número del plato (1, 2, 3...) dentro del círculo `.c-tick`. El círculo se pone verde con número blanco cuando el plato es tuyo (`.c-tick.on`) y aparece el badge "Tú" en la fila. El emoji se renderiza inline al lado del nombre (`.c-item-emoji-inline`). Selección, montos, estados shared/paid y "Toca para escogerlo" intactos.
+
 ### 2026-06-18 — Home abre la app demo
 - **Qué:** `src/app/page.tsx`.
 - **Por qué:** El dominio principal abría la landing estática en vez del flujo real de la app.
