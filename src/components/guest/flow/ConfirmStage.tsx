@@ -3,16 +3,16 @@
 /**
  * ConfirmStage — pre-payment verification screen.
  *
- * Ported from `design_handoff_customer/customer/flow.jsx` (`ConfirmScreen`,
- * `ConfirmItem`, `ConfirmEqual`, `ConfirmTodo`, `Donut`, `PeopleStrip`).
+ * Diseño: jerarquía de 3 cards de tamaño descendente.
+ *   Card 1 "Lo tuyo"               — GRANDE, siempre visible.
+ *   Card 2 "Otros"                 — MEDIA, colapsable, solo en mode=item.
+ *   Card 3 "Falta por reclamar"    — CHICA, solo en mode=item con items libres.
  *
- * State lives in `useGuestPaymentFlow`; this component is presentational and
- * dispatches via `flow.goToBill()` / `flow.confirmPay()`. Owns local
- * `acked`/`nudge` UI state for the "I understand the table must be fully
- * paid" checkbox required when `mode !== "todo"`.
+ * Eliminado: Donut / progress bar grande. Sigue: checkbox acknowledgement con
+ * scroll-nudge, resumen tax/propina/total, CTA "Pagar tu parte".
  */
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
 import {
@@ -20,31 +20,23 @@ import {
   computeTotals,
   fmt,
   freeUnits,
+  initialsFor,
+  itemOwed,
   memberSubtotal,
   paidSubtotal,
   unclaimedItems,
+  unitsOf,
 } from "@/lib/guest-billing/split-math";
+import { expandRepeatedItems } from "@/lib/guest-billing/bill-display";
 import type {
   BillItem,
   RestaurantConfig,
   TableMember,
 } from "@/lib/guest-billing/types";
 
-import { Avatar, Ic, LogoMark } from "./_shared";
+import { Avatar, Ic, LogoMark, useBumpOnChange } from "./_shared";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
-
-const HEADS = {
-  item: { t: "Revisa y paga lo tuyo", s: "Confirma los platos que escogiste." },
-  equal: {
-    t: "Paga tu parte igual",
-    s: "Lo que falta se divide en partes iguales.",
-  },
-  todo: {
-    t: "Pagas toda la cuenta",
-    s: "Cubres la mesa completa de un solo.",
-  },
-} as const;
 
 /* ── smooth-scroll helper (some webviews ignore behavior:smooth) ── */
 
@@ -61,255 +53,199 @@ function smoothScrollTo(el: HTMLElement, to: number, ms = 440) {
   }, 16);
 }
 
-/* ── Apple-style progress ring ─────────────────────────────── */
+/* ── SummaryRow ────────────────────────────────────────────────── */
 
-function Donut({
-  pct,
-  size = 168,
+function SummaryRow({
   label,
-  sub,
-  tone = "pay",
+  value,
+  badge,
 }: {
-  pct: number;
-  size?: number;
-  label?: string;
-  sub?: string;
-  tone?: "pay" | "accent";
+  label: string;
+  value: string;
+  badge?: string;
 }) {
-  const p = Math.max(0, Math.min(100, pct));
-  const stroke = 14;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const color = tone === "accent" ? "var(--accent)" : "var(--pay)";
   return (
-    <div className="donut" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="donut-svg">
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke="var(--c-fill-2)"
-          strokeWidth={stroke}
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={c * (1 - p / 100)}
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          style={{
-            transition:
-              "stroke-dashoffset .9s cubic-bezier(.22,1,.36,1), stroke .3s",
-          }}
-        />
-      </svg>
-      <div className="donut-hole">
-        <div className="donut-pct">
-          {Math.round(p)}
-          <span>%</span>
-        </div>
-        {label && <div className="donut-lbl">{label}</div>}
-        {sub && <div className="donut-sub">{sub}</div>}
-      </div>
+    <div className="c-sum-row">
+      <span>
+        {label}
+        {badge && <span className="badge">{badge}</span>}
+      </span>
+      <span className="v">{value}</span>
     </div>
   );
 }
 
-/* ── PeopleStrip (used by Equal body) ───────────────────────── */
 
-function PeopleStrip({
-  members,
-  label = "En la mesa",
-  subtitle,
-  youName,
+function PersonItemLine({
+  item, claims, memberId, paid,
 }: {
-  members: readonly TableMember[];
-  label?: string;
-  subtitle?: (id: string) => string;
-  youName: string;
+  item: BillItem;
+  claims: Flow["state"]["claims"];
+  memberId: string;
+  paid: boolean;
 }) {
+  const u = unitsOf(claims, item.id, memberId);
+  const shared = Object.keys(claims[item.id] ?? {}).filter((id) => (claims[item.id]?.[id] ?? 0) > 0).length > 1;
+  const pct = item.qty > 0 ? Math.round((u / item.qty) * 100) : 0;
   return (
-    <div>
-      <div className="sec-label" style={{ marginBottom: 8 }}>
-        {label}
-        <span className="sec-count">{members.length}</span>
+    <div className={"pi" + (paid ? " pi-paid" : "")}>
+      <span className="e">{item.emoji}</span>
+      <span className="pn"><b>{item.displayLabel ?? item.name}</b></span>
+      {paid ? <span className="pi-paidtag"><Ic.check s={10} w={3} /> Pagado</span>
+        : shared ? <span className="portion">{pct}%</span>
+        : item.qty > 1 ? <span className="portion">×{u}</span> : null}
+      <span className="amt">{fmt(itemOwed(item, claims, memberId))}</span>
+    </div>
+  );
+}
+
+function PersonCard({ member, claims, config, displayName, paid, paidItemIds, items }: {
+  member: TableMember; claims: Flow["state"]["claims"]; config: RestaurantConfig;
+  displayName: string; paid: boolean; paidItemIds: readonly string[]; items: readonly BillItem[];
+}) {
+  const expanded = useMemo(() => expandRepeatedItems(items), [items]);
+  const claimed = expanded.filter((it) => unitsOf(claims, it.id, member.id) > 0);
+  const sub = memberSubtotal(items, claims, member.id);
+  const owed = computeTotals(sub, config, 0).total;
+  return (
+    <div className="person surfx" data-testid={`confirm-person-${member.id}`}>
+      <div className="person-head">
+        <Avatar member={member} size={44} />
+        <div className="nm">
+          <div className="t">{displayName}{member.isYou && displayName.trim() && <span className="tag-you">tú</span>}</div>
+          <div className="s">{claimed.length ? `${claimed.length} ítem${claimed.length > 1 ? "s" : ""}` : "Aún no escoge nada"}</div>
+        </div>
+        <div className={"owed" + (member.isYou ? " you-amt" : "")}>
+          {paid ? <span className="tag-paid"><Ic.check s={11} w={3} /> Pagado</span>
+            : <><div className="a">{fmt(owed)}</div><div className="l">con imp.</div></>}
+        </div>
       </div>
-      <div className="people-strip surfx">
-        {members.map((m) => (
-          <div key={m.id} className="ps-row">
-            <Avatar member={m} size={26} />
-            <span className="ps-name">
-              {m.isYou ? youName.trim() || "Tú" : m.name}
-              {m.isYou && youName.trim() && (
-                <span className="tag-you">tú</span>
-              )}
-            </span>
-            {subtitle && <span className="ps-sub">{subtitle(m.id)}</span>}
-          </div>
+      {claimed.length > 0 && (
+        <div className="person-items">
+          {claimed.map((it) => <PersonItemLine key={it.id} item={it} claims={claims} memberId={member.id} paid={paidItemIds.includes(it.id)} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PersonasEnMesa({ flow, items, members, config }: { flow: Flow; items: readonly BillItem[]; members: readonly TableMember[]; config: RestaurantConfig; }) {
+  const { state, youId } = flow;
+  const others = members.filter((m) => m.id !== youId);
+  if (others.length === 0) return null;
+  return (
+    <div data-testid="confirm-personas-mesa">
+      <div className="sec-label" style={{ marginBottom: 10 }}>Personas en la mesa</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {others.map((m) => (
+          <PersonCard key={m.id} member={m} claims={state.claims} config={config}
+            displayName={m.name} paid={state.paidIds.includes(m.id)}
+            paidItemIds={state.paidItemIds} items={items} />
         ))}
       </div>
     </div>
   );
 }
 
-/* ── ConfirmItem / ConfirmEqual / ConfirmTodo bodies ───────── */
-
-function ConfirmItem({
-  flow,
-  items,
-  members,
-}: {
-  flow: Flow;
-  items: readonly BillItem[];
-  members: readonly TableMember[];
-}) {
-  const { state } = flow;
-  const { claims, paidItemIds } = state;
-  const fullSub = billSubtotal(items);
-  const claimedVal = members.reduce(
-    (s, m) => s + memberSubtotal(items, claims, m.id),
-    0,
-  );
-  const paidVal = paidSubtotal(items, paidItemIds);
-  const coveredVal = Math.max(claimedVal, paidVal);
-  const unclaimedVal = Math.max(0, fullSub - coveredVal);
-  const pct = fullSub > 0 ? (coveredVal / fullSub) * 100 : 0;
-  const free = unclaimedItems(items, claims).filter(
-    (it) => !paidItemIds.includes(it.id),
-  );
-  const allClaimed = free.length === 0;
-
+function CardSinReclamar({ items, flow }: { items: readonly BillItem[]; flow: Flow; }) {
+  const { claims, paidItemIds } = flow.state;
+  const freeItems = unclaimedItems(items, claims).filter((it) => !paidItemIds.includes(it.id));
+  if (freeItems.length === 0) return null;
+  const expandedFree = useMemo(() => expandRepeatedItems(freeItems), [freeItems.map((i) => i.id).join(",")]);
   return (
     <>
-      <div className="confirm-progress surfx">
-        <Donut
-          pct={pct}
-          label="de la mesa"
-          tone={allClaimed ? "pay" : "accent"}
-        />
-        <div className="confirm-legend">
-          <div className="cl-row">
-            <span className="cl-dot ok" />
-            <span className="cl-k">Reclamado o pagado</span>
-            <span className="cl-v">{fmt(coveredVal)}</span>
-          </div>
-          <div className="cl-row">
-            <span className="cl-dot warn" />
-            <span className="cl-k">Falta</span>
-            <span className="cl-v">{fmt(unclaimedVal)}</span>
-          </div>
+      <div className="confirm-unclaimed unclaimed-card surfx" data-testid="confirm-card-falta">
+        <div className="uc-h"><Ic.bell s={16} /> Aún sin reclamar</div>
+        <div className="uc-list">
+          {expandedFree.map((it) => (
+            <div key={it.id} className="uc-item">
+              <span className="e">{it.emoji}</span>
+              <span className="nm">{it.displayLabel ?? it.name}</span>
+              <span className="amt">{fmt(freeUnits(it, claims) * it.unitPrice)}</span>
+            </div>
+          ))}
         </div>
       </div>
+      <div className="disclaimer">
+        <div className="disclaimer-em">😅</div>
+        <div><b>Tranqui:</b> puedes pagar lo tuyo ahora. Entre todos, la mesa debe quedar pagada antes de cerrar.</div>
+      </div>
+    </>
+  );
+}
 
-      {free.length > 0 && (
-        <div className="confirm-unclaimed unclaimed-card">
-          <div className="uc-h">
-            <Ic.bell s={16} /> Aún sin reclamar
+
+function ConfirmYoursCard({
+  flow, items, members, config, mode, derived,
+}: {
+  flow: Flow; items: readonly BillItem[]; members: readonly TableMember[];
+  config: RestaurantConfig; mode: "item" | "equal" | "todo";
+  derived: Flow["derived"];
+}) {
+  const { state, youId } = flow;
+  const youMember = members.find((m) => m.id === youId) ?? members[0];
+  const displayName = state.name.trim() || "P1";
+  const expanded = useMemo(() => expandRepeatedItems(items), [items]);
+  const myItems = expanded.filter(
+    (it) => itemOwed(it, state.claims, youId) > 0 && !state.paidItemIds.includes(it.id),
+  );
+  const fullSub = billSubtotal(items);
+  const paidSub = paidSubtotal(items, state.paidItemIds);
+  return (
+    <div className="confirm-card confirm-card-lg surfx" data-testid="confirm-card-lotuyo">
+      <div className="confirm-yours-head">
+        {youMember && (
+          <Avatar
+            member={{
+              ...youMember,
+              isYou: true,
+              initials: initialsFor(displayName),
+            }}
+            size={48}
+          />
+        )}
+        <div className="confirm-yours-info">
+          <div className="confirm-yours-name">{displayName} <span className="tag-you">tú</span></div>
+          <div className="s" style={{ fontSize: 13, color: "var(--c-ink-2)" }}>
+            {mode === "item" && myItems.length ? `${myItems.length} ítem${myItems.length > 1 ? "s" : ""}` : mode === "equal" ? `1 de ${state.people} · partes iguales` : "Toda la cuenta"}
           </div>
-          <div className="uc-list">
-            {free.map((it) => (
-              <div key={it.id} className="uc-item">
-                <span className="e">{it.emoji}</span>
-                <span className="nm">{it.name}</span>
-                <span className="amt">
-                  {fmt(freeUnits(it, claims) * it.unitPrice)}
-                </span>
-              </div>
-            ))}
-          </div>
+        </div>
+        <div className="confirm-yours-total">{fmt(derived.totals.total)}</div>
+      </div>
+      {mode === "item" && myItems.length > 0 && (
+        <div className="confirm-my-items">
+          {myItems.map((it) => (
+            <div key={it.id} className="confirm-my-row">
+              <span className="confirm-my-emoji">{it.emoji}</span>
+              <span className="confirm-my-name">{it.displayLabel ?? it.name}</span>
+              <span className="confirm-my-amt">{fmt(itemOwed(it, state.claims, youId))}</span>
+            </div>
+          ))}
         </div>
       )}
-
-      <div className="disclaimer">
-        <div className="disclaimer-em">😄</div>
-        <div>
-          <b>{allClaimed ? "¡Todo listo!" : "Tranqui:"}</b> puedes pagar lo
-          tuyo ahora. Entre todos, la mesa debe quedar pagada antes de cerrar.
-        </div>
+      {mode === "equal" && (
+        <p className="confirm-equal-note">
+          1 de {state.people} {state.people === 1 ? "persona" : "personas"} — partes iguales
+        </p>
+      )}
+      {mode === "todo" && (
+        <p className="confirm-todo-note">
+          {paidSub > 0.01 ? `Ya se pagó ${fmt(paidSub)} — cubres lo que falta.` : `Cuenta completa (${fmt(computeTotals(fullSub, config, 0).total)} con imp.).`}
+        </p>
+      )}
+      <div className="confirm-yours-breakdown c-sum-rows">
+        <SummaryRow label="Subtotal" value={fmt(derived.totals.subtotal)} />
+        <SummaryRow label={`IVA ${Math.round(config.ivaRate * 100)}%`} value={fmt(derived.totals.iva)} />
+        {config.serviceEnabled && <SummaryRow label="Servicio" badge={`${Math.round(config.serviceRate * 100)}%`} value={fmt(derived.totals.servicio)} />}
+        {derived.totals.propina > 0 && <SummaryRow label="Propina" value={fmt(derived.totals.propina)} />}
+        <hr className="c-sum-hair" />
+        <div className="c-sum-total-row"><span className="k">Total a pagar</span><span className="v" data-testid="confirm-total">{fmt(derived.totals.total)}</span></div>
       </div>
-    </>
+    </div>
   );
 }
 
-function ConfirmEqual({
-  flow,
-  members,
-  perPerson,
-  mesaTotal,
-  remainingPeople,
-}: {
-  flow: Flow;
-  members: readonly TableMember[];
-  perPerson: number;
-  mesaTotal: number;
-  remainingPeople: number;
-}) {
-  return (
-    <>
-      <div className="split-note surfx">
-        <div className="ico">
-          <Ic.users s={26} />
-        </div>
-        <div className="t">Se divide en partes iguales</div>
-        <div className="big">{fmt(perPerson)}</div>
-        <div className="s">
-          La cuenta completa ({fmt(mesaTotal)} con impuestos) se reparte entre{" "}
-          {remainingPeople}{" "}
-          {remainingPeople === 1 ? "persona" : "personas"}. No importa quién
-          pidió qué.
-        </div>
-      </div>
-      <PeopleStrip
-        members={members}
-        subtitle={() => "Parte igual"}
-        youName={flow.state.name}
-      />
-    </>
-  );
-}
-
-function ConfirmTodo({
-  yourTotal,
-  paidSub,
-  mesaTotal,
-}: {
-  yourTotal: number;
-  paidSub: number;
-  mesaTotal: number;
-}) {
-  const someonePaid = paidSub > 0.01;
-  return (
-    <>
-      <div className="split-note surfx">
-        <div className="ico">
-          <Ic.receipt s={26} />
-        </div>
-        <div className="t">Pagas toda la cuenta</div>
-        <div className="big">{fmt(yourTotal)}</div>
-        <div className="s">
-          {someonePaid
-            ? `Ya se pagó ${fmt(paidSub)} de la mesa — tú cubres lo que falta y queda en cero.`
-            : `Cubres la cuenta completa de la mesa (${fmt(mesaTotal)} con impuestos). Nadie más tiene que pagar.`}
-        </div>
-      </div>
-      <div className="disclaimer">
-        <div className="disclaimer-em">🎉</div>
-        <div>
-          <b>¡Qué generoso!</b> Con este pago la mesa queda saldada por
-          completo.
-        </div>
-      </div>
-    </>
-  );
-}
-
-/* ── ConfirmStage ──────────────────────────────────────────── */
+/* ── ConfirmStage ──────────────────────────────────────────────── */
 
 export interface ConfirmStageProps {
   flow: Flow;
@@ -332,16 +268,14 @@ export function ConfirmStage({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const ackRef = useRef<HTMLLabelElement | null>(null);
 
-  const head = HEADS[mode] ?? HEADS.item;
   const needsAck = mode !== "todo";
 
-  const fullSub = billSubtotal(items);
-  const mesaTotal = computeTotals(fullSub, config, 0).total;
-  const paidSub = paidSubtotal(items, state.paidItemIds);
+  // Bump animation on total change (used by CTA label)
+  const bump = useBumpOnChange(Math.round(derived.totals.total * 100));
+
 
   const tryPay = () => {
     if (needsAck && !acked) {
-      // Don't block with an error — guide the eye down to the missed checkbox.
       const c = scrollRef.current;
       const a = ackRef.current;
       if (c && a) {
@@ -367,33 +301,53 @@ export function ConfirmStage({
     >
       <div className="flowscreen">
         <div className="flow-scroll" ref={scrollRef}>
-          <div className="flow-brand">
-            <LogoMark size={28} />
-            <span>
-              {config.name} · Mesa {config.table}
-            </span>
+          {/* ── Header compacto ─────────────────────────────── */}
+          <div className="bill-head-compact glassx">
+            <div className="bill-head-row">
+              <LogoMark size={26} />
+              <span className="bill-head-venue">
+                {config.name} · Mesa {config.table}
+              </span>
+              <span className="live-pill-sm glassx">
+                <span className="dot" /> En vivo
+              </span>
+            </div>
           </div>
-          <h1 className="flow-title">{head.t}</h1>
-          <p className="flow-lede">{head.s}</p>
 
-          {mode === "equal" ? (
-            <ConfirmEqual
-              flow={flow}
-              members={members}
-              perPerson={derived.totals.total}
-              mesaTotal={mesaTotal}
-              remainingPeople={derived.remainingPeople}
+          {/* Thin progress line — decorative, cool but no Donut */}
+          <div
+            aria-hidden="true"
+            style={{
+              height: 3,
+              borderRadius: 2,
+              background: "var(--c-fill-2)",
+              margin: "0 0 18px",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${Math.min(100, derived.subtotal > 0 ? 100 : 0)}%`,
+                background: "var(--pay, var(--accent))",
+                borderRadius: 2,
+                transition: "width 0.6s cubic-bezier(.22,1,.36,1)",
+              }}
             />
-          ) : mode === "todo" ? (
-            <ConfirmTodo
-              yourTotal={derived.totals.total}
-              paidSub={paidSub}
-              mesaTotal={mesaTotal}
-            />
-          ) : (
-            <ConfirmItem flow={flow} items={items} members={members} />
+          </div>
+
+          <h1 className="flow-title" style={{ marginBottom: 4 }}>
+            Revisa y paga lo tuyo
+          </h1>
+{/* ── Lo tuyo unificado ── */}
+          <ConfirmYoursCard flow={flow} items={items} members={members} config={config} mode={mode} derived={derived} />
+
+          {mode === "item" && (
+            <PersonasEnMesa flow={flow} items={items} members={members} config={config} />
           )}
+          {mode === "item" && <CardSinReclamar items={items} flow={flow} />}
 
+          {/* ── Checkbox acknowledgement ───────────────────────── */}
           {needsAck && (
             <label
               ref={ackRef}
@@ -417,35 +371,25 @@ export function ConfirmStage({
               </span>
             </label>
           )}
-
-          <div className="confirm-yours surfx">
-            <div className="cy-k">
-              Tu parte
-              <small>
-                {state.name.trim() || "Invitado"} · Mesa {config.table}
-              </small>
-            </div>
-            <div className="cy-v">{fmt(derived.totals.total)}</div>
-          </div>
         </div>
 
+        {/* ── Footer CTA ─────────────────────────────────────── */}
         <div className="flow-foot">
           <button
             className={
-              "c-pay-btn" + (needsAck && !acked ? " is-locked" : "")
+              "c-pay-btn" +
+              (bump ? " bump" : "") +
+              (needsAck && !acked ? " is-locked" : "")
             }
             onClick={tryPay}
-            aria-disabled={needsAck && !acked}
+            aria-disabled={!derived.canPay || (needsAck && !acked)}
+            disabled={!derived.canPay}
             data-testid="confirm-pay-btn"
           >
-            <Ic.lock s={18} /> Pagar {fmt(derived.totals.total)}
+            <Ic.lock s={18} /> Pagar tu parte · {fmt(derived.totals.total)}
           </button>
-          <button
-            className="flow-secondary"
-            onClick={() => flow.goToBill()}
-            data-testid="confirm-back-btn"
-          >
-            Volver a editar
+          <button className="flow-secondary solid" onClick={() => flow.goToBill()} data-testid="confirm-back-btn">
+            ← Volver a editar
           </button>
         </div>
       </div>

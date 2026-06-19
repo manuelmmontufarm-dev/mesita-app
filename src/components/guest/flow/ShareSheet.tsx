@@ -8,7 +8,7 @@
 import { useState } from "react";
 
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
-import { fmt, lineTotal, round2 } from "@/lib/guest-billing/split-math";
+import { fmt, lineTotal, resolveRoster, round2 } from "@/lib/guest-billing/split-math";
 import type {
   BillItem,
   MemberId,
@@ -38,6 +38,11 @@ export function ShareSheet({ flow, items, members }: ShareSheetProps) {
 
   if (!item) return null;
   const qty = item.qty;
+  const displayMembers = resolveRoster(
+    members,
+    flow.state.name,
+    flow.youId,
+  );
 
   const toggle = (id: MemberId) =>
     setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -82,7 +87,7 @@ export function ShareSheet({ flow, items, members }: ShareSheetProps) {
 
         <div className="sheet-body">
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {members.map((m) => {
+            {displayMembers.map((m) => {
               const on = sel.includes(m.id);
               return (
                 <div
@@ -93,7 +98,7 @@ export function ShareSheet({ flow, items, members }: ShareSheetProps) {
                   data-testid={`share-pick-${m.id}`}
                 >
                   <Avatar member={m} size={36} />
-                  <span className="nm">{m.isYou ? "Tú" : m.name}</span>
+                  <span className="nm">{m.name}</span>
                   <span className="c-tick tick">
                     {on && <Ic.check s={14} w={2.6} />}
                   </span>
@@ -110,11 +115,11 @@ export function ShareSheet({ flow, items, members }: ShareSheetProps) {
               </div>
               <div className="portion-chips">
                 {sel.map((id) => {
-                  const m = members.find((mm) => mm.id === id) ?? null;
+                  const m = displayMembers.find((mm) => mm.id === id) ?? null;
                   return (
                     <span key={id} className="pchip">
                       <Avatar member={m} size={22} />
-                      {m?.isYou ? "Tú" : m?.name ?? "?"}
+                      {m?.name ?? "?"}
                       <b className="pp">{pct(id)}%</b>
                       <span
                         style={{

@@ -28,6 +28,8 @@ import {
   computeTotals,
   fmt,
   memberSubtotal,
+  resolveMemberDisplay,
+  resolveRoster,
   unitsOf,
 } from "@/lib/guest-billing/split-math";
 import type {
@@ -49,16 +51,6 @@ export interface WaitingSuccessStageProps {
 }
 
 /* ── helpers ────────────────────────────────────────────────────────────── */
-
-const FRAC_LABELS: Record<number, string> = {
-  2: "½",
-  3: "⅓",
-  4: "¼",
-};
-
-function fractionLabel(n: number): string {
-  return FRAC_LABELS[n] ?? `1/${n}`;
-}
 
 function unitLabel(units: number): string {
   if (Math.abs(units - 0.5) < 0.01) return "(½)";
@@ -137,10 +129,34 @@ function MesaProgressRing({
   );
 }
 
+function TodoChampionHero({
+  member,
+}: {
+  member: { initials?: string; hue?: number; isYou?: boolean };
+}) {
+  return (
+    <div className="ws-king-hero" data-testid="ws-todo-champion">
+      <span className="ws-king-crown" aria-hidden="true">
+        👑
+      </span>
+      <Avatar member={member} size={72} />
+      <span className="ws-king-scepter" aria-hidden="true">
+        🪄
+      </span>
+      <p className="ws-king-title">Rey de la mesa</p>
+      <p className="ws-king-sub">Pagaste TODO. Leyenda.</p>
+    </div>
+  );
+}
+
+const SUCCESS_QUIPS = [
+  "El mesero ya te admira.",
+  "Factura en camino — sin filas.",
+  "Mesa cerrada. Buen servicio.",
+  "Eso sí es pagar con estilo.",
+];
+
 function AnimatedCheckRing() {
-  // Two concentric pulse rings expand and fade out behind the check disc.
-  // The disc itself enters with a bouncy scale (handled by `.ws-disc-pop`
-  // in CSS) and the checkmark stroke draws after the disc lands.
   return (
     <div className="ws-check-wrap" aria-hidden="true">
       <span className="ws-pulse-ring ws-pulse-ring-1" />
@@ -336,10 +352,24 @@ export function WaitingSuccessStage({
     mesaTotal > 0.01
       ? Math.round(((mesaTotal - derived.remainingSub) / mesaTotal) * 100)
       : 100;
-  const perPersonEqual = mesaTotal / Math.max(1, people);
+
+  const displayMembers = resolveRoster(members, state.name, youId);
+  const youDisplay = resolveMemberDisplay(
+    displayMembers.find((m) => m.id === youId) ?? displayMembers[0],
+    state.name,
+    youId,
+  );
+
+  const remainingPeople = Math.max(1, people - paidIds.length);
 
   const owed = (id: MemberId): number => {
-    if (mode === "equal") return perPersonEqual;
+    if (mode === "equal") {
+      return computeTotals(
+        derived.remainingSub / remainingPeople,
+        config,
+        0,
+      ).total;
+    }
     const itemAmt = computeTotals(
       memberSubtotal(items, claims, id),
       config,
@@ -350,6 +380,11 @@ export function WaitingSuccessStage({
   };
 
   const displayName = state.name.trim() || latestReceipt(state)?.name || "tú";
+
+  const successQuip = useMemo(
+    () => SUCCESS_QUIPS[Math.floor(Math.random() * SUCCESS_QUIPS.length)] ?? SUCCESS_QUIPS[0],
+    [],
+  );
 
   /* ── expanded items for per-diner item list ───────────────────────────── */
 
@@ -376,7 +411,7 @@ export function WaitingSuccessStage({
     const memberMode = memberModeFor(memberId);
     if (memberMode === "todo") return "Toda la cuenta";
     if (memberMode === "equal") {
-      return `${fractionLabel(Math.max(1, people))} de la cuenta`;
+      return "Parte igual";
     }
     // item mode — build compact item list
     const claimed = expandedItems.filter(
@@ -426,14 +461,15 @@ export function WaitingSuccessStage({
 
           <div className="ws-pending-title">Pendientes de pago</div>
           {pendingMembers.map((m) => {
-            const name = m.isYou ? displayName : m.name;
+            const resolved = resolveMemberDisplay(m, state.name, youId);
+            const name = m.isYou ? resolved.name : m.name;
             return (
               <div
                 key={m.id}
                 className="ws-pending-row"
                 data-testid={`ws-pending-${m.id}`}
               >
-                <Avatar member={m} size={28} />
+                <Avatar member={resolved} size={32} />
                 <div className="ws-pending-info">
                   <span className="ws-pending-name">
                     {name}
@@ -454,9 +490,20 @@ export function WaitingSuccessStage({
 
   const successContent = (
     <div className="ws-success state-wrap completed">
-      <AnimatedCheckRing />
-      <div className="ok-title">¡Cuenta completada!</div>
-      <div className="completed-sub">La mesa quedó pagada en su totalidad.</div>
+      {mode === "todo" ? (
+        <TodoChampionHero member={youDisplay} />
+      ) : (
+        <AnimatedCheckRing />
+      )}
+      <div className="ok-title">
+        {mode === "todo" ? "¡Cuenta completada!" : "¡Mesa cerrada!"}
+      </div>
+      <div className="completed-sub">
+        {mode === "todo"
+          ? "Cerraste la mesa entera. Respeto total."
+          : "Entre todos lo lograron. Buen servicio."}
+      </div>
+      <p className="ws-success-quip">{successQuip}</p>
 
       <div className="completed-brand">
         <LogoMark size={30} />
@@ -474,14 +521,6 @@ export function WaitingSuccessStage({
           <Ic.instagram s={17} /> Síguenos en Instagram
         </button>
       </div>
-
-      <button
-        className="btn-again"
-        onClick={() => flow.reset({ initialTip: 0, initialPeople: 1 })}
-        data-testid="success-reset-btn"
-      >
-        <Ic.arrow s={16} /> Volver al inicio
-      </button>
       <div style={{ height: 84, flex: "0 0 auto" }} aria-hidden="true" />
     </div>
   );
@@ -508,7 +547,7 @@ export function WaitingSuccessStage({
               onClick={() => flow.goToBill()}
               data-testid="waiting-back-btn"
             >
-              <Ic.arrow s={16} /> Volver a la cuenta
+              <Ic.users s={16} /> Ver mesa
             </button>
           </div>
         </>

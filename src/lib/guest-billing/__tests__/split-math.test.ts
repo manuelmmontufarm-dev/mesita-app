@@ -83,9 +83,11 @@ describe("initialsFor", () => {
     expect(initialsFor(`${GUEST_PREFIX}10`)).toBe("P10");
   });
 
-  it("returns first character uppercased for real names", () => {
-    expect(initialsFor("Juanito")).toBe("J");
-    expect(initialsFor("ana")).toBe("A");
+  it("returns first two characters uppercased for real names", () => {
+    expect(initialsFor("Juanito")).toBe("JU");
+    expect(initialsFor("ana")).toBe("AN");
+    expect(initialsFor("manuel")).toBe("MA");
+    expect(initialsFor("María José")).toBe("MA");
   });
 });
 

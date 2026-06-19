@@ -21,6 +21,11 @@ import type {
   RestaurantConfig,
   TableMember,
 } from '@/lib/guest-billing';
+import {
+  AVATAR_HUE_YOU,
+  guestAvatarHue,
+  initialsFor,
+} from '@/lib/guest-billing/split-math';
 import { IVA_RATE, PROPINA_RATE } from '@/lib/constants/ecuador-tax';
 
 import '../customer.css';
@@ -67,7 +72,7 @@ export default function GuestBillPage({ params }: PageProps) {
       serviceRate: PROPINA_RATE,
       serviceEnabled: true,
       tipPresets: [0, 10, 15, 20],
-      defaultTip: 0,
+      defaultTip: 15,
     }),
     [restaurant?.name, table?.name],
   );
@@ -80,7 +85,7 @@ export default function GuestBillPage({ params }: PageProps) {
           id: guestUuid || 'you',
           name: displayName || `P${guestIndex || 1}`,
           initials: 'Tú',
-          hue: 160,
+          hue: AVATAR_HUE_YOU,
           isYou: true,
         },
       ];
@@ -88,8 +93,8 @@ export default function GuestBillPage({ params }: PageProps) {
     return allGuests.map((g, idx) => ({
       id: g.guestUuid,
       name: g.displayName || `P${idx + 1}`,
-      initials: (g.displayName || `P${idx + 1}`).slice(0, 2).toUpperCase(),
-      hue: (idx * 53) % 360,
+      initials: initialsFor(g.displayName || `P${idx + 1}`),
+      hue: g.guestUuid === guestUuid ? AVATAR_HUE_YOU : guestAvatarHue(idx),
       isYou: g.guestUuid === guestUuid,
     }));
   }, [allGuests, guestUuid, displayName, guestIndex]);
@@ -97,7 +102,7 @@ export default function GuestBillPage({ params }: PageProps) {
   const init: FlowInit = useMemo(
     () => ({
       initialMode: 'item',
-      initialTip: 0,
+      initialTip: 15,
       initialPeople: Math.max(1, allGuests.length || 1),
     }),
     [allGuests.length],

@@ -19,6 +19,8 @@ export interface BillItem {
   emoji?: string;
   qty: number;
   unitPrice: number;
+  displayIndex?: number;
+  displayLabel?: string;
 }
 
 export interface TableMember {

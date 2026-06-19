@@ -14,6 +14,7 @@ import type {
   RestaurantConfig,
   TableMember,
 } from '@/lib/guest-billing';
+import { guestAvatarHue, AVATAR_HUE_YOU } from '@/lib/guest-billing/split-math';
 import type { FlowInit, PaidPayload } from '@/hooks/useGuestPaymentFlow';
 
 import '../customer.css';
@@ -28,9 +29,9 @@ const DEMO_ITEMS: BillItem[] = [
 ];
 
 const DEMO_MEMBERS: TableMember[] = [
-  { id: 'you', name: 'Tú', initials: 'Tú', hue: 160, isYou: true },
-  { id: 'p2', name: 'P2', initials: 'P2', hue: 22 },
-  { id: 'p3', name: 'P3', initials: 'P3', hue: 280 },
+  { id: 'you', name: 'Tú', initials: 'Tú', hue: AVATAR_HUE_YOU, isYou: true },
+  { id: 'p2', name: 'P2', initials: 'P2', hue: guestAvatarHue(1) },
+  { id: 'p3', name: 'P3', initials: 'P3', hue: guestAvatarHue(2) },
 ];
 
 const DEMO_CONFIG: RestaurantConfig = {
@@ -43,13 +44,14 @@ const DEMO_CONFIG: RestaurantConfig = {
   serviceRate: 0.1,
   serviceEnabled: true,
   tipPresets: [0, 10, 15, 20],
-  defaultTip: 0,
+  defaultTip: 15,
 };
 
 const DEMO_INIT: FlowInit = {
   initialMode: 'item',
-  initialTip: 0,
+  initialTip: 15,
   initialPeople: 3,
+  initialPaidItemIds: ['locro'],
 };
 
 export default function DemoPayPage() {

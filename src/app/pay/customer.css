@@ -338,6 +338,10 @@
   box-shadow:0 8px 22px -8px rgba(26,158,98,.6);
   transition:transform .15s var(--ease), box-shadow .25s, opacity .2s;
 }
+.flow-foot .c-pay-btn {
+  flex-shrink: 0;
+  margin: 0;
+}
 .c-pay-btn:active { transform:translateY(1px) scale(.992); }
 .c-pay-btn:disabled { opacity:.42; box-shadow:none; filter:saturate(.4); }
 .pay-secure { display:flex; align-items:center; justify-content:center; gap:6px; margin-top:11px; font-size:12.5px; color:var(--c-ink-3); }
@@ -641,7 +645,10 @@
   border-radius:50%; color:#fff; font-weight:700; letter-spacing:-0.01em;
   box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.5);
 }
-.av.you { box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.7), 0 0 0 2px var(--accent-soft); }
+.av.you {
+  background: var(--pay);
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.7), 0 0 0 2px var(--accent-soft);
+}
 .av-stack { display:inline-flex; align-items:center; }
 .av-stack > * + * { margin-left:-6px; }
 .av-more {
@@ -698,6 +705,34 @@
 .todo-card {
   border-radius:22px; padding:22px 18px; text-align:center;
   display:flex; flex-direction:column; align-items:center; gap:6px;
+}
+.todo-payer-av {
+  position:relative;
+  margin-bottom:6px;
+}
+.todo-payer-crown {
+  position:absolute;
+  top:-14px;
+  left:50%;
+  transform:translateX(-50%) rotate(-8deg);
+  font-size:28px;
+  line-height:1;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.12));
+  z-index:2;
+}
+.todo-payer-badge {
+  position:absolute;
+  right:-4px;
+  bottom:-2px;
+  width:26px;
+  height:26px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  color:#fff;
+  background:var(--ok);
+  border:2px solid var(--c-card);
+  box-shadow:0 2px 8px rgba(30,158,99,.35);
 }
 .todo-ic {
   width:54px; height:54px; border-radius:16px;
@@ -1490,6 +1525,10 @@
   margin: -10px 0 0; text-wrap: pretty;
 }
 .flow-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
   padding: 14px 16px calc(16px + env(safe-area-inset-bottom,0px));
   border-top: 1px solid var(--c-sep);
   background: rgba(255,255,255,.82);
@@ -1497,13 +1536,14 @@
   backdrop-filter: blur(20px) saturate(180%);
 }
 .flow-secondary {
-  width: 100%; min-height: 50px; margin-top: 8px; border-radius: 16px;
-  font-size: 16px; font-weight: 600; color: var(--accent-strong);
+  width: 100%; min-height: 48px; border-radius: 16px;
+  font-size: 15px; font-weight: 600; color: var(--accent-strong);
   background: transparent;
   display: flex; align-items: center; justify-content: center; gap: 8px;
+  flex-shrink: 0;
 }
 .flow-secondary:active { background: var(--c-fill); }
-.flow-secondary.solid { background: var(--c-fill-2); color: var(--c-ink); margin-top: 0; }
+.flow-secondary.solid { background: var(--c-fill-2); color: var(--c-ink); }
 .flow-secondary.solid:active { background: var(--c-sep); }
 
 /* Apple-style progress donut */
@@ -1952,6 +1992,10 @@
   margin: -10px 0 0; text-wrap: pretty;
 }
 .flow-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
   padding: 14px 16px calc(16px + env(safe-area-inset-bottom,0px));
   border-top: 1px solid var(--c-sep);
   background: rgba(255,255,255,.82);
@@ -1959,13 +2003,14 @@
   backdrop-filter: blur(20px) saturate(180%);
 }
 .flow-secondary {
-  width: 100%; min-height: 50px; margin-top: 8px; border-radius: 16px;
-  font-size: 16px; font-weight: 600; color: var(--accent-strong);
+  width: 100%; min-height: 48px; border-radius: 16px;
+  font-size: 15px; font-weight: 600; color: var(--accent-strong);
   background: transparent;
   display: flex; align-items: center; justify-content: center; gap: 8px;
+  flex-shrink: 0;
 }
 .flow-secondary:active { background: var(--c-fill); }
-.flow-secondary.solid { background: var(--c-fill-2); color: var(--c-ink); margin-top: 0; }
+.flow-secondary.solid { background: var(--c-fill-2); color: var(--c-ink); }
 .flow-secondary.solid:active { background: var(--c-sep); }
 
 /* Apple-style progress donut */
@@ -2307,6 +2352,75 @@
   letter-spacing: -0.03em;
   color: var(--c-ink);
   font-variant-numeric: tabular-nums;
+}
+.bill-head-paid-hint {
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--c-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Equal-split share meter */
+.equal-share-visual {
+  margin-top: 12px;
+  padding: 18px 16px 14px;
+  border-radius: 22px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  text-align: center;
+}
+.equal-share-avatars {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.equal-share-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 36px;
+}
+.equal-share-more {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--c-ink-2);
+  background: var(--c-fill-2);
+  border: 1.5px solid var(--c-sep);
+}
+.equal-share-bar {
+  display: grid;
+  gap: 3px;
+  height: 8px;
+  border-radius: 100px;
+  overflow: hidden;
+  margin: 0 auto;
+  max-width: 280px;
+}
+.equal-share-seg {
+  background: var(--accent-soft);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(47,179,126,.22);
+}
+.equal-share-amt {
+  margin-top: 12px;
+  font-size: 28px;
+  font-weight: 780;
+  letter-spacing: -0.03em;
+  color: var(--c-ink);
+  font-variant-numeric: tabular-nums;
+}
+.equal-share-copy {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-ink-2);
 }
 
 /* Item number chip */
@@ -2867,6 +2981,110 @@ html.has-receipt-peek .ws-wait-foot {
   font-weight: 600;
   color: var(--c-ink-2);
 }
+
+/* Pending payers list (Gracias) */
+.ws-pending-list {
+  border-radius: 22px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.ws-pending-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-ink-2);
+  margin-bottom: 12px;
+}
+.ws-pending-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--c-sep);
+}
+.ws-pending-row:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+.ws-pending-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ws-pending-name {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--c-ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ws-pending-items {
+  font-size: 13px;
+  color: var(--c-ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-pending-amt {
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--c-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Todo champion hero (cuenta completada) */
+.ws-king-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 4px;
+  padding-top: 8px;
+}
+.ws-king-crown {
+  font-size: 36px;
+  line-height: 1;
+  transform: rotate(-6deg);
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,.12));
+}
+.ws-king-scepter {
+  position: absolute;
+  right: calc(50% - 56px);
+  bottom: 52px;
+  font-size: 22px;
+  transform: rotate(18deg);
+  opacity: 0.9;
+}
+.ws-king-title {
+  margin: 8px 0 0;
+  font-size: 26px;
+  font-weight: 780;
+  letter-spacing: -0.03em;
+  color: var(--c-ink);
+}
+.ws-king-sub {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-ink-2);
+}
+.ws-success-quip {
+  margin: 12px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-strong);
+  text-align: center;
+  max-width: 280px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ws-reg-badge { animation: none; }
   .ws-mesa-ring-fill { transition: none; }

@@ -48,6 +48,24 @@ export const Ic = {
       <path d="M16 6.2A3 3 0 0118 12M21 19c0-2.2-1.3-3.8-3-4.5" />
     </svg>
   ),
+  scale: ({ s = 48 }: IconProps) => (
+    <svg
+      viewBox="0 0 24 24"
+      width={s}
+      height={s}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 3v18" />
+      <path d="M5 7h14" />
+      <path d="M3 7l2-3h2l-2 3zM19 7l-2-3h-2l2 3z" />
+      <path d="M4 17h6l-1 4H5l-1-4zM14 17h6l-1 4h-4l-1-4z" />
+    </svg>
+  ),
   receipt: ({ s = 19 }: IconProps) => (
     <svg
       viewBox="0 0 24 24"
@@ -331,6 +349,48 @@ export function AvatarStack({
           +{extra}
         </span>
       )}
+    </div>
+  );
+}
+
+/* ── equal-split visual (shared segments + avatars) ─────────── */
+
+export function EqualShareVisual({
+  members,
+  people,
+  perPersonLabel,
+}: {
+  members: readonly TableMember[];
+  people: number;
+  perPersonLabel: string;
+}) {
+  const slots = Math.max(1, people);
+  const shownMembers = members.slice(0, slots);
+  const extraPeople = Math.max(0, slots - shownMembers.length);
+
+  return (
+    <div className="equal-share-visual" aria-hidden="true">
+      <div className="equal-share-avatars">
+        {shownMembers.map((m) => (
+          <div key={m.id} className="equal-share-slot">
+            <Avatar member={m} size={32} />
+          </div>
+        ))}
+        {extraPeople > 0 && (
+          <div className="equal-share-slot">
+            <span className="equal-share-more">+{extraPeople}</span>
+          </div>
+        )}
+      </div>
+      <div className="equal-share-bar" style={{ gridTemplateColumns: `repeat(${slots}, 1fr)` }}>
+        {Array.from({ length: slots }, (_, i) => (
+          <span key={i} className="equal-share-seg" />
+        ))}
+      </div>
+      <div className="equal-share-amt">{perPersonLabel}</div>
+      <p className="equal-share-copy">
+        {slots} persona{slots !== 1 ? "s" : ""} · lo mismo para cada quien
+      </p>
     </div>
   );
 }

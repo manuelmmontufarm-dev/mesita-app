@@ -1,15 +1,11 @@
 "use client";
 
 /**
- * GuestBillFlow — Step 3 integration scaffold.
+ * GuestBillFlow — integration shell for the customer payment flow.
  *
- * Mounts the `useGuestPaymentFlow` state machine and routes to a placeholder
- * component per stage. The placeholders are intentionally minimal: they expose
- * the current state, derived totals, selected mode, active tab, and provide
- * just enough controls (buttons / inputs) to manually drive the flow forward.
- *
- * Step 4 will replace each placeholder with the pixel-faithful screen from
- * `design_handoff_customer/customer/{bill,screens}.jsx`.
+ * Mounts the `useGuestPaymentFlow` state machine and routes to the correct
+ * stage component. The ReceiptDrawer is rendered ONCE at this level so it
+ * survives the Waiting→Success stage transition without unmounting.
  */
 
 import {
@@ -22,11 +18,10 @@ import {
 
 import { BillStage } from "./BillStage";
 import { ConfirmStage } from "./ConfirmStage";
-import { MesaStage } from "./MesaStage";
 import { PaymentStage } from "./PaymentStage";
+import { ReceiptDrawer } from "./ReceiptDrawer";
 import { ShareSheet } from "./ShareSheet";
-import { SuccessStage } from "./SuccessStage";
-import { WaitingStage } from "./WaitingStage";
+import { WaitingSuccessStage } from "./WaitingSuccessStage";
 import { Ic, LogoMark, useBumpOnChange } from "./_shared";
 import {
   type FlowInit,
@@ -104,34 +99,56 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
   }, [externalLoading, externalError]);
 
   const stageProps: StageProps = { flow, items, members, config };
+  const stage = flow.state.stage;
+  const receiptDrawer =
+    flow.state.receipts.length > 0 ? (
+      <ReceiptDrawer receipts={flow.state.receipts} config={config} />
+    ) : null;
 
-  switch (flow.state.stage) {
+  useEffect(() => {
+    document.documentElement.classList.toggle(
+      "has-receipt-peek",
+      flow.state.receipts.length > 0,
+    );
+    return () => document.documentElement.classList.remove("has-receipt-peek");
+  }, [flow.state.receipts.length]);
+
+  // Waiting and Success share a single WaitingSuccessStage so the component
+  // root never unmounts during the transition. ReceiptDrawer is also kept
+  // alive here — it does not re-mount when the inner phase flips.
+  if (stage === "waiting" || stage === "success") {
+    return (
+      <>
+        <div className="cust-root cust-app" data-testid="guest-bill-flow" data-stage={stage}>
+          <WaitingSuccessStage {...stageProps} />
+        </div>
+        {receiptDrawer}
+      </>
+    );
+  }
+
+  switch (stage) {
     case "loading":
-      return <LoadingStage {...stageProps} />;
+      return (<>{<LoadingStage {...stageProps} />}{receiptDrawer}</>);
     case "error":
-      return <ErrorStage {...stageProps} externalError={externalError ?? null} />;
+      return (<><ErrorStage {...stageProps} externalError={externalError ?? null} />{receiptDrawer}</>);
     case "bill":
-      return <BillShellStage {...stageProps} />;
+      return (<><BillShellStage {...stageProps} />{receiptDrawer}</>);
     case "confirm":
-      return <ConfirmStage {...stageProps} />;
+      return (<><ConfirmStage {...stageProps} />{receiptDrawer}</>);
     case "payment":
-      return <PaymentStage {...stageProps} />;
-    case "waiting":
-      return <WaitingStage {...stageProps} />;
-    case "success":
-      return <SuccessStage {...stageProps} />;
+      return (<><PaymentStage {...stageProps} />{receiptDrawer}</>);
   }
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
- * BillShellStage — pixel-faithful chrome around BillStage / MesaStage.
+ * BillShellStage — pixel-faithful chrome around BillStage.
  * Ported from `design_handoff_customer/customer/app.jsx` shell section
- * (sticky header + segmented tabs + sticky bottom pay dock).
+ * (sticky header + sticky bottom pay dock).
  * ────────────────────────────────────────────────────────────────────────── */
 
 function BillShellStage({ flow, items, members, config }: StageProps) {
   const { state, derived } = flow;
-  const tab = state.tab;
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [atBottom, setAtBottom] = useState(false);
@@ -144,12 +161,6 @@ function BillShellStage({ flow, items, members, config }: StageProps) {
     setHeadCompact(el.scrollTop > 16);
   };
 
-  // Reset chrome state when the tab flips so the dock re-collapses correctly.
-  useEffect(() => {
-    setAtBottom(false);
-    setHeadCompact(false);
-  }, [tab]);
-
   // Measure whether the content is actually overflowing — if not, expand the
   // dock immediately (no scroll needed). Re-measure on every state mutation
   // that changes content height.
@@ -157,7 +168,6 @@ function BillShellStage({ flow, items, members, config }: StageProps) {
     const el = scrollRef.current;
     setScrollable(el ? el.scrollHeight > el.clientHeight + 12 : false);
   }, [
-    tab,
     state.mode,
     state.claims,
     state.people,
@@ -174,7 +184,6 @@ function BillShellStage({ flow, items, members, config }: StageProps) {
       className="cust-root cust-app"
       data-testid="guest-bill-flow"
       data-stage="bill"
-      data-tab={tab}
     >
       {/* sticky header */}
       <div className={"cust-head" + (headCompact ? " compact" : "")}>
@@ -194,58 +203,25 @@ function BillShellStage({ flow, items, members, config }: StageProps) {
             En vivo
           </span>
         </div>
-        <div className="head-title">
-          {tab === "cuenta" ? "Tu cuenta" : "La mesa"}
-        </div>
-        <div className="tabseg glassx" role="tablist">
-          <button
-            className={tab === "cuenta" ? "on" : ""}
-            onClick={() => flow.setTab("cuenta")}
-            role="tab"
-            aria-selected={tab === "cuenta"}
-            data-testid="shell-tab-cuenta"
-          >
-            <Ic.receipt s={16} /> Cuenta
-          </button>
-          <button
-            className={tab === "mesa" ? "on" : ""}
-            onClick={() => flow.setTab("mesa")}
-            role="tab"
-            aria-selected={tab === "mesa"}
-            data-testid="shell-tab-mesa"
-          >
-            <Ic.users s={16} /> Mesa{" "}
-            <span className="cnt">{state.people}</span>
-          </button>
-        </div>
+        <div className="head-title">Total por pagar</div>
       </div>
 
-      {/* scrollable tab body */}
+      {/* scrollable bill body */}
       <div
         className="cust-scroll"
-        key={tab}
         ref={scrollRef}
         onScroll={handleScroll}
       >
-        {tab === "cuenta" ? (
-          <BillStage
-            flow={flow}
-            items={items}
-            members={members}
-            config={config}
-          />
-        ) : (
-          <MesaStage
-            flow={flow}
-            items={items}
-            members={members}
-            config={config}
-          />
-        )}
+        <BillStage
+          flow={flow}
+          items={items}
+          members={members}
+          config={config}
+        />
       </div>
 
       {/* sticky bottom pay dock */}
-      <div className={"c-dock " + (dockExpanded ? "dock-full" : "dock-mini")}>
+      <div className={"c-dock " + (dockExpanded ? "dock-full" : "dock-mini") + (flow.state.receipts.length > 0 ? " has-receipt-dock" : "")}>
         <div className="dock-top">
           <div className="dock-k">
             Tu parte
@@ -278,74 +254,39 @@ function BillShellStage({ flow, items, members, config }: StageProps) {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
- * Placeholder stages. Each is a diagnostic harness so a human (or e2e test)
- * can manually advance the state machine. Step 4 replaces these.
+ * Loading & Error stages — polished, customer-facing.
+ *
+ * - Loading uses shimmer-bone skeleton rows that mimic the BillItemRow layout
+ *   so the eye lands on what's coming, not a lonely spinner.
+ * - Error uses an emoji + friendly Spanish copy + a single retry CTA wired to
+ *   `flow.loadStart()`. The retry preserves form data because we only reset
+ *   the load lifecycle, never the form state.
  * ────────────────────────────────────────────────────────────────────────── */
-
-function Shell({
-  title,
-  flow,
-  children,
-}: {
-  title: string;
-  flow: Flow;
-  children: React.ReactNode;
-}) {
-  const { state, derived } = flow;
-  return (
-    <div
-      data-testid="guest-bill-flow"
-      data-stage={state.stage}
-      style={{
-        padding: 16,
-        maxWidth: 480,
-        margin: "0 auto",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-      }}
-    >
-      <header style={{ marginBottom: 16 }}>
-        <p style={{ fontSize: 12, color: "#666", margin: 0 }}>Stage</p>
-        <h2 style={{ margin: "2px 0 0", fontSize: 20 }}>{title}</h2>
-        <dl
-          style={{
-            display: "grid",
-            gridTemplateColumns: "auto 1fr",
-            gap: "2px 12px",
-            fontSize: 12,
-            margin: "8px 0 0",
-            color: "#444",
-          }}
-        >
-          <dt>mode</dt>
-          <dd data-testid="flow-mode" style={{ margin: 0 }}>
-            {state.mode}
-          </dd>
-          <dt>tab</dt>
-          <dd data-testid="flow-tab" style={{ margin: 0 }}>
-            {state.tab}
-          </dd>
-          <dt>subtotal</dt>
-          <dd style={{ margin: 0 }}>${derived.subtotal.toFixed(2)}</dd>
-          <dt>total</dt>
-          <dd data-testid="flow-total" style={{ margin: 0 }}>
-            ${derived.totals.total.toFixed(2)}
-          </dd>
-        </dl>
-      </header>
-      <section>{children}</section>
-    </div>
-  );
-}
 
 function LoadingStage({ flow }: StageProps) {
   return (
-    <Shell title="Loading" flow={flow}>
-      <p>Fetching bill…</p>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button onClick={() => flow.loadSuccess()}>force success</button>
-        <button onClick={() => flow.loadError()}>force error</button>
+    <div
+      className="cust-root cust-app"
+      data-testid="guest-bill-flow"
+      data-stage={flow.state.stage}
+    >
+      <div className="load-stage">
+        <div className="c-load-spinner" aria-hidden="true" />
+        <div className="load-title">Cargando tu cuenta…</div>
+        <div className="skeleton-list" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="skel-row">
+              <span className="skel-emoji" />
+              <span className="skel-lines">
+                <span className="skel-bar" />
+                <span className="skel-bar short" />
+              </span>
+              <span className="skel-price" />
+            </div>
+          ))}
+        </div>
       </div>
-    </Shell>
+    </div>
   );
 }
 
@@ -354,12 +295,29 @@ function ErrorStage({
   externalError,
 }: StageProps & { externalError: string | null }) {
   return (
-    <Shell title="Error" flow={flow}>
-      <p style={{ color: "#b00020" }}>
-        {externalError ?? "Could not load the bill."}
-      </p>
-      <button onClick={() => flow.loadStart()}>retry</button>
-    </Shell>
+    <div
+      className="cust-root cust-app"
+      data-testid="guest-bill-flow"
+      data-stage={flow.state.stage}
+    >
+      <div className="err-stage" role="alert" aria-live="polite">
+        <span className="err-emoji" aria-hidden="true">
+          😕
+        </span>
+        <div className="err-title">Ay, no pudimos cargar tu cuenta</div>
+        <div className="err-sub">
+          {externalError ??
+            "Algo falló al traer los datos de la mesa. Intenta otra vez."}
+        </div>
+        <button
+          className="err-retry"
+          onClick={() => flow.loadStart()}
+          data-testid="error-retry-btn"
+        >
+          <Ic.arrow s={17} /> Intentar de nuevo
+        </button>
+      </div>
+    </div>
   );
 }
 

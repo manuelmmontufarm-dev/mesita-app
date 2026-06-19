@@ -100,7 +100,7 @@ export interface FlowState {
   paidItemIds: ItemId[];
   sharePicker: boolean;
   shareItem: ItemId | null;
-  receipt: Receipt | null;
+  receipts: Receipt[];
   /** Last method + eInvoice seen from PaymentScreen, kept for receipt building. */
   lastMethod: PaymentMethod;
   lastEInvoice: EInvoicePayload | null;
@@ -115,6 +115,7 @@ export interface FlowInit {
   initialClaims?: Claims;
   initialPaidIds?: MemberId[];
   initialPaidItemIds?: ItemId[];
+  initialReceipts?: Receipt[];
 }
 
 export function createInitialState(init: FlowInit): FlowState {
@@ -131,7 +132,7 @@ export function createInitialState(init: FlowInit): FlowState {
     paidItemIds: init.initialPaidItemIds ?? [],
     sharePicker: false,
     shareItem: null,
-    receipt: null,
+    receipts: init.initialReceipts ?? [],
     lastMethod: "datafast",
     lastEInvoice: null,
   };
@@ -251,7 +252,7 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
       return {
         ...state,
         stage: "waiting",
-        receipt: action.receipt,
+        receipts: [...state.receipts, action.receipt],
         paidIds,
         paidItemIds,
       };
@@ -305,7 +306,7 @@ export function deriveTotals(
   );
   const subtotal =
     state.mode === "equal"
-      ? remainingSub / Math.max(1, state.people)
+      ? remainingSub / remainingPeople
       : state.mode === "todo"
         ? remainingSub
         : myUnpaidSub;
@@ -374,7 +375,11 @@ export function buildReceipt(args: {
     how = `División en partes iguales · 1 de ${state.people}`;
   } else {
     lineItems = items
-      .filter((it) => unitsOf(state.claims, it.id, youId) > 0)
+      .filter(
+        (it) =>
+          unitsOf(state.claims, it.id, youId) > 0 &&
+          !state.paidItemIds.includes(it.id),
+      )
       .map((it) => ({
         name: it.name,
         emoji: it.emoji,
@@ -420,6 +425,15 @@ export function itemsToMarkPaid(
       .map((it) => it.id);
   }
   return [];
+}
+
+export function latestReceipt(state: FlowState): Receipt | null {
+  const n = state.receipts.length;
+  return n > 0 ? state.receipts[n - 1]! : null;
+}
+
+export function receiptsTotal(receipts: readonly Receipt[]): number {
+  return round2(receipts.reduce((s, r) => s + r.amount, 0));
 }
 
 /* ---------------- React hook ---------------- */

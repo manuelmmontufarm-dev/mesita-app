@@ -1,28 +1,44 @@
 "use client";
 
 /**
- * BillStage — pixel-faithful port of the "Cuenta" tab from
- * `design_handoff_customer/customer/bill.jsx` (BillScreen + BillItemRow +
- * BillListRow), plus the NameField from `ui.jsx` and the SharePicker from
- * `sheets.jsx`.
+ * BillStage — nueva versión del paso "Cuenta" del flujo de pago al cliente.
  *
- * State lives in `useGuestPaymentFlow`; this component is presentational and
- * dispatches via the `flow` API. Renders the scrollable inner content of the
- * Cuenta tab only — the sticky header, segmented tabs, and bottom pay dock
- * are owned by `GuestBillFlow` (the chrome shell).
+ * Cambios vs. versión anterior:
+ *   - Header compacto autónomo (sin tab Mesa — el shell lo suprimió).
+ *   - SplitModeSelector inline de 3 opciones.
+ *   - Items numerados con displayIndex/displayLabel (expandRepeatedItems).
+ *   - AvatarStack de claimants visible bajo cada ítem solo en mode=item.
+ *   - Badge "Pagado" + texto tachado + lock icon cuando isItemPaid().
+ *   - Tip wired a flow.state.tip / flow.setTip.
+ *   - CTA inferior via flow.goToConfirm() / derived.canPay.
+ *
+ * BillItemRow se coloca en este mismo archivo (helper interno nombrado) para
+ * mantener cohesión: los tests existentes van contra la lógica pura
+ * (split-math / bill-display), no contra esta UI. Si en el futuro se necesita
+ * reusar BillItemRow desde otro stage se puede extraer sin romper nada.
+ *
+ * DECISIÓN DE TOTALES: El header muestra el saldo restante de mesa
+ * (`computeTotals(derived.remainingSub, config, 0).total`) — baja cuando
+ * alguien paga ítems. El dock sigue mostrando "Tu parte".
  */
 
 import { useEffect, useMemo, useState } from "react";
 
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
 import {
+  AVATAR_HUE_YOU,
+  billSubtotal,
   claimantsOf,
+  computeTotals,
   fmt,
   freeUnits,
   initialsFor,
+  isItemPaid,
   itemOwed,
   lineTotal,
   paidSubtotal,
+  resolveMemberDisplay,
+  resolveRoster,
   unclaimedItems,
   unitsOf,
 } from "@/lib/guest-billing/split-math";
@@ -31,10 +47,13 @@ import type {
   RestaurantConfig,
   TableMember,
 } from "@/lib/guest-billing/types";
+import { expandRepeatedItems } from "@/lib/guest-billing/bill-display";
 
-import { Avatar, AvatarStack, Ic } from "./_shared";
+import { Avatar, AvatarStack, EqualShareVisual, Ic, LogoMark } from "./_shared";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
+
+/* ── constantes de texto ─────────────────────────────────────── */
 
 const NAME_PLACEHOLDERS = [
   "Ej: Juanito",
@@ -52,12 +71,12 @@ const COPY = {
 };
 
 const SPLIT_MODES = [
-  { k: "item", label: "Lo mío", icon: Ic.split },
-  { k: "equal", label: "Por igual", icon: Ic.users },
-  { k: "todo", label: "Todo", icon: Ic.receipt },
-] as const;
+  { k: "item" as const, label: "Lo mío", icon: Ic.split },
+  { k: "equal" as const, label: "Por iguales", icon: Ic.users },
+  { k: "todo" as const, label: "Todo", icon: Ic.receipt },
+];
 
-/* ── NameField with rotating placeholder ─────────────────────── */
+/* ── NameField ───────────────────────────────────────────────── */
 
 function NameField({
   value,
@@ -104,7 +123,11 @@ function NameField({
         />
         {value.trim() ? (
           <Avatar
-            member={{ initials: initialsFor(value), hue: 14, isYou: true }}
+            member={{
+              initials: initialsFor(value),
+              hue: AVATAR_HUE_YOU,
+              isYou: true,
+            }}
             size={34}
           />
         ) : null}
@@ -118,9 +141,17 @@ function NameField({
   );
 }
 
-/* ── Item rows ───────────────────────────────────────────────── */
+/* ── BillItemRow ─────────────────────────────────────────────── */
+//
+// Renderiza un ítem de la cuenta con:
+//   - Chip "#N" (displayIndex) monoespacio a la izquierda.
+//   - Emoji + displayLabel (fallback a name).
+//   - AvatarStack de claimants visible solo en mode=item.
+//   - Precio a la derecha.
+//   - Badge "Pagado" + lock + texto tachado cuando isItemPaid.
+//   - Tap solo interactivo en mode=item y cuando no está pagado.
 
-function BillItemRow({
+export function BillItemRow({
   item,
   flow,
   members,
@@ -136,13 +167,14 @@ function BillItemRow({
   const { state, youId } = flow;
   const yours = unitsOf(state.claims, item.id, youId);
   const free = freeUnits(item, state.claims);
-  const others = claimantsOf(state.claims, item.id, members).filter(
-    (id) => id !== youId,
-  );
+  const claimants = claimantsOf(state.claims, item.id, members);
   const mine = yours > 0;
+  const shared = claimants.length > 1;
   const interactive = mode === "item" && !paid;
   const myAmt = itemOwed(item, state.claims, youId);
-  const shared = others.length + (mine ? 1 : 0) > 1;
+
+  const displayIndex = item.displayIndex ?? null;
+  const displayLabel = item.displayLabel ?? item.name;
 
   const cls =
     "c-item" +
@@ -158,46 +190,77 @@ function BillItemRow({
       aria-pressed={interactive ? mine : undefined}
       data-testid={`bill-item-${item.id}`}
     >
-      {paid ? (
-        <span className="c-tick paid-tick">
-          <Ic.check s={16} w={2.8} />
+      {/* Número siempre visible en círculo */}
+      {displayIndex !== null ? (
+        <span
+          className={
+            "c-tick" +
+            (paid ? " paid-tick on" : mine && interactive ? " on" : "")
+          }
+          aria-label={
+            paid
+              ? `Ítem ${displayIndex} pagado`
+              : mine
+                ? `Ítem ${displayIndex} escogido`
+                : `Ítem ${displayIndex}`
+          }
+        >
+          <span className="c-tick-num">{displayIndex}</span>
         </span>
-      ) : mode === "item" ? (
-        <span className="c-tick">{mine && <Ic.check s={16} w={2.7} />}</span>
       ) : (
-        <span className="c-item-emoji">{item.emoji}</span>
+        paid ? (
+          <span className="c-tick paid-tick on" aria-label="Pagado">
+            <span className="c-tick-num">✓</span>
+          </span>
+        ) : mode === "item" ? (
+          <span className={"c-tick" + (mine ? " on" : "")}>
+            <span className="c-tick-num">·</span>
+          </span>
+        ) : (
+          <span className="c-item-emoji">{item.emoji}</span>
+        )
       )}
+
       <div className="c-item-main">
-        <div className="c-item-name">{item.name}</div>
+        {/* Nombre con emoji inline */}
+        <div className={"c-item-name" + (paid ? " struck" : "")}>
+          {item.emoji && <span className="c-item-emoji-inline">{item.emoji} </span>}
+          {displayLabel}
+          {paid && (
+            <span className="paid-lock" aria-label="Pagado">
+              <Ic.lock s={13} />
+            </span>
+          )}
+        </div>
+
+        {/* Fila de subtexto: badge pagado O claimants + estado */}
         <div className="c-item-sub">
           {paid ? (
             <span className="paid-tag">Pagado</span>
-          ) : mode === "item" ? (
+          ) : (
             <>
-              {others.length > 0 && (
+              {mode === "item" && claimants.length > 0 && (
                 <AvatarStack
-                  ids={
-                    shared && mine
-                      ? claimantsOf(state.claims, item.id, members)
-                      : others
-                  }
+                  ids={claimants}
                   roster={members}
                   size={20}
                   max={4}
                 />
               )}
-              {shared && <span className="shared-tag">compartido</span>}
-              {free > 0.001 && !mine && (
+              {mode === "item" && shared && (
+                <span className="shared-tag">compartido</span>
+              )}
+              {mode === "item" && free > 0.001 && !mine && claimants.length === 0 && (
                 <span className="free-tag">
                   <span className="dot" /> Toca para escogerlo
                 </span>
               )}
             </>
-          ) : (
-            <span>{item.note}</span>
           )}
         </div>
       </div>
+
+      {/* Precio a la derecha */}
       <div className="c-item-right">
         <span className={"c-item-price" + (paid ? " struck" : "")}>
           {fmt(lineTotal(item))}
@@ -206,67 +269,6 @@ function BillItemRow({
           <span className="c-item-yourshare">tú · {fmt(myAmt)}</span>
         )}
       </div>
-    </div>
-  );
-}
-
-function BillListRow({
-  item,
-  flow,
-  members,
-  paid,
-}: {
-  item: BillItem;
-  flow: Flow;
-  members: readonly TableMember[];
-  paid: boolean;
-}) {
-  const claimants = claimantsOf(flow.state.claims, item.id, members);
-  const shared = claimants.length > 1;
-  const first = claimants.length
-    ? (members.find((m) => m.id === claimants[0]) ?? null)
-    : null;
-  return (
-    <div className={"c-bl-row" + (paid ? " paid" : "")}>
-      <span className="c-bl-emoji">
-        {paid ? (
-          <span className="bl-paidtick">
-            <Ic.check s={13} w={3} />
-          </span>
-        ) : (
-          item.emoji
-        )}
-      </span>
-      <div className="bl-main">
-        <div className="c-bl-name">{item.name}</div>
-        {paid ? (
-          <div className="bl-claim">
-            <span className="paid-tag">Pagado</span>
-          </div>
-        ) : claimants.length > 0 ? (
-          <div className="bl-claim">
-            {shared ? (
-              <>
-                <AvatarStack
-                  ids={claimants}
-                  roster={members}
-                  size={18}
-                  max={4}
-                />
-                <span>Compartido</span>
-              </>
-            ) : (
-              <>
-                <Avatar member={first} size={18} />
-                <span>{first?.isYou ? "Tú" : (first?.name ?? "")}</span>
-              </>
-            )}
-          </div>
-        ) : null}
-      </div>
-      <span className={"c-bl-price" + (paid ? " struck" : "")}>
-        {fmt(lineTotal(item))}
-      </span>
     </div>
   );
 }
@@ -387,7 +389,29 @@ function SharePicker({
   );
 }
 
-/* ── BillStage (Cuenta tab content) ──────────────────────────── */
+/* ── SummaryRow helper ────────────────────────────────────────── */
+
+function SummaryRow({
+  label,
+  value,
+  badge,
+}: {
+  label: string;
+  value: string;
+  badge?: string;
+}) {
+  return (
+    <div className="c-sum-row">
+      <span>
+        {label}
+        {badge && <span className="badge">{badge}</span>}
+      </span>
+      <span className="v">{value}</span>
+    </div>
+  );
+}
+
+/* ── BillStage ───────────────────────────────────────────────── */
 
 export interface BillStageProps {
   flow: Flow;
@@ -408,11 +432,34 @@ export function BillStage({
   const { mode, tip, people, paidItemIds, claims } = state;
 
   const [otherTip, setOtherTip] = useState(false);
+  // Monto en USD que el usuario teclea en "Otro" — persiste aunque el parent
+  // solo guarde tipPct.
+  const [otherUsd, setOtherUsd] = useState<string>('');
 
-  const fullSub = useMemo(
-    () => items.reduce((s, it) => s + lineTotal(it), 0),
-    [items],
+  // items numerados; pagados primero en la lista
+  const sortedItems = useMemo(() => {
+    const expanded = expandRepeatedItems(items);
+    const paid: BillItem[] = [];
+    const unpaid: BillItem[] = [];
+    for (const it of expanded) {
+      if (isItemPaid(paidItemIds, it.id)) paid.push(it);
+      else unpaid.push(it);
+    }
+    return [...paid, ...unpaid];
+  }, [items, paidItemIds]);
+
+  // Saldo restante de mesa incl. IVA + servicio sin propina (header).
+  const remainingTotal = useMemo(
+    () => computeTotals(derived.remainingSub, config, 0).total,
+    [derived.remainingSub, config],
   );
+
+  const paidTotalWithTax = useMemo(
+    () => computeTotals(paidSubtotal(items, paidItemIds), config, 0).total,
+    [items, paidItemIds, config],
+  );
+
+  const fullSub = useMemo(() => billSubtotal(items), [items]);
   const claimedAll = unclaimedItems(items, claims).length === 0;
   const paidSub = paidSubtotal(items, paidItemIds);
   const someonePaid = paidItemIds.length > 0;
@@ -433,9 +480,52 @@ export function BillStage({
   const tipIsPreset = tipPresets.includes(tip);
   const showOtherTip = otherTip || !tipIsPreset;
 
+  const mesaTotal = useMemo(
+    () => computeTotals(fullSub, config, 0).total,
+    [fullSub, config],
+  );
+
+  const displayMembers = useMemo(
+    () => resolveRoster(members, state.name, flow.youId),
+    [members, state.name, flow.youId],
+  );
+
+  const youMember = useMemo(
+    () =>
+      displayMembers.find((m) => m.id === flow.youId) ??
+      resolveMemberDisplay(
+        { id: flow.youId, name: "Tú", initials: "Tú", hue: AVATAR_HUE_YOU, isYou: true },
+        state.name,
+        flow.youId,
+      ),
+    [displayMembers, flow.youId, state.name],
+  );
+
   return (
     <>
-      {/* name */}
+      {/* ── Header compacto ─────────────────────────────────── */}
+      <div className="bill-head-compact glassx">
+        <div className="bill-head-row">
+          <LogoMark size={26} />
+          <span className="bill-head-venue">
+            {config.name} · Mesa {config.table}
+          </span>
+          <span className="live-pill-sm glassx">
+            <span className="dot" /> En vivo
+          </span>
+        </div>
+        <div className="bill-head-total-row">
+          <span className="bill-head-total-label">Total por pagar:</span>
+          <span className="bill-head-total-amount">{fmt(remainingTotal)}</span>
+        </div>
+        {someonePaid && (
+          <div className="bill-head-paid-hint">
+            Pagado {fmt(paidTotalWithTax)} · mesa {fmt(mesaTotal)}
+          </div>
+        )}
+      </div>
+
+      {/* ── Nombre ──────────────────────────────────────────── */}
       <div>
         <div className="sec-label" style={{ marginBottom: 9 }}>
           ¿Quién paga?
@@ -447,7 +537,7 @@ export function BillStage({
         />
       </div>
 
-      {/* split mode */}
+      {/* ── SplitModeSelector ───────────────────────────────── */}
       <div>
         <div className="sec-label" style={{ marginBottom: 9 }}>
           ¿Cómo dividimos?
@@ -478,33 +568,43 @@ export function BillStage({
         </p>
       </div>
 
-      {/* mode-specific control */}
+      {/* ── Control específico del modo ─────────────────────── */}
       {mode === "equal" && (
-        <div className="surfx" style={{ borderRadius: 22 }}>
-          <div className="row-control">
-            <div className="lbl">
-              ¿Entre cuántos van?
-              <small>
-                {someonePaid
-                  ? `${fmt(derived.remainingSub)} restante ÷ ${people}`
-                  : `${fmt(fullSub)} ÷ ${people} personas`}
-              </small>
+        <>
+          <div className="surfx" style={{ borderRadius: 22 }}>
+            <div className="row-control">
+              <div className="lbl">
+                ¿Entre cuántos van?
+                <small>
+                  {someonePaid
+                    ? `${fmt(derived.remainingSub)} restante ÷ ${people}`
+                    : `${fmt(fullSub)} ÷ ${people} personas`}
+                </small>
+              </div>
+              <Stepper
+                value={people}
+                min={1}
+                max={20}
+                onChange={(v) => flow.setPeople(v)}
+              />
             </div>
-            <Stepper
-              value={people}
-              min={1}
-              max={20}
-              onChange={(v) => flow.setPeople(v)}
-            />
           </div>
-        </div>
+          <EqualShareVisual
+            members={displayMembers}
+            people={people}
+            perPersonLabel={fmt(derived.totals.total)}
+          />
+        </>
       )}
       {mode === "todo" && (
         <div className="surfx todo-card">
-          <div className="todo-ic">
-            <Ic.receipt s={28} />
+          <div className="todo-payer-av">
+            <span className="todo-payer-crown" aria-hidden="true">
+              👑
+            </span>
+            <Avatar member={youMember} size={56} />
           </div>
-          <div className="todo-t">Pagas toda la cuenta</div>
+          <div className="todo-t">Tú cierras la mesa</div>
           <div className="todo-big">{fmt(derived.totals.total)}</div>
           <div className="todo-s">
             {someonePaid
@@ -514,7 +614,7 @@ export function BillStage({
         </div>
       )}
 
-      {/* items */}
+      {/* ── Lista de ítems ──────────────────────────────────── */}
       <div>
         <div
           style={{
@@ -539,35 +639,32 @@ export function BillStage({
               : `${items.length} platos · ${fmt(fullSub)}`}
           </span>
         </div>
-        {mode === "item" ? (
-          <div className="surfx c-items">
-            {items.map((it) => (
-              <BillItemRow
-                key={it.id}
-                item={it}
-                flow={flow}
-                members={members}
-                mode={mode}
-                paid={paidItemIds.includes(it.id)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="surfx c-bl-list">
-            {items.map((it) => (
-              <BillListRow
-                key={it.id}
-                item={it}
-                flow={flow}
-                members={members}
-                paid={paidItemIds.includes(it.id)}
-              />
-            ))}
+
+        <div className="surfx c-items">
+          {sortedItems.map((it) => (
+            <BillItemRow
+              key={it.id}
+              item={it}
+              flow={flow}
+              members={displayMembers}
+              mode={mode}
+              paid={isItemPaid(paidItemIds, it.id)}
+            />
+          ))}
+        </div>
+
+        {/* Empty-state hint when in item mode and the user has claimed 0 items —
+            gentle nudge that disappears the moment they tap their first plate. */}
+        {mode === "item" && myItemCount === 0 && (
+          <div className="bill-empty-hint" data-testid="bill-empty-hint">
+            <Ic.bell s={14} />
+            Toca los platos que pediste para reclamarlos.
           </div>
         )}
+
         {mode === "item" && (
           <div className="items-foot">
-            {!claimedAll && (
+            {!claimedAll && myItemCount > 0 && (
               <p className="c-helper" style={{ margin: 0 }}>
                 Toca un plato para escogerlo como tuyo.
               </p>
@@ -585,7 +682,7 @@ export function BillStage({
         )}
       </div>
 
-      {/* propina */}
+      {/* ── Propina ─────────────────────────────────────────── */}
       <div className="surfx" style={{ borderRadius: 22 }}>
         <div className="row-control">
           <div className="lbl">
@@ -598,6 +695,7 @@ export function BillStage({
                 className={!otherTip && tip === p ? "on" : ""}
                 onClick={() => {
                   setOtherTip(false);
+                  setOtherUsd('');
                   flow.setTip(p);
                 }}
                 data-testid={`bill-tip-${p}`}
@@ -616,35 +714,66 @@ export function BillStage({
         </div>
         {showOtherTip && (
           <div className="tip-other">
-            <span className="tip-other-lbl">Propina personalizada</span>
-            <div className="tip-other-input">
+            <span className="tip-other-lbl">
+              {derived.subtotal > 0
+                ? 'Monto de propina'
+                : 'Ingresa luego de tener cuenta'}
+            </span>
+            {/* POS-style centavos display — fills right-to-left as user types digits */}
+            <div
+              className="tip-pos-display"
+              role="group"
+              aria-label="Monto de propina en dólares"
+            >
+              <span className="tip-pos-amount" aria-live="polite">
+                ${(parseInt(otherUsd || '0', 10) / 100).toFixed(2)}
+              </span>
               <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={100}
-                value={tip}
-                onChange={(e) =>
-                  flow.setTip(
-                    Math.max(
-                      0,
-                      Math.min(
-                        100,
-                        Math.round(parseFloat(e.target.value) || 0),
-                      ),
-                    ),
-                  )
-                }
-                aria-label="Propina personalizada"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value=""
+                readOnly={derived.subtotal <= 0}
+                disabled={derived.subtotal <= 0}
+                aria-label="Monto de propina en dólares"
                 autoFocus
+                className="tip-pos-hidden-input"
+                onKeyDown={(e) => {
+                  if (derived.subtotal <= 0) return;
+                  if (e.key >= '0' && e.key <= '9') {
+                    const next = Math.min(
+                      parseInt(otherUsd || '0', 10) * 10 + parseInt(e.key, 10),
+                      99999999,
+                    );
+                    const nextStr = String(next);
+                    setOtherUsd(nextStr);
+                    const amount = next / 100;
+                    if (amount > 0) {
+                      const pct = Math.round((amount / derived.subtotal) * 100 * 100) / 100;
+                      flow.setTip(Math.max(0, pct));
+                    } else {
+                      flow.setTip(0);
+                    }
+                  } else if (e.key === 'Backspace') {
+                    const next = Math.floor(parseInt(otherUsd || '0', 10) / 10);
+                    const nextStr = next > 0 ? String(next) : '';
+                    setOtherUsd(nextStr);
+                    if (next === 0) {
+                      flow.setTip(0);
+                    } else {
+                      const amount = next / 100;
+                      const pct = Math.round((amount / derived.subtotal) * 100 * 100) / 100;
+                      flow.setTip(Math.max(0, pct));
+                    }
+                  }
+                }}
               />
-              <span>%</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* summary */}
+      {/* ── Resumen (tu parte) ──────────────────────────────── */}
       <div className="c-sum glassx">
         <div className="sec-label" style={{ marginBottom: 14 }}>
           {COPY.yourPart}
@@ -666,7 +795,7 @@ export function BillStage({
           />
           {tip > 0 && (
             <SummaryRow
-              label={`Propina ${tip}%`}
+              label={showOtherTip ? 'Propina' : `Propina ${tip}%`}
               value={fmt(derived.totals.propina)}
             />
           )}
@@ -687,29 +816,12 @@ export function BillStage({
         </div>
       </div>
 
+      {/* CTA handled by the sticky dock in BillShellStage — no inline button here */}
+      <div style={{ height: 8 }} aria-hidden="true" />
+
       {state.sharePicker && (
         <SharePicker flow={flow} items={items} members={members} />
       )}
     </>
-  );
-}
-
-function SummaryRow({
-  label,
-  value,
-  badge,
-}: {
-  label: string;
-  value: string;
-  badge?: string;
-}) {
-  return (
-    <div className="c-sum-row">
-      <span>
-        {label}
-        {badge && <span className="badge">{badge}</span>}
-      </span>
-      <span className="v">{value}</span>
-    </div>
   );
 }

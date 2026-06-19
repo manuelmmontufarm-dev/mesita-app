@@ -49,9 +49,19 @@ export const billSubtotal = (items: readonly BillItem[]): number =>
 /** Guests who skip the name field pay as "P1", "P2"… (sequential per table). */
 export const GUEST_PREFIX = "P";
 
+/** Avatar hue for the current payer — brand green. */
+export const AVATAR_HUE_YOU = 160;
+
+/** Cheerful hues for tablemates (blue, yellow, purple). No tomato/brown. */
+export const AVATAR_HUE_GUESTS = [210, 48, 280] as const;
+
+export function guestAvatarHue(guestIndex: number): number {
+  return AVATAR_HUE_GUESTS[guestIndex % AVATAR_HUE_GUESTS.length];
+}
+
 /**
- * Avatar label. Empty name → "Tú". Guest labels (P1, P2…) are kept whole so
- * tablemates stay distinguishable. Otherwise first letter, uppercase.
+ * Avatar label. Empty name → "Tú". Guest labels (P1, P2…) are kept whole.
+ * Real names → first two letters, uppercase (e.g. "manuel" → "MA").
  */
 export const initialsFor = (name: string | null | undefined): string => {
   const s = (name || "").trim();
@@ -59,10 +69,37 @@ export const initialsFor = (name: string | null | undefined): string => {
   if (new RegExp("^" + GUEST_PREFIX + "\\d+$", "i").test(s)) {
     return s.toUpperCase();
   }
-  return s.slice(0, 1).toUpperCase();
+  const letters = s.replace(/\s+/g, "").slice(0, 2);
+  return letters.toUpperCase();
 };
 
 export const avatarColor = (hue: number): string => `hsl(${hue} 62% 47%)`;
+
+/** Apply typed name + green hue to the current payer's roster entry. */
+export function resolveMemberDisplay(
+  member: TableMember,
+  typedName: string,
+  youId: MemberId,
+): TableMember {
+  const isYou = member.id === youId || member.isYou === true;
+  if (!isYou) return member;
+  const name = typedName.trim() || member.name;
+  return {
+    ...member,
+    isYou: true,
+    name,
+    initials: initialsFor(name),
+    hue: AVATAR_HUE_YOU,
+  };
+}
+
+export function resolveRoster(
+  members: readonly TableMember[],
+  typedName: string,
+  youId: MemberId,
+): TableMember[] {
+  return members.map((m) => resolveMemberDisplay(m, typedName, youId));
+}
 
 /* ---------------- claims helpers ---------------- */
 

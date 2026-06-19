@@ -14,9 +14,10 @@ export interface CameraCardData {
 interface CameraScannerProps {
   isOpen: boolean;
   onCardDetected: (card: CameraCardData) => void;
-  onManualEntry: (card: CameraCardData) => void;
+  onManualEntry?: (card: CameraCardData) => void;
   onClose: () => void;
   language: 'es' | 'en';
+  allowManual?: boolean;
 }
 
 const labels = {
@@ -56,6 +57,7 @@ export function CameraScanner({
   onManualEntry,
   onClose,
   language,
+  allowManual = false,
 }: CameraScannerProps) {
   const t = labels[language];
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -86,7 +88,6 @@ export function CameraScanner({
         setCameraError(null);
       } catch {
         setCameraError(t.cameraDenied);
-        setMode('manual');
       }
     })();
 
@@ -101,7 +102,7 @@ export function CameraScanner({
   const submitManual = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const [expiryMonth = '', expiryYear = ''] = manualExpiry.split('/').map(part => part.trim());
-    onManualEntry({
+    onManualEntry?.({
       number: manualNumber.replace(/\s+/g, ''),
       expiryMonth,
       expiryYear,
@@ -136,18 +137,18 @@ export function CameraScanner({
           </button>
         </div>
 
-        <div className="scanner-tabs">
-          <button className={mode === 'scan' ? 'on' : ''} onClick={() => setMode('scan')} type="button">
-            <Camera size={17} />
-            {t.scan}
-          </button>
-          <button className={mode === 'manual' ? 'on' : ''} onClick={() => setMode('manual')} type="button">
-            <Keyboard size={17} />
-            {t.manual}
-          </button>
-        </div>
+        {allowManual && (
+          <div className="scanner-tabs">
+            <button className={mode === 'scan' ? 'on' : ''} onClick={() => setMode('scan')} type="button">
+              <Camera size={17} />{t.scan}
+            </button>
+            <button className={mode === 'manual' ? 'on' : ''} onClick={() => setMode('manual')} type="button">
+              <Keyboard size={17} />{t.manual}
+            </button>
+          </div>
+        )}
 
-        {mode === 'scan' ? (
+        {mode === 'scan' || !allowManual ? (
           <div className="scanner-camera">
             <video ref={videoRef} autoPlay playsInline muted />
             <div className="scanner-frame">

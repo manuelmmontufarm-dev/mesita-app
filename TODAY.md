@@ -79,6 +79,21 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Guest UX v2: avatares, totales, Gracias, rey Todo
+- **Qué:** `split-math.ts`, `BillStage`, `WaitingSuccessStage`, `ShareSheet`, `ConfirmStage`, `customer.css`, `page.tsx`, `demo/page.tsx`.
+- **Por qué:** Copy total redundante; avatares tomate/1 letra; pendientes sin estilo y mal calculados en equal; cuenta completada plana.
+- **Qué hace:** "Total por pagar" + sublínea mesa original; avatares MA verde + paleta alegre; corona en Todo; pendientes estilizados; "Ver mesa"; hero rey en success todo; sin "Volver al inicio".
+
+### 2026-06-19 — Guest pay: pagados arriba, footer confirm, visual por iguales
+- **Qué:** `BillStage.tsx`, `_shared.tsx`, `ConfirmStage` CSS en `customer.css`.
+- **Por qué:** Platos pagados perdidos en la lista; botones solapados en confirm; balanza fea en por iguales.
+- **Qué hace:** Ítems pagados van primero; footer confirm con gap entre CTAs; meter de segmentos iguales + avatares en lugar de balanza.
+
+### 2026-06-19 — Guest pay: total dinámico, propina 15%, avatares por modo
+- **Qué:** `BillStage.tsx`, `GuestBillFlow.tsx`, `_shared.tsx`, `customer.css`, `page.tsx`, `demo/page.tsx`.
+- **Por qué:** "Tu cuenta" no reflejaba pagos parciales; propina arrancaba en 0%; avatares bajo platos aparecían en todos los modos de split.
+- **Qué hace:** Header dice **Total** y muestra saldo restante de mesa (baja al pagar); propina default 15%; avatars solo en **Lo mío**; balanza con avatares en **Por iguales**; avatar+escudo en **Todo**; demo con locro ya pagado.
+
 ### 2026-06-18 — Anillo Gracias: % pagado + celebración
 - **Qué:** `WaitingSuccessStage.tsx`, `customer.css`.
 - **Por qué:** El anillo mostraba % por pagar (confuso); texto descentrado; faltaba un toque festivo post-pago.
