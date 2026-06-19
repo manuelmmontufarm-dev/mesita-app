@@ -92,7 +92,22 @@ Reglas de oro:
 ### 2026-06-19 — Guest pay: total dinámico, propina 15%, avatares por modo
 - **Qué:** `BillStage.tsx`, `GuestBillFlow.tsx`, `_shared.tsx`, `customer.css`, `page.tsx`, `demo/page.tsx`.
 - **Por qué:** "Tu cuenta" no reflejaba pagos parciales; propina arrancaba en 0%; avatares bajo platos aparecían en todos los modos de split.
-- **Qué hace:** Header dice **Total** y muestra saldo restante de mesa (baja al pagar); propina default 15%; avatars solo en **Lo mío**; balanza con avatares en **Por iguales**; avatar+escudo en **Todo**; demo con locro ya pagado.
+- **Qué hace:** Header dice **Total por pagar** y muestra saldo restante de mesa (baja al pagar); propina default 15%; avatars solo en **Lo mío**; equal share meter; corona en **Todo**; demo con locro ya pagado.
+
+### 2026-06-18 — Restaurar items numerados en la cuenta del guest
+- **Qué:** `src/components/guest/flow/BillStage.tsx`.
+- **Por qué:** En Vercel la lista "Escoge tus platos" salía como checkboxes vacíos sin numerar; localhost ya tenía la versión correcta numerada. El JSX no usaba las clases `.c-item-emoji-inline` y `.c-tick-num` que sí existen en `customer.css`.
+- **Qué hace:** Cada `BillItemRow` ahora recibe `index` y muestra el número del plato (1, 2, 3...) dentro del círculo `.c-tick`. El círculo se pone verde con número blanco cuando el plato es tuyo (`.c-tick.on`) y aparece el badge "Tú" en la fila. El emoji se renderiza inline al lado del nombre (`.c-item-emoji-inline`). Selección, montos, estados shared/paid y "Toca para escogerlo" intactos.
+
+### 2026-06-18 — Home abre la app demo
+- **Qué:** `src/app/page.tsx`.
+- **Por qué:** El dominio principal abría la landing estática en vez del flujo real de la app.
+- **Qué hace:** Redirige `/` hacia `/pay/demo` para que el deploy abra directamente la experiencia demo de pago.
+
+### 2026-06-18 — Arreglo build Vercel en pantalla Gracias
+- **Qué:** `WaitingSuccessStage.tsx`, `package.json`, `package-lock.json`.
+- **Por qué:** El deploy fallaba por imports inexistentes (`latestReceipt`, `bill-display`) y por usar `canvas-confetti` sin declararlo como dependencia.
+- **Qué hace:** Usa `state.receipt?.name` como fallback del nombre, calcula etiquetas de ítems con los datos existentes y agrega `canvas-confetti` + sus tipos para que `npm run build` compile en Vercel.
 
 ### 2026-06-18 — Anillo Gracias: % pagado + celebración
 - **Qué:** `WaitingSuccessStage.tsx`, `customer.css`.

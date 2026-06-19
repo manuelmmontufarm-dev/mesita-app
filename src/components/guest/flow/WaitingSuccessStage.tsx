@@ -437,7 +437,7 @@ export function WaitingSuccessStage({
         </div>
         <p className="ws-reg-eyebrow">Un pago registrado</p>
         <h1 className="flow-title ws-reg-title">
-          ¡Gracias{state.name.trim() ? `, ${state.name.trim()}` : ""}!
+          ¡Gracias{displayName !== "tú" ? `, ${displayName}` : ""}!
         </h1>
         <p className="flow-lede ws-reg-lede">
           Tu pago en {config.name} quedó guardado en MesitaQR{" "}
