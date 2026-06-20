@@ -79,6 +79,31 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-20 — Polish guest UX: widget MA+name, propina, % real, medallas al final, recall tarjeta
+- **Qué:** `BillStage.tsx`, `WaitingSuccessStage.tsx`, `ConfirmStage.tsx`, `GuestBillFlow.tsx`, `PaymentStage.tsx`, `demo-table-progress.ts`, `payment-form-storage.ts`, `customer.css`, tests, tip presets en hooks demo/live.
+- **Por qué:** Nombre duplicado en Lo mío; propina "Sin" no deseada; % pagado inflado por headcount; medallas antes de cerrar mesa; keys duplicadas en resumen; tarjeta/factura no se recordaban al volver a pagar; espaciado dock; Reiniciar visible al scrollear.
+- **Qué hace:** Widget estilo OwnerChip (MA + manuel); propina 10/15/20/Otro; progreso por monto real; medallas solo en éxito; dedupe pagos por guest; sessionStorage para tarjeta/factura; más aire antes del dock; Reiniciar se oculta al bajar scroll; fix duplicate React keys.
+
+### 2026-06-20 — Fix: pantalla en blanco en `/pay/demo` antes de hidratar
+- **Qué:** `GuestPayPage.tsx`, `useDemoTableSession.ts`, `customer.css`.
+- **Por qué:** El demo mostraba un `<div>` vacío hasta que React hidrataba; si el JS tardaba o fallaba, la página quedaba blanca.
+- **Qué hace:** Mientras carga la sesión se muestra el lobby (`DemoTableEntry`) con botón en loading; `useLayoutEffect` lee sessionStorage antes del primer paint.
+
+### 2026-06-20 — Fix: mesa no cierra con 1 ítem; UI modos Lo mío / Todo
+- **Qué:** `demo-table-progress.ts`, `GuestBillFlow.tsx`, `BillStage.tsx`, `_shared.tsx` (`OwnerChip`), `customer.css`, tests.
+- **Por qué:** Pagar un solo plato cerraba la mesa (allGuestsPaid con 1 comensal); Todo sin checks; Lo mío mostraba "Tú" y números en ítems.
+- **Qué hace:** Mesa cerrada solo si todos los platos están pagos; waiting hasta que la cuenta esté cubierta; Todo = todos los ítems con ✓ + corona; Lo mío = widget con tu nombre + chip con nombre en filas; solo checks, sin números.
+
+### 2026-06-20 — Fix: scroll roto en Bill First Page + tests de layout
+- **Qué:** `customer.css` (`min-height:0` en `.cust-scroll`, padding dock), `GuestBillFlow.tsx` (header compacto, ResizeObserver), `bill-shell-scroll.ts` + tests, `bill-first-page.spec.ts`, e2e multi-device actualizado, `split-math.ts` (iniciales P1/P2).
+- **Por qué:** La tarjeta First Page no scrolleaba — flex child sin `min-height:0` crecía fuera del viewport y `overflow:hidden` del shell la recortaba.
+- **Qué hace:** Scroll táctil funciona; dock no tapa totales; header sin duplicar restaurante; 263 unit tests + suite e2e bill-first-page; avatares Persona N distinguibles (P1, P2…).
+
+### 2026-06-20 — UI: Mesita First Page en BillStage (tarjeta fluida + dock)
+- **Qué:** `BillStage.tsx`, `_shared.tsx` (`OwnerChip`, `TableRosterCompact`, `AvatarDot`), `GuestBillFlow.tsx`, `customer.css`.
+- **Por qué:** Alinear la pantalla de cuenta del demo con el prototipo Mesita First Page — una tarjeta, nombre inline, roster compacto, propina inline, dock glass.
+- **Qué hace:** Cuenta en tarjeta única con payer row + "En la mesa", filas de plato con owner chips, banners azules en iguales/todo, stepper + EqualShareVisual compact, propina Sin/10/15/Otro fusionada en totales, botón dock "Pagar tu parte · $X"; sync demo sin cambios.
+
 ### 2026-06-20 — Fix: "Internal server error" al Entrar (join en Redis vacío)
 - **Qué:** `demo-table-store.ts` (`mutateDemoState` bootstrap), test `cold-join.test.ts`.
 - **Por qué:** Primer join en Upstash sin GET previo usaba `tryCommit(…, 0)` que nunca inserta → 10 retries → 500 en "Entrar a la mesa".

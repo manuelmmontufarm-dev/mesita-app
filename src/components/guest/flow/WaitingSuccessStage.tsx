@@ -95,35 +95,6 @@ function PayerBadgeChip({ badge }: { badge: PayerBadge }) {
   );
 }
 
-function PayerBadgeCard({ badge, featured }: { badge: PayerBadge; featured?: boolean }) {
-  return (
-    <div
-      className={"ws-payer-badge-card" + (featured ? " ws-payer-badge-card-featured" : "")}
-      data-testid={`ws-badge-${badge.id}`}
-    >
-      <span className="ws-payer-badge-card-emoji" aria-hidden="true">
-        {badge.emoji}
-      </span>
-      <div className="ws-payer-badge-card-copy">
-        <span className="ws-payer-badge-card-title">{badge.title}</span>
-        <span className="ws-payer-badge-card-sub">{badge.subtitle}</span>
-      </div>
-    </div>
-  );
-}
-
-function YourBadgesSection({ badges }: { badges: readonly PayerBadge[] }) {
-  if (!badges.length) return null;
-  const primary = badges[0];
-  if (!primary) return null;
-  return (
-    <div className="ws-your-badges surfx" data-testid="ws-your-badges">
-      <div className="ws-paid-sofar-title">Tu paso por la mesa</div>
-      <PayerBadgeCard badge={primary} featured />
-    </div>
-  );
-}
-
 function MesaBadgesSection({
   awards,
 }: {
@@ -169,12 +140,14 @@ function MesaProgressRing({
   paidCount,
   totalCount,
   paidRows,
+  showBadges = false,
 }: {
   paidPct: number;
   remainingAmt: string;
   paidCount: number;
   totalCount: number;
-  paidRows: Array<{ member: TableMember; amount: string; badges: PayerBadge[] }>;
+  paidRows: Array<{ member: TableMember; amount: string; badges: PayerBadge[]; key: string }>;
+  showBadges?: boolean;
 }) {
   const r = 52;
   const c = 2 * Math.PI * r;
@@ -220,11 +193,11 @@ function MesaProgressRing({
       {paidRows.length > 0 && (
         <div className="ws-paid-sofar">
           <div className="ws-paid-sofar-title">Ya pagaron</div>
-          {paidRows.map(({ member, amount, badges }) => (
-            <div key={member.id} className="ws-paid-sofar-row">
+          {paidRows.map(({ member, amount, badges, key }) => (
+            <div key={key} className="ws-paid-sofar-row">
               <div className="ws-paid-sofar-left">
                 <NamePill member={member} size={34} />
-                {badges[0] ? (
+                {showBadges && badges[0] ? (
                   <div className="ws-payer-badge-row ws-payer-badge-row-inline">
                     <PayerBadgeChip badge={badges[0]} />
                   </div>
@@ -457,16 +430,22 @@ export function WaitingSuccessStage({
     demoTableProgress?.mesaTotal ?? computeTotals(fullSub, config, 0).total;
   const remainingSub =
     demoTableProgress?.remainingSub ?? derived.remainingSub;
-  const paidPct =
-    demoTableProgress?.paidPct ??
-    (mesaTotal > 0.01
-      ? Math.round(((mesaTotal - derived.remainingSub) / mesaTotal) * 100)
-      : 100);
   const remainingTotal = computeTotals(
     Math.max(0, remainingSub),
     config,
     0,
   ).total;
+  const paidPct =
+    demoTableProgress?.paidPct ??
+    (mesaTotal > 0.01
+      ? Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(((mesaTotal - remainingTotal) / mesaTotal) * 100),
+          ),
+        )
+      : 100);
   const paidGuestCount =
     demoTableProgress?.paidCount ??
     Math.max(paidSummaries.length, state.paidIds.length);
@@ -524,13 +503,22 @@ export function WaitingSuccessStage({
     [badgePayments, phase],
   );
 
-  const yourBadges = useMemo(
-    () => badgesForGuest(badgeAwards, youId),
-    [badgeAwards, youId],
-  );
-
   const paidRows = useMemo(() => {
-    const rows: Array<{ member: TableMember; amount: string; badges: PayerBadge[] }> = [];
+    type Acc = {
+      member: TableMember;
+      amount: number;
+    };
+    const byGuest = new Map<string, Acc>();
+
+    const upsert = (guestId: string, member: TableMember, amount: number) => {
+      const existing = byGuest.get(guestId);
+      if (existing) {
+        existing.amount += amount;
+        return;
+      }
+      byGuest.set(guestId, { member, amount });
+    };
+
     for (const payment of paidSummaries) {
       const member =
         displayMembers.find((m) => m.id === payment.guestId) ??
@@ -544,28 +532,35 @@ export function WaitingSuccessStage({
           payment.guestId === youId ? state.name : "",
           youId,
         );
-      rows.push({
-        member: resolveMemberDisplay(
+      upsert(
+        payment.guestId,
+        resolveMemberDisplay(
           member,
           member.id === youId ? state.name : "",
           youId,
         ),
-        amount: fmt(payment.amount),
-        badges: badgesForGuest(badgeAwards, payment.guestId),
-      });
+        payment.amount,
+      );
     }
-    if (rows.length === 0) {
+
+    if (byGuest.size === 0) {
       for (const id of paidIds) {
         const member = displayMembers.find((m) => m.id === id);
         if (!member) continue;
-        rows.push({
-          member: resolveMemberDisplay(member, state.name, youId),
-          amount: fmt(latestReceipt(state)?.amount ?? 0),
-          badges: badgesForGuest(badgeAwards, id),
-        });
+        upsert(
+          id,
+          resolveMemberDisplay(member, state.name, youId),
+          latestReceipt(state)?.amount ?? 0,
+        );
       }
     }
-    return rows;
+
+    return Array.from(byGuest.entries()).map(([guestId, row]) => ({
+      key: guestId,
+      member: row.member,
+      amount: fmt(row.amount),
+      badges: badgesForGuest(badgeAwards, guestId),
+    }));
   }, [paidSummaries, paidIds, displayMembers, youId, state.name, state, badgeAwards]);
 
   /* ── pending members list (for waiting phase) ─────────────────────────── */
@@ -633,9 +628,8 @@ export function WaitingSuccessStage({
         paidCount={paidGuestCount}
         totalCount={totalGuestCount}
         paidRows={paidRows}
+        showBadges={false}
       />
-
-      <YourBadgesSection badges={yourBadges} />
 
       {pendingMembers.length > 0 && (
         <div className="ws-pending-list surfx">
@@ -684,8 +678,8 @@ export function WaitingSuccessStage({
       {paidRows.length > 0 && (
         <div className="ws-paid-sofar ws-paid-sofar-success surfx">
           <div className="ws-paid-sofar-title">Resumen de la mesa</div>
-          {paidRows.map(({ member, amount, badges }) => (
-            <div key={member.id} className="ws-paid-sofar-row">
+          {paidRows.map(({ member, amount, badges, key }) => (
+            <div key={key} className="ws-paid-sofar-row">
               <div className="ws-paid-sofar-left">
                 <NamePill member={member} size={36} />
                 {badges.length > 0 && (

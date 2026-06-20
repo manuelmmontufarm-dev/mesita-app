@@ -159,7 +159,7 @@ function buildConfig(state: TableSessionState): RestaurantConfig {
     ivaRate: IVA_RATE,
     serviceRate: PROPINA_RATE,
     serviceEnabled: true,
-    tipPresets: [0, 10, 15, 20],
+    tipPresets: [10, 15, 20],
     defaultTip: 15,
     demoMode: demo,
   };
@@ -366,7 +366,7 @@ export function useLiveTableSession(token: string): UseLiveTableSessionResult {
             ivaRate: IVA_RATE,
             serviceRate: PROPINA_RATE,
             serviceEnabled: true,
-            tipPresets: [0, 10, 15, 20],
+            tipPresets: [10, 15, 20],
             defaultTip: 15,
           },
     [state],

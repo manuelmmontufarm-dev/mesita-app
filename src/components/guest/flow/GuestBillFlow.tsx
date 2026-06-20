@@ -23,7 +23,7 @@ import { PaymentStage } from "./PaymentStage";
 import { ReceiptDrawer } from "./ReceiptDrawer";
 import { ShareSheet } from "./ShareSheet";
 import { WaitingSuccessStage } from "./WaitingSuccessStage";
-import { Ic, LogoMark, useBumpOnChange } from "./_shared";
+import { Ic, useBumpOnChange } from "./_shared";
 import {
   type FlowInit,
   type PaidPayload,
@@ -31,6 +31,7 @@ import {
 } from "@/hooks/useGuestPaymentFlow";
 import type { LiveSessionActions } from "@/hooks/useLiveTableSession";
 import { fmt } from "@/lib/guest-billing";
+import { computeBillShellScrollMetrics } from "@/lib/guest-billing/bill-shell-scroll";
 import { mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
 import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
 import { freeUnits, isTableFullyPaid, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
@@ -57,6 +58,7 @@ interface StageProps {
   paidSummaries?: readonly TablePaymentSummary[];
   demoTableProgress?: DemoTableProgress;
   onResetDemo?: () => Promise<void>;
+  tableToken?: string;
 }
 
 export interface GuestBillFlowProps {
@@ -95,6 +97,8 @@ export interface GuestBillFlowProps {
   paidSummaries?: readonly TablePaymentSummary[];
   /** Demo-only: merged live progress for waiting/success ring. */
   demoTableProgress?: DemoTableProgress;
+  /** Table token for sessionStorage (payment form recall). */
+  tableToken?: string;
 }
 
 export function GuestBillFlow(props: GuestBillFlowProps) {
@@ -115,6 +119,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     pendingClaims,
     paidSummaries,
     demoTableProgress,
+    tableToken,
   } = props;
 
   const resolvedYouId = youId ?? liveSession?.guestSessionId ?? "you";
@@ -241,7 +246,8 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
       isTableFullyPaid(items, serverSync.paidItemIds);
     if (!tableClosed) return;
     const { stage } = flow.state;
-    if (stage === "bill" || stage === "confirm" || stage === "waiting") {
+    // Solo avanzar a éxito desde waiting — no saltar confirm/pago ni cerrar mesa parcial.
+    if (stage === "waiting") {
       flow.finishWaiting();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -286,6 +292,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     paidSummaries,
     demoTableProgress,
     onResetDemo,
+    tableToken,
   };
   const stage = flow.state.stage;
   const receiptDrawer =
@@ -325,7 +332,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     case "confirm":
       return (<><ConfirmStage {...stageProps} />{receiptDrawer}</>);
     case "payment":
-      return (<><PaymentStage {...stageProps} />{receiptDrawer}</>);
+      return (<><PaymentStage {...stageProps} tableToken={tableToken} />{receiptDrawer}</>);
   }
 }
 
@@ -354,23 +361,40 @@ function BillShellStage({
 
   const handleScroll = (e: UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
-    setAtBottom(el.scrollTop + el.clientHeight >= el.scrollHeight - 40);
+    const metrics = computeBillShellScrollMetrics(el);
+    setAtBottom(metrics.atBottom);
     setHeadCompact(el.scrollTop > 16);
+  };
+
+  const remeasureScroll = () => {
+    const el = scrollRef.current;
+    const metrics = computeBillShellScrollMetrics(el);
+    setScrollable(metrics.scrollable);
+    setAtBottom(metrics.atBottom);
   };
 
   // Measure whether the content is actually overflowing — if not, expand the
   // dock immediately (no scroll needed). Re-measure on every state mutation
   // that changes content height.
   useLayoutEffect(() => {
+    remeasureScroll();
     const el = scrollRef.current;
-    setScrollable(el ? el.scrollHeight > el.clientHeight + 12 : false);
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => remeasureScroll());
+    ro.observe(el);
+    for (const child of el.children) {
+      ro.observe(child);
+    }
+    return () => ro.disconnect();
   }, [
     state.mode,
     state.claims,
     state.people,
     state.tip,
     state.paidItemIds,
+    state.name,
     config.serviceEnabled,
+    items.length,
   ]);
 
   const dockExpanded = atBottom || !scrollable;
@@ -382,46 +406,39 @@ function BillShellStage({
       data-testid="guest-bill-flow"
       data-stage="bill"
     >
-      {/* sticky header */}
-      <div className={"cust-head" + (headCompact ? " compact" : "")}>
-        <div className="head-row">
-          <div className="head-rest">
-            <LogoMark size={32} />
-            <div>
-              <div className="head-name">{config.name}</div>
-              <div className="head-sub">
-                {config.tagline ? `${config.tagline} · ` : ""}
-                {`Mesa ${config.table}`}
-              </div>
-            </div>
-          </div>
+      {/* minimal sticky header — venue/total live inside bill card */}
+      <div className={"cust-head bill-shell-head" + (headCompact ? " compact" : "")}>
+        <div className="bill-shell-top">
           <span className="live-pill glassx">
             <span className="dot" />
             En vivo
           </span>
+          <span className="bill-shell-mesa">Mesa {config.table}</span>
+          {config.demoMode && onResetDemo ? (
+            <button
+              type="button"
+              className={
+                "demo-reset-btn" + (headCompact ? " demo-reset-hidden" : "")
+              }
+              disabled={resetting}
+              onClick={() => {
+                setResetting(true);
+                void onResetDemo().finally(() => setResetting(false));
+              }}
+              data-testid="demo-reset-btn"
+            >
+              {resetting ? "Reiniciando…" : "Reiniciar"}
+            </button>
+          ) : null}
         </div>
-        {config.demoMode && onResetDemo ? (
-          <button
-            type="button"
-            className="demo-reset-btn"
-            disabled={resetting}
-            onClick={() => {
-              setResetting(true);
-              void onResetDemo().finally(() => setResetting(false));
-            }}
-            data-testid="demo-reset-btn"
-          >
-            {resetting ? "Reiniciando…" : "Reiniciar demo"}
-          </button>
-        ) : null}
-        <div className="head-title">Total por pagar</div>
       </div>
 
       {/* scrollable bill body */}
       <div
-        className="cust-scroll"
+        className="cust-scroll bill-first-page"
         ref={scrollRef}
         onScroll={handleScroll}
+        data-testid="bill-scroll"
       >
         <BillStage
           flow={flow}
@@ -434,7 +451,7 @@ function BillShellStage({
       </div>
 
       {/* sticky bottom pay dock */}
-      <div className={"c-dock " + (dockExpanded ? "dock-full" : "dock-mini") + (flow.state.receipts.length > 0 ? " has-receipt-dock" : "")}>
+      <div className={"c-dock glass-dock " + (dockExpanded ? "dock-full" : "dock-mini") + (flow.state.receipts.length > 0 ? " has-receipt-dock" : "")}>
         <div className="dock-top">
           <div className="dock-k">
             Tu parte
@@ -452,7 +469,7 @@ function BillShellStage({
           disabled={!derived.canPay}
           data-testid="dock-pay-btn"
         >
-          <Ic.lock s={18} /> Pagar ahora
+          <Ic.lock s={18} /> Pagar tu parte · {fmt(derived.totals.total)}
         </button>
         <div className="pay-secure">
           <Ic.shield s={13} /> Pago cifrado · Factura electrónica automática

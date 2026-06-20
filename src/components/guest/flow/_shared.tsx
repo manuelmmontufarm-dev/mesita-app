@@ -397,27 +397,155 @@ export function AvatarStack({
   );
 }
 
+/** Small overlapping avatar dot (First Page roster / owner chips). */
+export function AvatarDot({
+  member,
+  name,
+  size = 18,
+}: {
+  member?: { initials?: string; hue?: number; isYou?: boolean } | null;
+  name?: string;
+  size?: number;
+}) {
+  const m = member ?? {};
+  const label =
+    m.initials ??
+    (name ? name.slice(0, 2).toUpperCase() : "?");
+  return (
+    <span
+      className={"avatar-dot" + (m.isYou ? " you" : "")}
+      style={{
+        width: size,
+        height: size,
+        fontSize: Math.max(8, Math.round(size * 0.38)),
+        background: avatarColor(m.hue ?? (m.isYou ? AVATAR_HUE_YOU : 14)),
+      }}
+      aria-hidden="true"
+    >
+      {label}
+    </span>
+  );
+}
+
+/** Gray capsule with mini avatars + claimant label on item rows. */
+export function OwnerChip({
+  ids,
+  roster,
+  youId,
+  youName,
+}: {
+  ids: readonly MemberId[];
+  roster: readonly TableMember[];
+  youId?: MemberId;
+  youName?: string;
+}) {
+  if (ids.length === 0) return null;
+  if (ids.length === 1 && ids[0] === youId) {
+    const member = resolveClaimantMember(ids[0], roster, youId, youName);
+    const label = memberPillLabel(member, youName, 10);
+    return (
+      <span className="owner-chip owner-chip-you">
+        <span className="owner-chip-avs">
+          <AvatarDot member={member} name={youName} size={18} />
+        </span>
+        <span className="owner-chip-label">{label}</span>
+      </span>
+    );
+  }
+
+  const shown = ids.slice(0, 3);
+  const extra = ids.length - shown.length;
+  const label =
+    ids.length > 1
+      ? "compartido"
+      : memberPillLabel(
+          resolveClaimantMember(ids[0], roster, youId, youName),
+          youId === ids[0] ? youName : undefined,
+          8,
+        );
+
+  return (
+    <span className="owner-chip">
+      <span className="owner-chip-avs">
+        {shown.map((id) => {
+          const member = resolveClaimantMember(id, roster, youId, youName);
+          return (
+            <AvatarDot
+              key={id}
+              member={member}
+              name={youId === id ? youName : undefined}
+              size={18}
+            />
+          );
+        })}
+        {extra > 0 && <span className="owner-chip-more">+{extra}</span>}
+      </span>
+      <span className="owner-chip-label">{label}</span>
+    </span>
+  );
+}
+
+/** Overlapping circles for "En la mesa" roster (no names). */
+export function TableRosterCompact({
+  members,
+  max = 4,
+  size = 26,
+}: {
+  members: readonly TableMember[];
+  max?: number;
+  size?: number;
+}) {
+  const shown = members.slice(0, max);
+  const extra = members.length - shown.length;
+  if (shown.length === 0) return null;
+
+  return (
+    <div className="table-roster-compact" aria-label={`${members.length} en la mesa`}>
+      <span className="table-roster-label">En la mesa</span>
+      <div className="table-roster-dots">
+        {shown.map((m) => (
+          <AvatarDot key={m.id} member={m} size={size} />
+        ))}
+        {extra > 0 && (
+          <span
+            className="table-roster-more"
+            style={{ width: size, height: size, fontSize: Math.round(size * 0.34) }}
+          >
+            +{extra}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── equal-split visual (shared segments + avatars) ─────────── */
 
 export function EqualShareVisual({
   members,
   people,
   perPersonLabel,
+  compact = false,
 }: {
   members: readonly TableMember[];
   people: number;
   perPersonLabel: string;
+  compact?: boolean;
 }) {
   const slots = Math.max(1, people);
   const shownMembers = members.slice(0, slots);
   const extraPeople = Math.max(0, slots - shownMembers.length);
+  const pillSize = compact ? 30 : 38;
 
   return (
-    <div className="equal-share-visual" aria-hidden="true">
+    <div
+      className={"equal-share-visual" + (compact ? " compact" : "")}
+      aria-hidden="true"
+    >
       <div className="equal-share-avatars">
         {shownMembers.map((m) => (
           <div key={m.id} className="equal-share-slot">
-            <NamePill member={m} size={38} />
+            <NamePill member={m} size={pillSize} />
           </div>
         ))}
         {extraPeople > 0 && (
@@ -432,9 +560,11 @@ export function EqualShareVisual({
         ))}
       </div>
       <div className="equal-share-amt">{perPersonLabel}</div>
-      <p className="equal-share-copy">
-        {slots} persona{slots !== 1 ? "s" : ""} · lo mismo para cada quien
-      </p>
+      {!compact && (
+        <p className="equal-share-copy">
+          {slots} persona{slots !== 1 ? "s" : ""} · lo mismo para cada quien
+        </p>
+      )}
     </div>
   );
 }

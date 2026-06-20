@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { mapDemoStateToSession } from "@/lib/demo-live-adapter";
 import { demoDebug } from "@/lib/demo-debug";
@@ -19,6 +19,7 @@ import { DEMO_LOBBY, emojiForItemName } from "@/lib/demo-restaurant";
 import type { DemoTableState } from "@/lib/demo-table-store";
 import { shouldApplyDemoVersion } from "@/lib/demo-table-store";
 import { isFreshDocumentNavigation } from "@/lib/navigation-kind";
+import { clearStoredPaymentForm } from "@/lib/guest-billing/payment-form-storage";
 import type {
   BillItem,
   Claims,
@@ -313,6 +314,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     clearStoredGuestId(token);
     clearStoredEntered(token);
     clearStoredResetSeq(token);
+    clearStoredPaymentForm(token);
     setHasEntered(false);
     setGuestSessionId(null);
     setRaw(null);
@@ -464,7 +466,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
 
   joinTableRef.current = joinTable;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isFreshDocumentNavigation()) {
       clearStoredGuestId(token);
       clearStoredEntered(token);
@@ -835,7 +837,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       ivaRate: IVA_RATE,
       serviceRate: PROPINA_RATE,
       serviceEnabled: true,
-      tipPresets: [0, 10, 15, 20],
+      tipPresets: [10, 15, 20],
       defaultTip: 15,
       demoMode: true,
     }),

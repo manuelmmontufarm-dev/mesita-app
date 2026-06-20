@@ -35,32 +35,26 @@ export function deriveDemoTableProgress(input: DemoTableProgressInput): DemoTabl
 
   const remainingSub = Math.min(remainingFromItems, remainingFromPayments);
 
-  const itemPct =
-    fullSub > 0.001 ? Math.round((itemPaidSub / fullSub) * 100) : 100;
-  const paymentPct =
-    fullSub > 0.001 && paymentsSub > 0
-      ? Math.round((Math.min(paymentsSub, fullSub) / fullSub) * 100)
-      : 0;
-  const guestDenom = Math.max(input.guestCount, input.paidGuestIds.length, 1);
-  const guestPct = Math.round((input.paidGuestIds.length / guestDenom) * 100);
-
-  const paidPct = Math.min(
-    100,
-    Math.max(itemPct, paymentPct, input.paidGuestIds.length > 0 ? guestPct : 0),
-  );
-
   const allItemsPaid = isTableFullyPaid(input.items, input.paidItemIds);
-  const allGuestsPaid =
-    input.guestCount > 0 &&
-    input.paidGuestIds.length >= input.guestCount;
   const paymentsCoverBill = paymentsSub >= fullSub - 0.02;
-  const tableClosed =
-    allItemsPaid || allGuestsPaid || paymentsCoverBill || remainingSub <= 0.01;
+  /** Mesa cerrada solo cuando la cuenta está cubierta — no porque un comensal pagó su parte. */
+  const tableClosed = allItemsPaid || paymentsCoverBill;
+
+  const paidSubBase = Math.max(
+    itemPaidSub,
+    paymentsSub > 0 ? Math.min(paymentsSub, fullSub) : 0,
+  );
+  const paidPctRaw =
+    fullSub > 0.001
+      ? Math.min(100, Math.round((paidSubBase / fullSub) * 100))
+      : tableClosed
+        ? 100
+        : 0;
 
   return {
     mesaTotal,
     remainingSub: tableClosed ? 0 : remainingSub,
-    paidPct: tableClosed ? 100 : paidPct,
+    paidPct: tableClosed ? 100 : paidPctRaw,
     paidCount: input.paidGuestIds.length,
     tableClosed,
   };

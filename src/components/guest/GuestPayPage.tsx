@@ -198,6 +198,7 @@ function GuestPayShell({
       pendingClaims={"pendingClaims" in live ? live.pendingClaims : undefined}
       paidSummaries={"paidSummaries" in live ? live.paidSummaries : undefined}
       demoTableProgress={demoProgress ?? undefined}
+      tableToken={token}
     />
     </>
   );
@@ -213,8 +214,19 @@ export function GuestPayPage({ token }: GuestPayPageProps) {
 function GuestDemoPayPage({ token }: { token: string }) {
   const live = useDemoTableSession(token);
 
+  // Never render a blank shell — lobby is static and safe before sessionStorage is read.
   if (!live.hydrated) {
-    return <div className="cust-root cust-app demo-entry-hydrate" aria-busy="true" />;
+    return (
+      <DemoTableEntry
+        restaurantName={live.lobby.restaurantName}
+        tagline={live.lobby.tagline}
+        table={live.lobby.table}
+        city={live.lobby.city}
+        onEnter={() => {}}
+        entering
+        error={null}
+      />
+    );
   }
 
   const inTable = Boolean(live.guestSessionId);

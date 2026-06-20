@@ -26,6 +26,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
 import {
+  avatarColor,
   billSubtotal,
   claimantsOf,
   computeTotals,
@@ -33,14 +34,11 @@ import {
   freeUnits,
   guestAvatarHue,
   guestLabel,
-  initialsFor,
   isItemPaid,
-  itemOwed,
   lineTotal,
   paidSubtotal,
   resolveMemberDisplay,
   resolveRoster,
-  unclaimedItems,
   unitsOf,
 } from "@/lib/guest-billing/split-math";
 import type {
@@ -50,9 +48,10 @@ import type {
   TableMember,
 } from "@/lib/guest-billing/types";
 import { expandRepeatedItems } from "@/lib/guest-billing/bill-display";
+import { payerAvatarInitials } from "@/lib/guest-billing/bill-shell-scroll";
 import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
 
-import { AvatarStack, EqualShareVisual, Ic, LogoMark, NamePill } from "./_shared";
+import { AvatarStack, AvatarDot, EqualShareVisual, Ic, LogoMark, NamePill, OwnerChip, TableRosterCompact } from "./_shared";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
 
@@ -66,9 +65,6 @@ const NAME_PLACEHOLDERS = [
 ];
 
 const COPY = {
-  helperItem: "Toca los platos que pediste. Pagas solo lo tuyo.",
-  helperEqual: "Lo que falta se reparte en partes iguales.",
-  helperTodo: "Pagas toda la cuenta de un solo. ¡Listo!",
   nameRequired: "Pon tu nombre para saber quién paga qué",
   yourPart: "Tu parte",
 };
@@ -79,9 +75,9 @@ const SPLIT_MODES = [
   { k: "todo" as const, label: "Todo", icon: Ic.receipt },
 ];
 
-/* ── NameField ───────────────────────────────────────────────── */
+/* ── PayerNameRow (First Page inline name) ─────────────────── */
 
-function NameField({
+function PayerNameRow({
   value,
   invalid,
   onChange,
@@ -92,11 +88,12 @@ function NameField({
   invalid: boolean;
   onChange: (next: string) => void;
   youHue: number;
-  /** Shown in the avatar pill when the input is empty — e.g. "Persona 1". */
   fallbackLabel?: string;
 }) {
   const [ph, setPh] = useState(NAME_PLACEHOLDERS[0]);
   const [focused, setFocused] = useState(false);
+  const trimmed = value.trim();
+  const avatarInitials = payerAvatarInitials(value, fallbackLabel ?? "");
 
   useEffect(() => {
     if (value || focused) return;
@@ -109,49 +106,36 @@ function NameField({
   }, [value, focused]);
 
   return (
-    <div>
-      <div
-        className={"name-field glassx" + (invalid ? " invalid" : "")}
-        style={{ borderRadius: 20 }}
+    <div className={"payer-name-block" + (invalid ? " invalid" : "")}>
+      <span
+        className="payer-av"
+        style={{ background: avatarColor(youHue) }}
+        aria-hidden="true"
+        data-testid="payer-avatar-initials"
       >
-        <span className="name-emoji" aria-hidden="true">
-          🙋
-        </span>
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          placeholder={ph}
-          aria-label="Tu nombre"
-          autoComplete="off"
-          spellCheck={false}
-          maxLength={10}
-          data-testid="bill-name-input"
-        />
-        {value.trim() ? (
-          <NamePill
-            name={value}
-            member={{
-              initials: initialsFor(value),
-              hue: youHue,
-              isYou: true,
-            }}
-            size={40}
+        {avatarInitials}
+      </span>
+      <div className="payer-name-main">
+        <span className="payer-label">Pagas como</span>
+        <div className="payer-name-capsule">
+          <input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={ph}
+            aria-label="Tu nombre"
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={10}
+            data-testid="bill-name-input"
+            size={Math.max(4, trimmed.length || fallbackLabel?.length || 4)}
           />
-        ) : fallbackLabel ? (
-          <NamePill
-            label={fallbackLabel}
-            member={{ hue: youHue, isYou: true }}
-            size={40}
-          />
-        ) : null}
-      </div>
-      {invalid && (
-        <div className="name-warn">
-          <Ic.bell s={14} /> {COPY.nameRequired}
+          <span className="payer-chevron" aria-hidden="true">
+            ›
+          </span>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -193,19 +177,21 @@ export function BillItemRow({
     (pendingOp === "claim" && !serverMine) ||
     (pendingOp === "release" && serverMine);
   const mine = serverMine && !isLoading;
-  const shared = claimants.length > 1;
   const interactive = mode === "item" && !paid && !isLoading;
-  const myAmt = itemOwed(item, displayClaims, youId);
+  const todoCovers = mode === "todo" && !paid;
+  const rowSelected = (mode === "item" && mine && !paid) || todoCovers;
 
-  const displayIndex = item.displayIndex ?? null;
   const displayLabel = item.displayLabel ?? item.name;
 
   const cls =
-    "c-item" +
-    (interactive ? " tappable" : " passive") +
-    (mine && mode === "item" && !paid ? " mine" : "") +
+    "item-row-fp" +
+    (interactive ? " tappable" : "") +
+    (rowSelected ? " on" : "") +
     (isLoading ? " syncing" : "") +
     (paid ? " paid" : "");
+
+  const showCheck = mode === "item" || mode === "todo";
+  const checkOn = paid || (mode === "item" && mine) || todoCovers;
 
   return (
     <div
@@ -217,109 +203,80 @@ export function BillItemRow({
       data-testid={`bill-item-${item.id}`}
       data-syncing={isLoading ? "true" : undefined}
     >
-      {/* Número siempre visible en círculo */}
-      {displayIndex !== null ? (
+      {showCheck ? (
         <span
           className={
-            "c-tick" +
-            (paid ? " paid-tick on" : isLoading ? " loading" : mine && mode === "item" ? " on" : "")
+            "item-fp-check" +
+            (paid ? " paid" : isLoading ? " loading" : checkOn ? " on" : "")
           }
           aria-label={
             isLoading
-              ? `Sincronizando ítem ${displayIndex}`
+              ? "Sincronizando"
               : paid
-                ? `Ítem ${displayIndex} pagado`
-                : mine
-                  ? `Ítem ${displayIndex} escogido`
-                  : `Ítem ${displayIndex}`
+                ? "Pagado"
+                : checkOn
+                  ? "Incluido"
+                  : "Disponible"
           }
         >
           {isLoading ? (
             <span className="c-tick-spinner" aria-hidden="true" />
-          ) : (
-            <span className="c-tick-num">{displayIndex}</span>
-          )}
+          ) : paid || checkOn ? (
+            <Ic.check s={13} w={2.2} />
+          ) : null}
+        </span>
+      ) : paid ? (
+        <span className="item-fp-check paid" aria-label="Pagado">
+          <Ic.check s={13} w={2.2} />
         </span>
       ) : (
-        paid ? (
-          <span className="c-tick paid-tick on" aria-label="Pagado">
-            <span className="c-tick-num">✓</span>
-          </span>
-        ) : mode === "item" ? (
-          <span
-            className={
-              "c-tick" +
-              (isLoading ? " loading" : mine ? " on" : "")
-            }
-            aria-busy={isLoading || undefined}
-          >
-            {isLoading ? (
-              <span className="c-tick-spinner" aria-hidden="true" />
-            ) : (
-              <span className="c-tick-num">{mine ? "✓" : "·"}</span>
-            )}
-          </span>
-        ) : (
-          <span className="c-item-emoji">{item.emoji}</span>
-        )
+        <span className="item-fp-emoji" aria-hidden="true">
+          {item.emoji}
+        </span>
       )}
 
-      <div className="c-item-main">
-        {/* Nombre con emoji inline */}
-        <div className={"c-item-name" + (paid ? " struck" : "")}>
-          {item.emoji && <span className="c-item-emoji-inline">{item.emoji} </span>}
+      {(mode === "item" || mode === "todo") && (
+        <span className="item-fp-emoji" aria-hidden="true">
+          {item.emoji}
+        </span>
+      )}
+
+      <div className="item-fp-main">
+        <div className={"item-fp-name" + (paid ? " struck" : "")}>
           {displayLabel}
           {paid && (
             <span className="paid-lock" aria-label="Pagado">
-              <Ic.lock s={13} />
+              <Ic.lock s={12} />
             </span>
           )}
         </div>
-
-        {/* Fila de subtexto: badge pagado O claimants + estado */}
-        <div className="c-item-sub">
+        <div className="item-fp-sub">
           {paid ? (
             <span className="paid-tag">Pagado</span>
-          ) : (
-            <>
-              {mode === "item" && isLoading && (
-                <span className="sync-tag">Guardando…</span>
-              )}
-              {mode === "item" && !isLoading && claimants.length > 0 && (
-                <AvatarStack
-                  ids={claimants}
-                  roster={members}
-                  size={28}
-                  max={4}
-                  youId={youId}
-                  youName={state.name}
-                />
-              )}
-              {mode === "item" && shared && (
-                <span className="shared-tag">compartido</span>
-              )}
-              {mode === "item" && free > 0.001 && !mine && claimants.length === 0 && (
-                <span className="free-tag">
-                  <span className="dot" /> Toca para escogerlo
-                </span>
-              )}
-              {mode === "item" && free <= 0.001 && !mine && !paid && claimants.length === 0 && (
-                <span className="taken-tag">Escogido</span>
-              )}
-            </>
-          )}
+          ) : mode === "item" && isLoading ? (
+            <span className="sync-tag">Guardando…</span>
+          ) : mode === "item" && claimants.length > 0 ? (
+            <OwnerChip
+              ids={claimants}
+              roster={members}
+              youId={youId}
+              youName={state.name}
+            />
+          ) : mode === "todo" && !paid ? (
+            <span className="todo-item-tag">Incluido en tu pago</span>
+          ) : mode === "item" && free > 0.001 && !mine && claimants.length === 0 ? (
+            <span className="free-tag">
+              <span className="dot" /> Toca para escogerlo
+            </span>
+          ) : mode === "item" && free <= 0.001 && !mine && claimants.length === 0 ? (
+            <span className="taken-tag">Escogido</span>
+          ) : null}
         </div>
       </div>
 
-      {/* Precio a la derecha */}
-      <div className="c-item-right">
-        <span className={"c-item-price" + (paid ? " struck" : "")}>
-          {fmt(lineTotal(item))}
-        </span>
-        {interactive && mine && myAmt > 0 && (
-          <span className="c-item-yourshare">tú · {fmt(myAmt)}</span>
-        )}
-      </div>
+      <span className={"item-fp-price" + (paid ? " struck" : "")}>
+        {fmt(lineTotal(item))}
+      </span>
     </div>
   );
 }
@@ -442,28 +399,6 @@ function SharePicker({
   );
 }
 
-/* ── SummaryRow helper ────────────────────────────────────────── */
-
-function SummaryRow({
-  label,
-  value,
-  badge,
-}: {
-  label: string;
-  value: string;
-  badge?: string;
-}) {
-  return (
-    <div className="c-sum-row">
-      <span>
-        {label}
-        {badge && <span className="badge">{badge}</span>}
-      </span>
-      <span className="v">{value}</span>
-    </div>
-  );
-}
-
 /* ── BillStage ───────────────────────────────────────────────── */
 
 export interface BillStageProps {
@@ -521,23 +456,15 @@ export function BillStage({
   );
 
   const fullSub = useMemo(() => billSubtotal(items), [items]);
-  const claimedAll = unclaimedItems(items, displayClaims).length === 0;
   const paidSub = paidSubtotal(items, paidItemIds);
   const someonePaid = paidItemIds.length > 0;
-
-  const helper =
-    mode === "equal"
-      ? COPY.helperEqual
-      : mode === "todo"
-        ? COPY.helperTodo
-        : COPY.helperItem;
 
   const myItemCount = items.filter(
     (it) =>
       unitsOf(displayClaims, it.id, flow.youId) > 0 && !paidItemIds.includes(it.id),
   ).length;
 
-  const tipPresets = config.tipPresets;
+  const tipPresets = config.tipPresets.filter((p) => p > 0);
   const tipIsPreset = tipPresets.includes(tip);
   const showOtherTip = otherTip || !tipIsPreset;
 
@@ -568,152 +495,161 @@ export function BillStage({
     [displayMembers, flow.youId, state.name, members],
   );
 
+  const payerDisplayName =
+    state.name.trim() ||
+    youMember.seatLabel ||
+    members.find((m) => m.id === flow.youId)?.seatLabel ||
+    guestLabel(Math.max(1, members.findIndex((m) => m.id === flow.youId) + 1));
+
   return (
     <>
-      {/* ── Header compacto ─────────────────────────────────── */}
-      <div className="bill-head-compact glassx">
-        <div className="bill-head-row">
-          <LogoMark size={26} />
-          <span className="bill-head-venue">
-            {config.name} · Mesa {config.table}
-          </span>
-          <span className="live-pill-sm glassx">
-            <span className="dot" /> En vivo
-          </span>
+      <div className="bill-card-fluid" data-testid="bill-card-fluid">
+        {/* Venue + total */}
+        <div className="bill-card-top">
+          <div className="bill-card-venue-row">
+            <LogoMark size={24} />
+            <span className="bill-card-venue">{config.name}</span>
+            <span className="live-pill-sm glassx">
+              <span className="dot" /> Mesa {config.table}
+            </span>
+          </div>
+          <div className="bill-card-total-block">
+            <span className="bill-card-total-label">Total por pagar</span>
+            {someonePaid && remainingTotal < mesaTotal - 0.009 && (
+              <span className="bill-card-total-struck">{fmt(mesaTotal)}</span>
+            )}
+            <span className="bill-card-total-main">{fmt(remainingTotal)}</span>
+          </div>
+          {someonePaid && (
+            <div className="bill-card-paid-hint">
+              Pagado {fmt(paidTotalWithTax)} (
+              {mesaTotal > 0.01
+                ? Math.round((paidTotalWithTax / mesaTotal) * 100)
+                : 0}
+              %) · mesa {fmt(mesaTotal)}
+            </div>
+          )}
         </div>
-        <div className="bill-head-total-row">
-          <span className="bill-head-total-label">Total por pagar:</span>
-          <span className="bill-head-total-amount">{fmt(remainingTotal)}</span>
+
+        <hr className="bill-card-hr" />
+
+        {/* Payer + roster */}
+        <div className="payer-row">
+          <PayerNameRow
+            value={state.name}
+            invalid={state.nameErr}
+            onChange={(v) => flow.setName(v)}
+            youHue={youMember.hue}
+            fallbackLabel={
+              youMember.seatLabel ??
+              members.find((m) => m.id === flow.youId)?.seatLabel ??
+              guestLabel(
+                Math.max(1, members.findIndex((m) => m.id === flow.youId) + 1),
+              )
+            }
+          />
+          <TableRosterCompact members={displayMembers} />
         </div>
-        {someonePaid && (
-          <div className="bill-head-paid-hint">
-            Pagado {fmt(paidTotalWithTax)} · mesa {fmt(mesaTotal)}
+        {state.nameErr && (
+          <div className="payer-warn">
+            <Ic.bell s={14} /> {COPY.nameRequired}
           </div>
         )}
-      </div>
 
-      {/* ── Nombre ──────────────────────────────────────────── */}
-      <div>
-        <div className="sec-label" style={{ marginBottom: 9 }}>
-          ¿Quién paga?
-        </div>
-        <NameField
-          value={state.name}
-          invalid={state.nameErr}
-          onChange={(v) => flow.setName(v)}
-          youHue={youMember.hue}
-          fallbackLabel={
-            youMember.seatLabel ??
-            members.find((m) => m.id === flow.youId)?.seatLabel ??
-            guestLabel(Math.max(1, members.findIndex((m) => m.id === flow.youId) + 1))
-          }
-        />
-      </div>
-
-      {/* ── SplitModeSelector ───────────────────────────────── */}
-      <div>
-        <div className="sec-label" style={{ marginBottom: 9 }}>
-          ¿Cómo dividimos?
-        </div>
-        <div className="modeseg glassx" role="tablist">
-          {SPLIT_MODES.map((m) => {
-            const Icon = m.icon;
-            const on = mode === m.k;
-            return (
-              <button
-                key={m.k}
-                className={on ? "on" : ""}
-                onClick={() => flow.setMode(m.k)}
-                role="tab"
-                aria-selected={on}
-                data-testid={`bill-mode-${m.k}`}
-              >
-                <span className="mi">
-                  <Icon s={19} />
-                </span>
-                {m.label}
-              </button>
-            );
-          })}
-        </div>
-        <p className="c-helper" style={{ marginTop: 11 }}>
-          {helper}
-        </p>
-      </div>
-
-      {/* ── Control específico del modo ─────────────────────── */}
-      {mode === "equal" && (
-        <>
-          <div className="surfx" style={{ borderRadius: 22 }}>
-            <div className="row-control">
-              <div className="lbl">
-                ¿Entre cuántos van?
-                <small>
-                  {someonePaid
-                    ? `${fmt(derived.remainingSub)} restante ÷ ${people}`
-                    : `${fmt(fullSub)} ÷ ${people} personas`}
-                </small>
-              </div>
-              <Stepper
-                value={people}
-                min={1}
-                max={20}
-                onChange={(v) => flow.setPeople(v)}
-              />
-            </div>
+        {/* Split modes */}
+        <div className="bill-card-modes">
+          <div className="modeseg glassx" role="tablist">
+            {SPLIT_MODES.map((m) => {
+              const Icon = m.icon;
+              const on = mode === m.k;
+              return (
+                <button
+                  key={m.k}
+                  className={on ? "on" : ""}
+                  onClick={() => flow.setMode(m.k)}
+                  role="tab"
+                  aria-selected={on}
+                  data-testid={`bill-mode-${m.k}`}
+                >
+                  <span className="mi">
+                    <Icon s={19} />
+                  </span>
+                  {m.label}
+                </button>
+              );
+            })}
           </div>
-          <EqualShareVisual
-            members={displayMembers}
-            people={people}
-            perPersonLabel={fmt(derived.totals.total)}
-          />
-        </>
-      )}
-      {mode === "todo" && (
-        <div className="surfx todo-card">
-          <div className="todo-payer-av">
-            <span className="todo-payer-crown" aria-hidden="true">
-              👑
+        </div>
+
+        {/* Mode context */}
+        {mode === "item" && (
+          <div className="mode-payer-widget item-mode-widget">
+            <span className="owner-chip owner-chip-you owner-chip-header">
+              <span className="owner-chip-avs">
+                <AvatarDot member={youMember} name={state.name} size={22} />
+              </span>
+              <span className="owner-chip-label">{payerDisplayName}</span>
             </span>
-            <NamePill member={youMember} name={state.name} size={60} />
+            <div className="mode-payer-sub">Toca los platos que pediste</div>
           </div>
-          <div className="todo-t">Tú cierras la mesa</div>
-          <div className="todo-big">{fmt(derived.totals.total)}</div>
-          <div className="todo-s">
-            {someonePaid
-              ? `Ya se pagó ${fmt(paidSub)} · tú cubres lo que falta`
-              : "Cubres la cuenta completa de la mesa"}
-          </div>
-        </div>
-      )}
+        )}
+        {mode === "equal" && (
+          <>
+            <div className="bill-card-equal-controls">
+              <div className="row-control">
+                <div className="lbl">
+                  ¿Entre cuántos van?
+                  <small>
+                    {someonePaid
+                      ? `${fmt(derived.remainingSub)} restante ÷ ${people}`
+                      : `${fmt(fullSub)} ÷ ${people} personas`}
+                  </small>
+                </div>
+                <Stepper
+                  value={people}
+                  min={2}
+                  max={20}
+                  onChange={(v) => flow.setPeople(v)}
+                />
+              </div>
+            </div>
+            <div className="mode-info-banner">
+              Dividido en partes iguales entre <strong>{people}</strong> ·{" "}
+              <strong>{fmt(derived.totals.total)}</strong> c/u
+            </div>
+            <EqualShareVisual
+              members={displayMembers}
+              people={people}
+              perPersonLabel={fmt(derived.totals.total)}
+              compact
+            />
+          </>
+        )}
+        {mode === "todo" && (
+          <>
+            <div className="mode-info-banner">
+              Pagas la cuenta completa de la mesa
+            </div>
+            <div className="surfx todo-card">
+              <div className="todo-payer-av">
+                <span className="todo-payer-crown" aria-hidden="true">
+                  👑
+                </span>
+                <NamePill member={youMember} name={state.name} size={60} />
+              </div>
+              <div className="todo-t">{payerDisplayName} cierra la mesa</div>
+              <div className="todo-big">{fmt(derived.totals.total)}</div>
+              <div className="todo-s">
+                {someonePaid
+                  ? `Ya se pagó ${fmt(paidSub)} · cubres lo que falta`
+                  : "Todos los platos incluidos · cuenta completa"}
+              </div>
+            </div>
+          </>
+        )}
 
-      {/* ── Lista de ítems ──────────────────────────────────── */}
-      <div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "baseline",
-            margin: "0 6px 9px",
-          }}
-        >
-          <span className="sec-label">
-            {mode === "item" ? "Escoge tus platos" : "Cuenta de la mesa"}
-          </span>
-          <span
-            style={{
-              fontSize: 13.5,
-              color: "var(--c-ink-2)",
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            {mode === "item" && myItemCount > 0
-              ? `${myItemCount} tuyo${myItemCount > 1 ? "s" : ""}`
-              : `${items.length} platos · ${fmt(fullSub)}`}
-          </span>
-        </div>
-
-        <div className="surfx c-items">
+        {/* Items */}
+        <div>
           {sortedItems.map((it) => (
             <BillItemRow
               key={it.id}
@@ -728,8 +664,6 @@ export function BillStage({
           ))}
         </div>
 
-        {/* Empty-state hint when in item mode and the user has claimed 0 items —
-            gentle nudge that disappears the moment they tap their first plate. */}
         {mode === "item" && myItemCount === 0 && (
           <div className="bill-empty-hint" data-testid="bill-empty-hint">
             <Ic.bell s={14} />
@@ -738,12 +672,7 @@ export function BillStage({
         )}
 
         {mode === "item" && (
-          <div className="items-foot">
-            {!claimedAll && myItemCount > 0 && (
-              <p className="c-helper" style={{ margin: 0 }}>
-                Toca un plato para escogerlo como tuyo.
-              </p>
-            )}
+          <div className="bill-card-foot">
             {shareEnabled && (
               <button
                 className="share-entry"
@@ -755,144 +684,136 @@ export function BillStage({
             )}
           </div>
         )}
-      </div>
 
-      {/* ── Propina ─────────────────────────────────────────── */}
-      <div className="surfx" style={{ borderRadius: 22 }}>
-        <div className="row-control">
-          <div className="lbl">
-            Propina<small>Sobre tu parte · opcional</small>
-          </div>
-          <div className="tip-chips">
-            {tipPresets.map((p) => (
-              <button
-                key={p}
-                className={!otherTip && tip === p ? "on" : ""}
-                onClick={() => {
-                  setOtherTip(false);
-                  setOtherUsd('');
-                  flow.setTip(p);
-                }}
-                data-testid={`bill-tip-${p}`}
-              >
-                {p}%
-              </button>
-            ))}
-            <button
-              className={showOtherTip ? "on" : ""}
-              onClick={() => setOtherTip(true)}
-              data-testid="bill-tip-other"
-            >
-              Otro
-            </button>
-          </div>
-        </div>
-        {showOtherTip && (
-          <div className="tip-other">
-            <span className="tip-other-lbl">
-              {derived.subtotal > 0
-                ? 'Monto de propina'
-                : 'Ingresa luego de tener cuenta'}
+        <hr className="bill-card-hr" />
+
+        {/* Fused totals + inline tip */}
+        <div className="totals-fused">
+          <div className="totals-fused-row">
+            <span>
+              {mode === "equal"
+                ? `Tu parte · 1 de ${people}`
+                : mode === "todo"
+                  ? "Subtotal · cuenta completa"
+                  : `Subtotal · ${myItemCount} plato${myItemCount !== 1 ? "s" : ""}`}
             </span>
-            {/* POS-style centavos display — fills right-to-left as user types digits */}
-            <div
-              className="tip-pos-display"
-              role="group"
-              aria-label="Monto de propina en dólares"
-            >
-              <span className="tip-pos-amount" aria-live="polite">
-                ${(parseInt(otherUsd || '0', 10) / 100).toFixed(2)}
+            <span className="v">{fmt(derived.subtotal)}</span>
+          </div>
+          <div className="totals-fused-row">
+            <span>IVA {Math.round(config.ivaRate * 100)}%</span>
+            <span className="v">{fmt(derived.totals.iva)}</span>
+          </div>
+          {config.serviceEnabled && (
+            <div className="totals-fused-row">
+              <span>
+                Servicio{" "}
+                <span className="badge">{Math.round(config.serviceRate * 100)}%</span>
               </span>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value=""
-                readOnly={derived.subtotal <= 0}
-                disabled={derived.subtotal <= 0}
-                aria-label="Monto de propina en dólares"
-                autoFocus
-                className="tip-pos-hidden-input"
-                onKeyDown={(e) => {
-                  if (derived.subtotal <= 0) return;
-                  if (e.key >= '0' && e.key <= '9') {
-                    const next = Math.min(
-                      parseInt(otherUsd || '0', 10) * 10 + parseInt(e.key, 10),
-                      99999999,
-                    );
-                    const nextStr = String(next);
-                    setOtherUsd(nextStr);
-                    const amount = next / 100;
-                    if (amount > 0) {
-                      const pct = Math.round((amount / derived.subtotal) * 100 * 100) / 100;
-                      flow.setTip(Math.max(0, pct));
-                    } else {
-                      flow.setTip(0);
-                    }
-                  } else if (e.key === 'Backspace') {
-                    const next = Math.floor(parseInt(otherUsd || '0', 10) / 10);
-                    const nextStr = next > 0 ? String(next) : '';
-                    setOtherUsd(nextStr);
-                    if (next === 0) {
-                      flow.setTip(0);
-                    } else {
-                      const amount = next / 100;
-                      const pct = Math.round((amount / derived.subtotal) * 100 * 100) / 100;
-                      flow.setTip(Math.max(0, pct));
-                    }
-                  }
-                }}
-              />
+              <span className="v">{fmt(derived.totals.servicio)}</span>
+            </div>
+          )}
+          <div className="totals-fused-row tip-row">
+            <span>Propina</span>
+            <div className="tip-row-body">
+              <div className="tip-inline-chips">
+                {tipPresets.map((p) => (
+                  <button
+                    key={p}
+                    className={!otherTip && tip === p ? "on" : ""}
+                    onClick={() => {
+                      setOtherTip(false);
+                      setOtherUsd("");
+                      flow.setTip(p);
+                    }}
+                    data-testid={`bill-tip-${p}`}
+                  >
+                    {`${p}%`}
+                  </button>
+                ))}
+                <button
+                  className={showOtherTip ? "on" : ""}
+                  onClick={() => setOtherTip(true)}
+                  data-testid="bill-tip-other"
+                >
+                  Otro
+                </button>
+              </div>
+              {tip > 0 && (
+                <span className="tip-amount">{fmt(derived.totals.propina)}</span>
+              )}
             </div>
           </div>
-        )}
-      </div>
-
-      {/* ── Resumen (tu parte) ──────────────────────────────── */}
-      <div className="c-sum glassx">
-        <div className="sec-label" style={{ marginBottom: 14 }}>
-          {COPY.yourPart}
-        </div>
-        <SummaryRow
-          label={
-            mode === "equal"
-              ? "Subtotal (tu parte)"
-              : mode === "todo"
-                ? "Subtotal de la cuenta"
-                : `Subtotal · ${myItemCount} ítem${myItemCount !== 1 ? "s" : ""}`
-          }
-          value={fmt(derived.subtotal)}
-        />
-        <div className="c-sum-rows" style={{ marginTop: 11 }}>
-          <SummaryRow
-            label={`IVA ${Math.round(config.ivaRate * 100)}%`}
-            value={fmt(derived.totals.iva)}
-          />
-          {tip > 0 && (
-            <SummaryRow
-              label={showOtherTip ? 'Propina' : `Propina ${tip}%`}
-              value={fmt(derived.totals.propina)}
-            />
+          {showOtherTip && (
+            <div className="tip-other">
+              <span className="tip-other-lbl">
+                {derived.subtotal > 0
+                  ? "Monto de propina"
+                  : "Ingresa luego de tener cuenta"}
+              </span>
+              <div
+                className="tip-pos-display"
+                role="group"
+                aria-label="Monto de propina en dólares"
+              >
+                <span className="tip-pos-amount" aria-live="polite">
+                  ${(parseInt(otherUsd || "0", 10) / 100).toFixed(2)}
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value=""
+                  readOnly={derived.subtotal <= 0}
+                  disabled={derived.subtotal <= 0}
+                  aria-label="Monto de propina en dólares"
+                  autoFocus
+                  className="tip-pos-hidden-input"
+                  onKeyDown={(e) => {
+                    if (derived.subtotal <= 0) return;
+                    if (e.key >= "0" && e.key <= "9") {
+                      const next = Math.min(
+                        parseInt(otherUsd || "0", 10) * 10 + parseInt(e.key, 10),
+                        99999999,
+                      );
+                      const nextStr = String(next);
+                      setOtherUsd(nextStr);
+                      const amount = next / 100;
+                      if (amount > 0) {
+                        const pct =
+                          Math.round((amount / derived.subtotal) * 100 * 100) / 100;
+                        flow.setTip(Math.max(0, pct));
+                      } else {
+                        flow.setTip(0);
+                      }
+                    } else if (e.key === "Backspace") {
+                      const next = Math.floor(parseInt(otherUsd || "0", 10) / 10);
+                      const nextStr = next > 0 ? String(next) : "";
+                      setOtherUsd(nextStr);
+                      if (next === 0) {
+                        flow.setTip(0);
+                      } else {
+                        const amount = next / 100;
+                        const pct =
+                          Math.round((amount / derived.subtotal) * 100 * 100) / 100;
+                        flow.setTip(Math.max(0, pct));
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
           )}
-          {config.serviceEnabled && (
-            <SummaryRow
-              label="Servicio"
-              badge={`${Math.round(config.serviceRate * 100)}%`}
-              value={fmt(derived.totals.servicio)}
-            />
-          )}
-          <hr className="c-sum-hair" />
-          <div className="c-sum-total-row">
-            <span className="k">Total a pagar</span>
-            <span className="v" data-testid="bill-total">
-              {fmt(derived.totals.total)}
-            </span>
-          </div>
+        </div>
+
+        <hr className="bill-card-hr" />
+
+        <div className="bill-your-part-row">
+          <span className="bill-your-part-label">{COPY.yourPart}</span>
+          <span className="bill-your-part-amt" data-testid="bill-total">
+            {fmt(derived.totals.total)}
+          </span>
         </div>
       </div>
-
-      {/* CTA handled by the sticky dock in BillShellStage — no inline button here */}
-      <div style={{ height: 8 }} aria-hidden="true" />
 
       {state.sharePicker && (
         <SharePicker flow={flow} items={items} members={members} />

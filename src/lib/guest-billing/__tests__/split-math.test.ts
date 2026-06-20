@@ -92,8 +92,8 @@ describe("initialsFor", () => {
   });
 
   it("abbreviates Persona labels for compact initials", () => {
-    expect(initialsFor("Persona 1")).toBe("PE");
-    expect(initialsFor("Persona 12")).toBe("PE");
+    expect(initialsFor("Persona 1")).toBe("P1");
+    expect(initialsFor("Persona 12")).toBe("P12");
   });
 
   it("returns first two characters uppercased for real names", () => {

@@ -168,10 +168,6 @@ function CardSinReclamar({ items, flow }: { items: readonly BillItem[]; flow: Fl
           ))}
         </div>
       </div>
-      <div className="disclaimer">
-        <div className="disclaimer-em">😅</div>
-        <div><b>Tranqui:</b> puedes pagar lo tuyo ahora. Entre todos, la mesa debe quedar pagada antes de cerrar.</div>
-      </div>
     </>
   );
 }

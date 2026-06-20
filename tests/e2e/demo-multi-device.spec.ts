@@ -43,12 +43,10 @@ async function enterTable(page: Page): Promise<void> {
   }
 }
 
-async function readDebugGuestLabel(page: Page): Promise<string> {
-  // Debug panel exposes the seatLabel — we use the avatar pill instead since
-  // it's a stable visible cue
-  const pill = page.locator(".name-field .av-pill.you").first();
-  await pill.waitFor({ state: "visible", timeout: 5_000 });
-  return (await pill.textContent())?.trim() ?? "";
+async function readPayerAvatarInitials(page: Page): Promise<string> {
+  const av = page.getByTestId("payer-avatar-initials");
+  await av.waitFor({ state: "visible", timeout: 5_000 });
+  return (await av.textContent())?.trim() ?? "";
 }
 
 test.beforeEach(async ({ request }) => {
@@ -67,12 +65,12 @@ test.describe("Layer 2 — multi-device UI", () => {
       await enterTable(b.page);
       await enterTable(c.page);
 
-      const labelA = await readDebugGuestLabel(a.page);
-      const labelB = await readDebugGuestLabel(b.page);
-      const labelC = await readDebugGuestLabel(c.page);
+      const labelA = await readPayerAvatarInitials(a.page);
+      const labelB = await readPayerAvatarInitials(b.page);
+      const labelC = await readPayerAvatarInitials(c.page);
 
       const labels = [labelA, labelB, labelC].sort();
-      expect(labels).toEqual(["Persona 1", "Persona 2", "Persona 3"]);
+      expect(labels).toEqual(["P1", "P2", "P3"]);
     } finally {
       await a.ctx.close();
       await b.ctx.close();
@@ -84,8 +82,8 @@ test.describe("Layer 2 — multi-device UI", () => {
     const d = await openDevice(browser);
     try {
       await enterTable(d.page);
-      const labelBefore = await readDebugGuestLabel(d.page);
-      expect(labelBefore).toBe("Persona 1");
+      const labelBefore = await readPayerAvatarInitials(d.page);
+      expect(labelBefore).toBe("P1");
 
       // Reload — sessionStorage entered flag survives reload (not a "navigate"),
       // so the hook re-joins via stored guestId+deviceId and lands in bill again.
@@ -94,8 +92,8 @@ test.describe("Layer 2 — multi-device UI", () => {
       // open forever, so networkidle never resolves.
       await d.page.getByTestId("bill-name-input").waitFor({ state: "visible", timeout: 30_000 });
 
-      const labelAfter = await readDebugGuestLabel(d.page);
-      expect(labelAfter).toBe("Persona 1");
+      const labelAfter = await readPayerAvatarInitials(d.page);
+      expect(labelAfter).toBe("P1");
     } finally {
       await d.ctx.close();
     }
@@ -108,14 +106,14 @@ test.describe("Layer 2 — multi-device UI", () => {
       const input = d.page.getByTestId("bill-name-input");
 
       // Before typing, the avatar should still show "Persona 1" (Fix B)
-      const labelBefore = await readDebugGuestLabel(d.page);
-      expect(labelBefore).toBe("Persona 1");
+      const labelBefore = await readPayerAvatarInitials(d.page);
+      expect(labelBefore).toBe("P1");
 
       await input.fill("Manuel");
       // Wait for the pill to reflect the typed name (debounce 150ms + render tick)
       await d.page.waitForTimeout(300);
-      const labelAfter = await readDebugGuestLabel(d.page);
-      expect(labelAfter).toBe("Manuel");
+      const labelAfter = await readPayerAvatarInitials(d.page);
+      expect(labelAfter).toBe("MA");
 
       // Value of input field
       expect(await input.inputValue()).toBe("Manuel");
@@ -136,8 +134,8 @@ test.describe("Layer 2 — multi-device UI", () => {
       await a.page.waitForTimeout(400);
       await b.page.waitForTimeout(400);
 
-      expect(await readDebugGuestLabel(a.page)).toBe("Manuel");
-      expect(await readDebugGuestLabel(b.page)).toBe("Ale");
+      expect(await readPayerAvatarInitials(a.page)).toBe("MA");
+      expect(await readPayerAvatarInitials(b.page)).toBe("AL");
     } finally {
       await a.ctx.close();
       await b.ctx.close();
@@ -151,7 +149,7 @@ test.describe("Layer 2 — multi-device UI", () => {
     const a = await openDevice(browser);
     try {
       await enterTable(a.page);
-      expect(await readDebugGuestLabel(a.page)).toBe("Persona 1");
+      expect(await readPayerAvatarInitials(a.page)).toBe("P1");
 
       // Simulate reset via API (the success-screen button uses the same endpoint)
       await resetDemoTable(request);
@@ -165,7 +163,7 @@ test.describe("Layer 2 — multi-device UI", () => {
       await a.page
         .getByTestId("bill-name-input")
         .waitFor({ state: "visible", timeout: 30_000 });
-      expect(await readDebugGuestLabel(a.page)).toBe("Persona 1");
+      expect(await readPayerAvatarInitials(a.page)).toBe("P1");
     } finally {
       await a.ctx.close();
     }
@@ -185,8 +183,8 @@ test.describe("Layer 2 — multi-device UI", () => {
       const placeholder = await input.getAttribute("placeholder");
       expect(placeholder).toMatch(/^Ej:/);
 
-      // Avatar pill still shows the seatLabel
-      expect(await readDebugGuestLabel(d.page)).toBe("Persona 1");
+      // Avatar shows seat initials when input is empty
+      expect(await readPayerAvatarInitials(d.page)).toBe("P1");
     } finally {
       await d.ctx.close();
     }

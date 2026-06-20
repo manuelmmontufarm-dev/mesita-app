@@ -119,7 +119,8 @@ export const initialsFor = (name: string | null | undefined): string => {
     return s.toUpperCase();
   }
   if (/^Persona \d+$/i.test(s)) {
-    return s.replace(/\s+/g, "").slice(0, 2).toUpperCase();
+    const m = /^Persona (\d+)$/i.exec(s);
+    return m ? `P${m[1]}` : s.replace(/\s+/g, "").slice(0, 2).toUpperCase();
   }
   const letters = s.replace(/\s+/g, "").slice(0, 2);
   return letters.toUpperCase();

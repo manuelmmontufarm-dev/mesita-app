@@ -4,13 +4,17 @@
  * PaymentStage — tarjeta de crédito/débito (demo o proveedor en producción).
  */
 
-import { useState, type InputHTMLAttributes } from "react";
+import { useEffect, useLayoutEffect, useState, type InputHTMLAttributes } from "react";
 
 import type { CameraCardData } from "@/components/guest/CameraScanner";
 import { CameraScanner } from "@/components/guest/CameraScanner";
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
 import type { EInvoicePayload, PaidPayload } from "@/hooks/useGuestPaymentFlow";
 import { fmt, round2 } from "@/lib/guest-billing/split-math";
+import {
+  readStoredPaymentForm,
+  writeStoredPaymentForm,
+} from "@/lib/guest-billing/payment-form-storage";
 import type { RestaurantConfig } from "@/lib/guest-billing/types";
 
 import { Ic } from "./_shared";
@@ -62,9 +66,10 @@ function Field({
 export interface PaymentStageProps {
   flow: Flow;
   config: RestaurantConfig;
+  tableToken?: string;
 }
 
-export function PaymentStage({ flow, config }: PaymentStageProps) {
+export function PaymentStage({ flow, config, tableToken }: PaymentStageProps) {
   const yourTotal = flow.derived.totals.total;
   const isLastPayer = flow.derived.isLastPayer;
   const demoMode = config.demoMode ?? false;
@@ -85,9 +90,33 @@ export function PaymentStage({ flow, config }: PaymentStageProps) {
     email: "",
     phone: "",
   });
+  const [formHydrated, setFormHydrated] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!tableToken) {
+      setFormHydrated(true);
+      return;
+    }
+    const stored = readStoredPaymentForm(tableToken);
+    if (stored) {
+      setCard(stored.card);
+      setBill(stored.bill);
+      if (!isLastPayer) setBillChoice(stored.billChoice);
+    }
+    setFormHydrated(true);
+  }, [tableToken, isLastPayer]);
+
+  useEffect(() => {
+    if (!tableToken || !formHydrated) return;
+    writeStoredPaymentForm(tableToken, {
+      card,
+      bill,
+      billChoice: isLastPayer ? "me" : billChoice,
+    });
+  }, [tableToken, formHydrated, card, bill, billChoice, isLastPayer]);
 
   const wantBilling = isLastPayer || billChoice === "me";
 
