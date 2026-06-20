@@ -20,6 +20,7 @@ import {
   billSubtotal,
   computeTotals,
   freeUnits,
+  guestLabel,
   itemOwed,
   lineTotal,
   memberSubtotal,
@@ -265,7 +266,7 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
 
 /* ---------------- derivation helpers (pure) ---------------- */
 
-const GUEST_NAME = "P1";
+const GUEST_NAME = guestLabel(1);
 
 const METHOD_LABELS: Record<PaymentMethod, string> = {
   datafast: "Datafast",

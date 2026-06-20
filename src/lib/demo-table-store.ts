@@ -1,3 +1,5 @@
+import { guestLabel } from "@/lib/guest-billing/split-math";
+
 export type DemoSplitMode = "item" | "equal" | "todo";
 export type DemoGuestStatus = "selecting" | "reviewing" | "in_payment" | "paid";
 
@@ -181,8 +183,8 @@ export function joinDemoTable(token: string, guestId?: string): {
   state.nextGuestNumber += 1;
   const guest: DemoGuest = {
     id: crypto.randomUUID(),
-    label: `P${number}`,
-    name: `P${number}`,
+    label: guestLabel(number),
+    name: guestLabel(number),
     hue: (number * 53 + 24) % 360,
     status: "selecting",
     joinedAt: ts,

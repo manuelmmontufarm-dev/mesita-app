@@ -9,11 +9,15 @@ import {
   fmt,
   freeUnits,
   GUEST_PREFIX,
+  guestLabel,
+  displayPillLabel,
+  memberPillLabel,
   initialsFor,
   isItemPaid,
   itemOwed,
   lineTotal,
   memberSubtotal,
+  namePillLabel,
   paidSubtotal,
   round2,
   unclaimedItems,
@@ -77,10 +81,15 @@ describe("initialsFor", () => {
     expect(initialsFor(undefined)).toBe("Tú");
   });
 
-  it("preserves guest labels (P1, P2 …) whole and uppercased", () => {
+  it("preserves legacy P labels in initialsFor", () => {
     expect(initialsFor("P1")).toBe("P1");
     expect(initialsFor("p2")).toBe("P2");
     expect(initialsFor(`${GUEST_PREFIX}10`)).toBe("P10");
+  });
+
+  it("abbreviates Persona labels for compact initials", () => {
+    expect(initialsFor("Persona 1")).toBe("PE");
+    expect(initialsFor("Persona 12")).toBe("PE");
   });
 
   it("returns first two characters uppercased for real names", () => {
@@ -88,6 +97,42 @@ describe("initialsFor", () => {
     expect(initialsFor("ana")).toBe("AN");
     expect(initialsFor("manuel")).toBe("MA");
     expect(initialsFor("María José")).toBe("MA");
+  });
+});
+
+describe("namePillLabel", () => {
+  it("returns Tú for empty names", () => {
+    expect(namePillLabel("")).toBe("Tú");
+    expect(namePillLabel("   ")).toBe("Tú");
+  });
+
+  it("keeps short names whole up to 10 characters", () => {
+    expect(namePillLabel("Juanito")).toBe("Juanito");
+    expect(namePillLabel("La Ñaña")).toBe("La Ñaña");
+  });
+
+  it("truncates longer names at 10 characters", () => {
+    expect(namePillLabel("María José")).toBe("María José");
+    expect(namePillLabel("El Panita")).toBe("El Panita");
+    expect(namePillLabel("Supercalifrag")).toBe("Supercalif");
+  });
+});
+
+describe("guestLabel & displayPillLabel", () => {
+  it("formats sequential guests as Persona N", () => {
+    expect(guestLabel(1)).toBe("Persona 1");
+    expect(guestLabel(2)).toBe("Persona 2");
+  });
+
+  it("maps legacy P2 to Persona 2 in pills", () => {
+    expect(displayPillLabel("P2")).toBe("Persona 2");
+    expect(displayPillLabel("Persona 3")).toBe("Persona 3");
+  });
+
+  it("memberPillLabel prefers typed name for you", () => {
+    expect(memberPillLabel({ isYou: true, name: "Tú" }, "Manuel")).toBe("Manuel");
+    expect(memberPillLabel({ isYou: true, name: "Tú" }, "")).toBe("Tú");
+    expect(memberPillLabel({ name: "Persona 2" }, undefined)).toBe("Persona 2");
   });
 });
 

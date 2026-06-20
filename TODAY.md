@@ -79,6 +79,31 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Ajuste fino tipografía cilindros (un poco más chico)
+- **Qué:** `_shared.tsx`, `customer.css`, tamaños de pill en stages.
+- **Por qué:** Texto quedó demasiado grande tras el bump anterior.
+- **Qué hace:** Escala font ~10% menor (mín 12px); pills ligeramente más compactos — punto medio legible/sutil.
+
+### 2026-06-19 — Tipografía más grande en cilindros NamePill
+- **Qué:** `_shared.tsx` (escala font), `customer.css`, tamaños de pill en stages.
+- **Por qué:** Texto dentro del widget ilegible en móvil.
+- **Qué hace:** Fuente ~40% más grande (mín 13px), weight 800; pills de confirm/mesa/items un poco más altos.
+
+### 2026-06-19 — Cilindros/píldoras en toda la UI + Persona 1/2
+- **Qué:** `NamePill`, `guestLabel`, `memberPillLabel`, `NAME_PILL_MAX=10`; `_shared`, `BillStage`, `ConfirmStage`, `MesaStage`, `ShareSheet`, `WaitingSuccessStage`, `customer.css`, demo, hooks.
+- **Por qué:** Círculos de 2 letras ilegibles; P2/P3 fríos; nombre duplicado al lado del widget en confirm.
+- **Qué hace:** Todos los chips son píldoras más grandes; invitados = "Persona 1/2"; input max 10 chars; confirm/mesa solo muestran el cilindro + ítems/monto (sin "MANUEL" repetido).
+
+### 2026-06-19 — Name pill expandible bajo platos (Lo mío)
+- **Qué:** `NamePill` + `namePillLabel` en `split-math.ts`, `_shared.tsx`, `BillStage.tsx`, `customer.css`.
+- **Por qué:** Círculo de 2 letras no mostraba el nombre que escribes al reclamar platos.
+- **Qué hace:** Chip verde crece como píldora (hasta 8 chars) en input de nombre y bajo ítems en "Lo mío"; equal/mesa/confirm siguen con 2 letras.
+
+### 2026-06-19 — Descartado experimento labels 1,2,3; vuelta a P1,P2,P3
+- **Qué:** `git restore` de cambios locales sin commitear (labels numéricos, demo `initialStage`, `useLayoutEffect`).
+- **Por qué:** No convenció visualmente; `main` ya tenía el UX bueno con P1/P2/P3.
+- **Qué hace:** Working copy alineada con `origin/main` (`9a8b903`).
+
 ### 2026-06-19 — Guest UX v2: avatares, totales, Gracias, rey Todo
 - **Qué:** `split-math.ts`, `BillStage`, `WaitingSuccessStage`, `ShareSheet`, `ConfirmStage`, `customer.css`, `page.tsx`, `demo/page.tsx`.
 - **Por qué:** Copy total redundante; avatares tomate/1 letra; pendientes sin estilo y mal calculados en equal; cuenta completada plana.

@@ -15,7 +15,7 @@ import type {
   TableMember,
 } from "@/lib/guest-billing/types";
 
-import { Avatar, Ic } from "./_shared";
+import { Ic, NamePill } from "./_shared";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
 
@@ -97,8 +97,7 @@ export function ShareSheet({ flow, items, members }: ShareSheetProps) {
                   role="button"
                   data-testid={`share-pick-${m.id}`}
                 >
-                  <Avatar member={m} size={36} />
-                  <span className="nm">{m.name}</span>
+            <NamePill member={m} name={m.isYou ? flow.state.name : undefined} size={38} />
                   <span className="c-tick tick">
                     {on && <Ic.check s={14} w={2.6} />}
                   </span>
@@ -118,8 +117,7 @@ export function ShareSheet({ flow, items, members }: ShareSheetProps) {
                   const m = displayMembers.find((mm) => mm.id === id) ?? null;
                   return (
                     <span key={id} className="pchip">
-                      <Avatar member={m} size={22} />
-                      {m?.name ?? "?"}
+                      <NamePill member={m} name={m?.isYou ? flow.state.name : undefined} size={28} />
                       <b className="pp">{pct(id)}%</b>
                       <span
                         style={{

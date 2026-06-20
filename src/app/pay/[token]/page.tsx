@@ -24,6 +24,7 @@ import type {
 import {
   AVATAR_HUE_YOU,
   guestAvatarHue,
+  guestLabel,
   initialsFor,
 } from '@/lib/guest-billing/split-math';
 import { IVA_RATE, PROPINA_RATE } from '@/lib/constants/ecuador-tax';
@@ -83,7 +84,7 @@ export default function GuestBillPage({ params }: PageProps) {
       return [
         {
           id: guestUuid || 'you',
-          name: displayName || `P${guestIndex || 1}`,
+          name: displayName || guestLabel(guestIndex || 1),
           initials: 'Tú',
           hue: AVATAR_HUE_YOU,
           isYou: true,
@@ -92,8 +93,8 @@ export default function GuestBillPage({ params }: PageProps) {
     }
     return allGuests.map((g, idx) => ({
       id: g.guestUuid,
-      name: g.displayName || `P${idx + 1}`,
-      initials: initialsFor(g.displayName || `P${idx + 1}`),
+      name: g.displayName || guestLabel(idx + 1),
+      initials: initialsFor(g.displayName || guestLabel(idx + 1)),
       hue: g.guestUuid === guestUuid ? AVATAR_HUE_YOU : guestAvatarHue(idx),
       isYou: g.guestUuid === guestUuid,
     }));

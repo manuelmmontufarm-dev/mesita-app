@@ -36,7 +36,7 @@ import type {
   TableMember,
 } from "@/lib/guest-billing/types";
 
-import { Avatar, Ic } from "./_shared";
+import { Ic, NamePill } from "./_shared";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
 
@@ -106,18 +106,15 @@ function PersonCard({
   );
   const sub = memberSubtotal(items, state.claims, member.id);
   const owed = computeTotals(sub, config, 0).total;
-  const displayName = member.isYou ? state.name.trim() || "Tú" : member.name;
   return (
     <div className="person surfx">
       <div className="person-head">
-        <Avatar member={member} size={44} />
+        <NamePill
+          member={member}
+          name={member.isYou ? state.name : undefined}
+          size={52}
+        />
         <div className="nm">
-          <div className="t">
-            {displayName}
-            {member.isYou && state.name.trim() && (
-              <span className="tag-you">tú</span>
-            )}
-          </div>
           <div className="s">
             {ownedItems.length
               ? `${ownedItems.length} ítem${ownedItems.length > 1 ? "s" : ""}`
@@ -310,18 +307,15 @@ export function MesaStage({ flow, items, members, config }: MesaStageProps) {
             const paid = paidIds.includes(m.id);
             const share =
               mesaTotal > 0 ? Math.min(100, (amt / mesaTotal) * 100) : 0;
-            const displayName = m.isYou ? state.name.trim() || "Tú" : m.name;
             return (
               <div key={m.id} className="contrib-row">
-                <Avatar member={m} size={36} />
+                <NamePill
+                  member={m}
+                  name={m.isYou ? state.name : undefined}
+                  size={38}
+                />
                 <div className="contrib-main">
                   <div className="contrib-top">
-                    <span className="contrib-nm">
-                      {displayName}
-                      {m.isYou && state.name.trim() && (
-                        <span className="tag-you">tú</span>
-                      )}
-                    </span>
                     {paid ? (
                       <span className="tag-paid">
                         <Ic.check s={11} w={3} /> Pagó

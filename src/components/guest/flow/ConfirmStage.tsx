@@ -20,7 +20,6 @@ import {
   computeTotals,
   fmt,
   freeUnits,
-  initialsFor,
   itemOwed,
   memberSubtotal,
   paidSubtotal,
@@ -34,7 +33,7 @@ import type {
   TableMember,
 } from "@/lib/guest-billing/types";
 
-import { Avatar, Ic, LogoMark, useBumpOnChange } from "./_shared";
+import { Ic, LogoMark, NamePill, useBumpOnChange } from "./_shared";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
 
@@ -99,9 +98,9 @@ function PersonItemLine({
   );
 }
 
-function PersonCard({ member, claims, config, displayName, paid, paidItemIds, items }: {
+function PersonCard({ member, claims, config, typedName, paid, paidItemIds, items }: {
   member: TableMember; claims: Flow["state"]["claims"]; config: RestaurantConfig;
-  displayName: string; paid: boolean; paidItemIds: readonly string[]; items: readonly BillItem[];
+  typedName: string; paid: boolean; paidItemIds: readonly string[]; items: readonly BillItem[];
 }) {
   const expanded = useMemo(() => expandRepeatedItems(items), [items]);
   const claimed = expanded.filter((it) => unitsOf(claims, it.id, member.id) > 0);
@@ -110,9 +109,12 @@ function PersonCard({ member, claims, config, displayName, paid, paidItemIds, it
   return (
     <div className="person surfx" data-testid={`confirm-person-${member.id}`}>
       <div className="person-head">
-        <Avatar member={member} size={44} />
+        <NamePill
+          member={member}
+          name={member.isYou ? typedName : undefined}
+          size={52}
+        />
         <div className="nm">
-          <div className="t">{displayName}{member.isYou && displayName.trim() && <span className="tag-you">tú</span>}</div>
           <div className="s">{claimed.length ? `${claimed.length} ítem${claimed.length > 1 ? "s" : ""}` : "Aún no escoge nada"}</div>
         </div>
         <div className={"owed" + (member.isYou ? " you-amt" : "")}>
@@ -139,7 +141,7 @@ function PersonasEnMesa({ flow, items, members, config }: { flow: Flow; items: r
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {others.map((m) => (
           <PersonCard key={m.id} member={m} claims={state.claims} config={config}
-            displayName={m.name} paid={state.paidIds.includes(m.id)}
+            typedName={state.name} paid={state.paidIds.includes(m.id)}
             paidItemIds={state.paidItemIds} items={items} />
         ))}
       </div>
@@ -184,7 +186,6 @@ function ConfirmYoursCard({
 }) {
   const { state, youId } = flow;
   const youMember = members.find((m) => m.id === youId) ?? members[0];
-  const displayName = state.name.trim() || "P1";
   const expanded = useMemo(() => expandRepeatedItems(items), [items]);
   const myItems = expanded.filter(
     (it) => itemOwed(it, state.claims, youId) > 0 && !state.paidItemIds.includes(it.id),
@@ -195,17 +196,13 @@ function ConfirmYoursCard({
     <div className="confirm-card confirm-card-lg surfx" data-testid="confirm-card-lotuyo">
       <div className="confirm-yours-head">
         {youMember && (
-          <Avatar
-            member={{
-              ...youMember,
-              isYou: true,
-              initials: initialsFor(displayName),
-            }}
-            size={48}
+          <NamePill
+            member={{ ...youMember, isYou: true }}
+            name={state.name}
+            size={54}
           />
         )}
         <div className="confirm-yours-info">
-          <div className="confirm-yours-name">{displayName} <span className="tag-you">tú</span></div>
           <div className="s" style={{ fontSize: 13, color: "var(--c-ink-2)" }}>
             {mode === "item" && myItems.length ? `${myItems.length} ítem${myItems.length > 1 ? "s" : ""}` : mode === "equal" ? `1 de ${state.people} · partes iguales` : "Toda la cuenta"}
           </div>

@@ -46,8 +46,15 @@ export const billSubtotal = (items: readonly BillItem[]): number =>
 
 /* ---------------- member / guest labelling ---------------- */
 
-/** Guests who skip the name field pay as "P1", "P2"… (sequential per table). */
+export const NAME_PILL_MAX = 10;
+
+/** Legacy prefix — still recognised in receipts / old sessions. */
 export const GUEST_PREFIX = "P";
+
+/** Sequential label when a guest skips the name field. */
+export function guestLabel(ordinal: number): string {
+  return `Persona ${ordinal}`;
+}
 
 /** Avatar hue for the current payer — brand green. */
 export const AVATAR_HUE_YOU = 160;
@@ -60,8 +67,8 @@ export function guestAvatarHue(guestIndex: number): number {
 }
 
 /**
- * Avatar label. Empty name → "Tú". Guest labels (P1, P2…) are kept whole.
- * Real names → first two letters, uppercase (e.g. "manuel" → "MA").
+ * Compact initials for receipts / legacy paths (2 letters).
+ * Pill widgets use `memberPillLabel` instead.
  */
 export const initialsFor = (name: string | null | undefined): string => {
   const s = (name || "").trim();
@@ -69,9 +76,48 @@ export const initialsFor = (name: string | null | undefined): string => {
   if (new RegExp("^" + GUEST_PREFIX + "\\d+$", "i").test(s)) {
     return s.toUpperCase();
   }
+  if (/^Persona \d+$/i.test(s)) {
+    return s.replace(/\s+/g, "").slice(0, 2).toUpperCase();
+  }
   const letters = s.replace(/\s+/g, "").slice(0, 2);
   return letters.toUpperCase();
 };
+
+/** Truncate a typed name for pill display (max 10 chars). */
+export function namePillLabel(name: string, maxLen = NAME_PILL_MAX): string {
+  const s = name.trim();
+  if (!s) return "Tú";
+  return s.length <= maxLen ? s : s.slice(0, maxLen);
+}
+
+/** Normalise legacy P2 / Persona 2 / real names into pill text. */
+export function displayPillLabel(
+  name: string | null | undefined,
+  maxLen = NAME_PILL_MAX,
+): string {
+  const s = (name || "").trim();
+  if (!s || s === "Tú") return "Tú";
+  const legacyP = /^P(\d+)$/i.exec(s);
+  if (legacyP) return guestLabel(Number(legacyP[1]));
+  return namePillLabel(s, maxLen);
+}
+
+/** Label shown inside a name pill for a roster member. */
+export function memberPillLabel(
+  member: { name?: string; isYou?: boolean } | null | undefined,
+  typedName?: string,
+  maxLen = NAME_PILL_MAX,
+): string {
+  const m = member ?? {};
+  if (m.isYou) {
+    const typed = (typedName ?? "").trim();
+    if (typed) return namePillLabel(typed, maxLen);
+    const fallback = (m.name ?? "").trim();
+    if (fallback && fallback !== "Tú") return displayPillLabel(fallback, maxLen);
+    return "Tú";
+  }
+  return displayPillLabel(m.name, maxLen);
+}
 
 export const avatarColor = (hue: number): string => `hsl(${hue} 62% 47%)`;
 

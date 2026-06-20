@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { guestLabel } from '@/lib/guest-billing/split-math';
 
 export interface MultiGuest {
   guestUuid: string;
@@ -44,7 +45,7 @@ function withIndexes(guests: MultiGuest[]): MultiGuest[] {
   return sortGuests(guests).map((guest, index) => ({
     ...guest,
     guestIndex: index + 1,
-    displayName: guest.displayName || `P${index + 1}`,
+    displayName: guest.displayName || guestLabel(index + 1),
   }));
 }
 
@@ -147,7 +148,7 @@ export function useMultiGuestState(token: string): UseMultiGuestStateReturn {
 
   return {
     guestUuid,
-    displayName: currentGuest?.displayName || `P${currentGuest?.guestIndex ?? 1}`,
+    displayName: currentGuest?.displayName || guestLabel(currentGuest?.guestIndex ?? 1),
     guestIndex: currentGuest?.guestIndex ?? 1,
     allGuests,
     broadcastUpdate,

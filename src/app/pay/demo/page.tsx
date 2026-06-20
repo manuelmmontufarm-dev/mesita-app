@@ -14,7 +14,7 @@ import type {
   RestaurantConfig,
   TableMember,
 } from '@/lib/guest-billing';
-import { guestAvatarHue, AVATAR_HUE_YOU } from '@/lib/guest-billing/split-math';
+import { guestAvatarHue, AVATAR_HUE_YOU, guestLabel } from '@/lib/guest-billing/split-math';
 import type { FlowInit, PaidPayload } from '@/hooks/useGuestPaymentFlow';
 
 import '../customer.css';
@@ -30,8 +30,8 @@ const DEMO_ITEMS: BillItem[] = [
 
 const DEMO_MEMBERS: TableMember[] = [
   { id: 'you', name: 'Tú', initials: 'Tú', hue: AVATAR_HUE_YOU, isYou: true },
-  { id: 'p2', name: 'P2', initials: 'P2', hue: guestAvatarHue(1) },
-  { id: 'p3', name: 'P3', initials: 'P3', hue: guestAvatarHue(2) },
+  { id: 'guest-1', name: guestLabel(1), initials: guestLabel(1), hue: guestAvatarHue(1) },
+  { id: 'guest-2', name: guestLabel(2), initials: guestLabel(2), hue: guestAvatarHue(2) },
 ];
 
 const DEMO_CONFIG: RestaurantConfig = {

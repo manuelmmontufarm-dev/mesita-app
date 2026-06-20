@@ -49,7 +49,7 @@ import type {
 } from "@/lib/guest-billing/types";
 import { expandRepeatedItems } from "@/lib/guest-billing/bill-display";
 
-import { Avatar, AvatarStack, EqualShareVisual, Ic, LogoMark } from "./_shared";
+import { AvatarStack, EqualShareVisual, Ic, LogoMark, NamePill } from "./_shared";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
 
@@ -118,17 +118,18 @@ function NameField({
           aria-label="Tu nombre"
           autoComplete="off"
           spellCheck={false}
-          maxLength={22}
+          maxLength={10}
           data-testid="bill-name-input"
         />
         {value.trim() ? (
-          <Avatar
+          <NamePill
+            name={value}
             member={{
               initials: initialsFor(value),
               hue: AVATAR_HUE_YOU,
               isYou: true,
             }}
-            size={34}
+            size={40}
           />
         ) : null}
       </div>
@@ -243,8 +244,10 @@ export function BillItemRow({
                 <AvatarStack
                   ids={claimants}
                   roster={members}
-                  size={20}
+                  size={28}
                   max={4}
+                  youId={youId}
+                  youName={state.name}
                 />
               )}
               {mode === "item" && shared && (
@@ -358,8 +361,10 @@ function SharePicker({
                           <AvatarStack
                             ids={claimants}
                             roster={members}
-                            size={20}
+                            size={28}
                             max={4}
+                            youId={flow.youId}
+                            youName={flow.state.name}
                           />
                           <span className="shared-tag">compartido</span>
                         </>
@@ -602,7 +607,7 @@ export function BillStage({
             <span className="todo-payer-crown" aria-hidden="true">
               👑
             </span>
-            <Avatar member={youMember} size={56} />
+            <NamePill member={youMember} name={state.name} size={60} />
           </div>
           <div className="todo-t">Tú cierras la mesa</div>
           <div className="todo-big">{fmt(derived.totals.total)}</div>

@@ -8,7 +8,12 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { MemberId, TableMember } from "@/lib/guest-billing/types";
-import { avatarColor } from "@/lib/guest-billing/split-math";
+import {
+  avatarColor,
+  AVATAR_HUE_YOU,
+  memberPillLabel,
+  NAME_PILL_MAX,
+} from "@/lib/guest-billing/split-math";
 
 /* ── icons ─────────────────────────────────────────────────── */
 
@@ -297,53 +302,91 @@ export function LogoMark({ size = 32 }: { size?: number }) {
   );
 }
 
-/* ── avatars ───────────────────────────────────────────────── */
+/* ── name pills (cylinders) ─────────────────────────────────── */
 
+export function NamePill({
+  label,
+  name,
+  member,
+  size = 30,
+  maxChars = NAME_PILL_MAX,
+}: {
+  label?: string;
+  name?: string;
+  member?: { name?: string; initials?: string; hue?: number; isYou?: boolean } | null;
+  size?: number;
+  maxChars?: number;
+}) {
+  const m = member ?? {};
+  const text = label ?? memberPillLabel(m, name, maxChars);
+  const len = text.length;
+  const scale =
+    len > 9 ? 0.32 : len > 7 ? 0.34 : len > 5 ? 0.36 : len > 3 ? 0.38 : 0.4;
+  const fontSize = Math.max(12, Math.round(size * scale));
+
+  return (
+    <div
+      className={"av av-pill expanded" + (m.isYou ? " you" : "")}
+      style={{
+        ["--av-size" as string]: `${size}px`,
+        height: size,
+        fontSize,
+        background: avatarColor(m.hue ?? (m.isYou ? AVATAR_HUE_YOU : 14)),
+      }}
+      title={text}
+    >
+      {text}
+    </div>
+  );
+}
+
+/** @deprecated Use NamePill — kept as alias for gradual migration. */
 export function Avatar({
   member,
   size = 38,
+  name,
+  label,
 }: {
-  member: { initials?: string; hue?: number; isYou?: boolean } | null;
+  member: { name?: string; initials?: string; hue?: number; isYou?: boolean } | null;
   size?: number;
+  name?: string;
+  label?: string;
 }) {
-  const m = member ?? {};
   return (
-    <div
-      className={"av" + (m.isYou ? " you" : "")}
-      style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.36,
-        background: avatarColor(m.hue ?? 14),
-      }}
-    >
-      {m.initials || "?"}
-    </div>
+    <NamePill member={member} size={size} name={name} label={label} />
   );
 }
 
 export function AvatarStack({
   ids,
   roster,
-  size = 26,
+  size = 30,
   max = 3,
+  youId,
+  youName,
 }: {
   ids: readonly MemberId[];
   roster: readonly TableMember[];
   size?: number;
   max?: number;
+  youId?: MemberId;
+  youName?: string;
 }) {
   const shown = ids.slice(0, max);
   const extra = ids.length - shown.length;
   return (
     <div className="av-stack">
-      {shown.map((id) => (
-        <Avatar
-          key={id}
-          member={roster.find((m) => m.id === id) ?? null}
-          size={size}
-        />
-      ))}
+      {shown.map((id) => {
+        const member = roster.find((m) => m.id === id) ?? null;
+        return (
+          <NamePill
+            key={id}
+            member={member}
+            name={youId === id ? youName : undefined}
+            size={size}
+          />
+        );
+      })}
       {extra > 0 && (
         <span className="av-more" style={{ width: size, height: size }}>
           +{extra}
@@ -373,7 +416,7 @@ export function EqualShareVisual({
       <div className="equal-share-avatars">
         {shownMembers.map((m) => (
           <div key={m.id} className="equal-share-slot">
-            <Avatar member={m} size={32} />
+            <NamePill member={m} size={38} />
           </div>
         ))}
         {extraPeople > 0 && (

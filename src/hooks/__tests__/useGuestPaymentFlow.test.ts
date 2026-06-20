@@ -368,7 +368,7 @@ describe("buildReceipt", () => {
     });
     expect(r.items).toEqual([]);
     expect(r.how).toBe("División en partes iguales · 1 de 4");
-    expect(r.name).toBe("P1");
+    expect(r.name).toBe("Persona 1");
     expect(r.methodLabel).toBe("Diners Club");
   });
 });

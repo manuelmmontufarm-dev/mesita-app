@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { calculateBillBreakdown } from "@/modules/bills";
 import { money, toNumberSafe } from "@/lib/money";
+import { guestLabel } from "@/lib/guest-billing/split-math";
 import { Decimal } from "@prisma/client/runtime/library";
 import type {
   BillItemClaimStatus,
@@ -29,7 +30,7 @@ function guestHue(ordinal: number): number {
 }
 
 function labelFor(ordinal: number): string {
-  return `P${ordinal}`;
+  return guestLabel(ordinal);
 }
 
 async function findActiveBillByToken(token: string) {

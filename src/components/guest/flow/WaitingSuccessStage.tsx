@@ -39,7 +39,7 @@ import type {
   TableMember,
 } from "@/lib/guest-billing/types";
 
-import { Avatar, Ic, LogoMark } from "./_shared";
+import { Ic, LogoMark, NamePill } from "./_shared";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
 
@@ -139,7 +139,7 @@ function TodoChampionHero({
       <span className="ws-king-crown" aria-hidden="true">
         👑
       </span>
-      <Avatar member={member} size={72} />
+      <NamePill member={member} size={76} />
       <span className="ws-king-scepter" aria-hidden="true">
         🪄
       </span>
@@ -462,19 +462,14 @@ export function WaitingSuccessStage({
           <div className="ws-pending-title">Pendientes de pago</div>
           {pendingMembers.map((m) => {
             const resolved = resolveMemberDisplay(m, state.name, youId);
-            const name = m.isYou ? resolved.name : m.name;
             return (
               <div
                 key={m.id}
                 className="ws-pending-row"
                 data-testid={`ws-pending-${m.id}`}
               >
-                <Avatar member={resolved} size={32} />
+                <NamePill member={resolved} name={m.isYou ? state.name : undefined} size={38} />
                 <div className="ws-pending-info">
-                  <span className="ws-pending-name">
-                    {name}
-                    {m.isYou && <span className="wait-you">tú</span>}
-                  </span>
                   <span className="ws-pending-items">{memberItemLabel(m.id)}</span>
                 </div>
                 <span className="ws-pending-amt">{fmt(owed(m.id))}</span>
