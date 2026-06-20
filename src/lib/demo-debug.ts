@@ -8,6 +8,7 @@ import { guestLabel } from "@/lib/guest-billing/split-math";
 export type DemoDebugEvent =
   | "sync:apply"
   | "sync:skip"
+  | "sync:reset"
   | "sync:poll"
   | "sync:sse"
   | "join"

@@ -195,7 +195,7 @@ export function BillItemRow({
   const mine = serverMine && !isLoading;
   const shared = claimants.length > 1;
   const interactive = mode === "item" && !paid && !isLoading;
-  const myAmt = itemOwed(displayClaims, item.id, youId);
+  const myAmt = itemOwed(item, displayClaims, youId);
 
   const displayIndex = item.displayIndex ?? null;
   const displayLabel = item.displayLabel ?? item.name;

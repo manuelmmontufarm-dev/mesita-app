@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Fix: build Vercel — typecheck demo (BillStage, debug, actionChain)
+- **Qué:** `BillStage.tsx` (`itemOwed` args), `demo-debug.ts` (`sync:reset` event), `useDemoTableSession.ts` (`actionChain` typing).
+- **Por qué:** Deploy en Vercel falló en `npm run build` — typecheck estricto no corre igual en dev.
+- **Qué hace:** Build de producción pasa; Vercel puede deployar con Upstash + spinner.
+
 ### 2026-06-19 — UX: spinner en plato hasta sync confirmado + pendingClaims
 - **Qué:** `BillStage.tsx`, `BillItemRow`, `useDemoTableSession`, `demo-optimistic-merge.ts`, `customer.css`, `GuestBillFlow`, `GuestPayPage`.
 - **Por qué:** Al tocar un plato el check parpadeaba o desaparecía; el usuario quiere feedback claro (loading) hasta que el server confirme y los otros devices vean la selección.

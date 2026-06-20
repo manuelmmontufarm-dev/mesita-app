@@ -291,7 +291,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   /** True while a pay POST is in flight — blocks the silent heal re-join. */
   const paying = useRef(false);
   const pendingOps = useRef<PendingDemoOps>(createPendingDemoOps());
-  const actionChain = useRef(Promise.resolve());
+  const actionChain = useRef<Promise<unknown>>(Promise.resolve());
   const joinTableRef = useRef<
     | ((opts?: { guestId?: string; clearStored?: boolean }) => Promise<string | null>)
     | null
