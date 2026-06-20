@@ -15,6 +15,8 @@ import {
   initialsFor,
   guestAvatarHue,
   normalizeMemberName,
+  personNumberFromLabel,
+  hueFromGuestId,
   isItemPaid,
   itemOwed,
   lineTotal,
@@ -147,6 +149,18 @@ describe("guestLabel & displayPillLabel", () => {
     expect(guestAvatarHue(0)).toBe(152);
     expect(guestAvatarHue(1)).toBe(210);
     expect(guestAvatarHue(2)).toBe(275);
+  });
+
+  it("personNumberFromLabel parses Persona N", () => {
+    expect(personNumberFromLabel("Persona 3")).toBe(3);
+    expect(personNumberFromLabel("persona 1")).toBe(1);
+    expect(personNumberFromLabel("Manuel")).toBeNull();
+  });
+
+  it("hueFromGuestId is stable for same id", () => {
+    const a = hueFromGuestId("abc-123");
+    const b = hueFromGuestId("abc-123");
+    expect(a).toBe(b);
   });
 });
 

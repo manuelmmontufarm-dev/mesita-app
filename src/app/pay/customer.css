@@ -2838,8 +2838,28 @@ html.has-receipt-peek .cust-scroll {
   scroll-padding-bottom: calc(188px + var(--receipt-peek, 84px) + env(safe-area-inset-bottom, 0px));
 }
 html.has-receipt-peek .flow-scroll,
-html.has-receipt-peek .wait-scroll {
-  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+html.has-receipt-peek .wait-scroll,
+html.has-receipt-peek .ws-success-scroll {
+  padding-bottom: calc(16px + var(--receipt-peek, 84px) + env(safe-area-inset-bottom, 0px)) !important;
+  scroll-padding-bottom: calc(16px + var(--receipt-peek, 84px) + env(safe-area-inset-bottom, 0px));
+}
+.ws-success-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ws-success-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+html.has-receipt-peek .ws-success-scroll {
+  padding-bottom: calc(32px + var(--receipt-peek, 84px) + env(safe-area-inset-bottom, 0px)) !important;
+}
+html.has-receipt-peek .completed-actions {
+  margin-bottom: 8px;
 }
 html.has-receipt-peek .flow-foot,
 html.has-receipt-peek .ws-wait-foot {
@@ -3071,9 +3091,16 @@ html.has-receipt-peek .ws-wait-foot {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin: 8px auto 18px;
-  position: relative;
+  width: 100%;
+  max-width: 320px;
+}
+.ws-hero-emoji-row {
+  font-size: 42px;
+  line-height: 1;
+  margin: 4px 0 2px;
+  filter: drop-shadow(0 4px 12px rgba(27, 23, 20, 0.12));
 }
 .ws-payer-emoji {
   font-size: 28px;
@@ -3081,16 +3108,10 @@ html.has-receipt-peek .ws-wait-foot {
   filter: drop-shadow(0 4px 10px rgba(27,23,20,.12));
 }
 .ws-payer-emoji-left {
-  position: absolute;
-  left: calc(50% - 72px);
-  top: 18px;
-  animation: wsFloatEmoji 2.8s ease-in-out infinite;
+  display: none;
 }
 .ws-payer-emoji-right {
-  position: absolute;
-  right: calc(50% - 72px);
-  top: 24px;
-  animation: wsFloatEmoji 3.1s ease-in-out infinite reverse;
+  display: none;
 }
 @keyframes wsFloatEmoji {
   0%, 100% { transform: translateY(0); }
@@ -3177,27 +3198,20 @@ html.has-receipt-peek .ws-wait-foot {
 
 /* Todo champion hero (cuenta completada) */
 .ws-king-hero {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  margin: 8px 0 4px;
-  padding-top: 8px;
+  gap: 10px;
+  margin: 8px auto 20px;
+  width: 100%;
+  max-width: 320px;
+  padding-top: 4px;
 }
 .ws-king-crown {
-  font-size: 36px;
-  line-height: 1;
-  transform: rotate(-6deg);
-  filter: drop-shadow(0 3px 6px rgba(0,0,0,.12));
+  display: none;
 }
 .ws-king-scepter {
-  position: absolute;
-  right: calc(50% - 56px);
-  bottom: 52px;
-  font-size: 22px;
-  transform: rotate(18deg);
-  opacity: 0.9;
+  display: none;
 }
 .ws-king-title {
   margin: 8px 0 0;

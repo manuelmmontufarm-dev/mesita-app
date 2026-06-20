@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Demo: 1 usuario = 1 ID, sync 500ms, éxito scroll + emojis
+- **Qué:** `useDemoTableSession`, `demo-table-store`, `split-math`, `WaitingSuccessStage`, `customer.css`, API join.
+- **Por qué:** Mismo usuario aparecía como Persona 3 con otro color; sync lento; emojis tapaban el pill en éxito; recibo bloqueaba botones en mobile.
+- **Qué hace:** Sin re-join fantasma (solo reset); join con ID inválido → 409 + fresh join; claims huérfanos limpiados; poll/SSE 500ms; rename optimista; emojis arriba del pill; scroll en pantalla final con padding por recibo.
+
 ### 2026-06-19 — Demo: sync 1s, colores Persona 1/2/3, sin Invitado, debug
 - **Qué:** `useDemoTableSession`, `demo-table-store`, `split-math`, `DemoDebugPanel`, `demo-debug.ts`, `GuestPayPage`, `ReceiptDrawer`, `customer.css`.
 - **Por qué:** El usuario quería actualización continua cada segundo, colores verde/azul/morado por persona, nombres Persona N (no "Invitado"), y debug robusto.

@@ -1,6 +1,6 @@
 import { Redis } from "@upstash/redis";
 
-import { guestLabel, guestAvatarHue } from "@/lib/guest-billing/split-math";
+import { guestLabel, guestAvatarHue, personNumberFromLabel } from "@/lib/guest-billing/split-math";
 
 /** Vercel-safe demo table state — persisted in Upstash when configured. */
 
@@ -45,7 +45,7 @@ export interface DemoPayment {
 }
 
 /** Bump when default demo seed shape changes — migrated in-place, never wipes guests. */
-const DEMO_STATE_VERSION = 3;
+const DEMO_STATE_VERSION = 4;
 
 export class DemoGuestNotFoundError extends Error {
   constructor(public readonly guestId: string) {
@@ -160,8 +160,9 @@ function migrateState(state: DemoTableState): DemoTableState {
   if (state.resetSeq == null) state.resetSeq = 0;
 
   for (const guest of state.guests) {
-    const numMatch = /^Persona (\d+)$/i.exec(guest.label?.trim() ?? "");
-    const ordinal = numMatch ? Number(numMatch[1]) : state.guests.indexOf(guest) + 1;
+    const ordinal =
+      personNumberFromLabel(guest.label) ??
+      state.guests.indexOf(guest) + 1;
     guest.hue = guestAvatarHue(ordinal - 1);
     const cleaned = guest.name?.trim();
     if (!cleaned || cleaned.toLowerCase() === "invitado") {
@@ -169,7 +170,27 @@ function migrateState(state: DemoTableState): DemoTableState {
     }
   }
 
+  scrubOrphanClaims(state);
+
   state.stateVersion = DEMO_STATE_VERSION;
+  return touch(state);
+}
+
+/** Drop claims pointing at guests that no longer exist (prevents phantom Persona N). */
+function scrubOrphanClaims(state: DemoTableState): boolean {
+  const guestIds = new Set(state.guests.map((g) => g.id));
+  let changed = false;
+  for (const [itemId, guestId] of Object.entries(state.claims)) {
+    if (!guestIds.has(guestId)) {
+      delete state.claims[itemId];
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function normalizeLoadedState(state: DemoTableState): DemoTableState | null {
+  if (!scrubOrphanClaims(state)) return null;
   return touch(state);
 }
 
@@ -200,6 +221,10 @@ export async function getDemoTableState(token: string): Promise<DemoTableState> 
     if ((existing.stateVersion ?? 1) < DEMO_STATE_VERSION) {
       return saveState(token, migrateState(existing));
     }
+    const scrubbed = normalizeLoadedState(existing);
+    if (scrubbed) {
+      return saveState(token, scrubbed);
+    }
     return existing;
   }
   const created = createState(token);
@@ -226,6 +251,7 @@ export async function joinDemoTable(
       existing.updatedAt = nowIso();
       return { state: await saveState(token, touch(state)), guest: existing };
     }
+    throw new DemoGuestNotFoundError(guestId);
   }
 
   const ts = nowIso();

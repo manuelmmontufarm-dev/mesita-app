@@ -20,6 +20,7 @@ import {
   initialsFor,
   NAME_PILL_MAX,
   normalizeMemberName,
+  personNumberFromLabel,
 } from "@/lib/guest-billing/split-math";
 import { IVA_RATE, PROPINA_RATE } from "@/lib/constants/ecuador-tax";
 
@@ -32,8 +33,8 @@ import type {
 /** Tab-scoped — each browser tab is a separate demo guest. */
 const SESSION_KEY = (token: string) => `mesita:demo-guest:${token}`;
 
-/** Live sync every second (SSE + poll; version guard prevents stale overwrites). */
-const SYNC_INTERVAL_MS = 1_000;
+/** Live sync every 500ms — version guard prevents stale overwrites. */
+const SYNC_INTERVAL_MS = 500;
 
 export interface UseDemoTableSessionResult {
   state: TableSessionState | null;
@@ -113,16 +114,18 @@ function buildDemoRoster(
   for (const guestId of Object.values(raw.claims)) {
     if (!guestId || byId.has(guestId)) continue;
     const guest = raw.guests.find((g) => g.id === guestId);
-    const name = normalizeMemberName(
-      guest?.name,
-      guest?.label || guestLabel(byId.size + 1),
-    );
+    const slot =
+      personNumberFromLabel(guest?.label) ??
+      personNumberFromLabel(guest?.name) ??
+      byId.size + 1;
+    const label = guest?.label || guestLabel(slot);
+    const name = normalizeMemberName(guest?.name, label);
     byId.set(guestId, {
       id: guestId,
       name,
-      seatLabel: guest?.label,
+      seatLabel: label,
       initials: initialsFor(name),
-      hue: guest?.hue ?? guestAvatarHue(byId.size),
+      hue: guest?.hue ?? guestAvatarHue(slot - 1),
       isYou: guestId === youId,
     });
   }
@@ -222,19 +225,36 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       try {
         if (opts?.clearStored) clearStoredGuestId(token);
         const savedId = opts?.guestId ?? readStoredGuestId(token);
-        const { state: joined, guest } = await postDemo<{
-          state: DemoTableState;
-          guest: { id: string };
-        }>(token, { action: "join", guestId: savedId });
-        writeStoredGuestId(token, guest.id);
-        setGuestSessionId(guest.id);
-        applyDemo(joined, { force: true, source: "join" });
-        lastResetSeq.current = joined.resetSeq;
-        demoDebug("join", `guest ${guest.id.slice(0, 8)}`, {
-          label: joined.guests.find((g) => g.id === guest.id)?.label,
-          resetSeq: joined.resetSeq,
-        });
-        return guest.id;
+        try {
+          const { state: joined, guest } = await postDemo<{
+            state: DemoTableState;
+            guest: { id: string };
+          }>(token, { action: "join", guestId: savedId });
+          writeStoredGuestId(token, guest.id);
+          setGuestSessionId(guest.id);
+          applyDemo(joined, { force: true, source: "join" });
+          lastResetSeq.current = joined.resetSeq;
+          demoDebug("join", `guest ${guest.id.slice(0, 8)}`, {
+            label: joined.guests.find((g) => g.id === guest.id)?.label,
+            resetSeq: joined.resetSeq,
+          });
+          return guest.id;
+        } catch (err) {
+          if (savedId && err instanceof Error && err.message === "SESSION_EXPIRED") {
+            clearStoredGuestId(token);
+            demoDebug("join", "stale guestId — fresh join", { savedId: savedId.slice(0, 8) });
+            const { state: joined, guest } = await postDemo<{
+              state: DemoTableState;
+              guest: { id: string };
+            }>(token, { action: "join" });
+            writeStoredGuestId(token, guest.id);
+            setGuestSessionId(guest.id);
+            applyDemo(joined, { force: true, source: "join-fresh" });
+            lastResetSeq.current = joined.resetSeq;
+            return guest.id;
+          }
+          throw err;
+        }
       } finally {
         rejoining.current = false;
       }
@@ -263,33 +283,24 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     };
   }, [token, joinAttempt, joinTable]);
 
-  /** After table reset or expired guest — single re-join (avoids double-join on reset). */
+  /** Re-join ONLY on table reset — never on transient guestMissing (prevents duplicate Persona). */
   useEffect(() => {
     if (!raw) return;
 
     if (lastResetSeq.current === undefined) {
       lastResetSeq.current = raw.resetSeq;
+      return;
     }
 
-    const resetChanged = raw.resetSeq !== lastResetSeq.current;
-    const guestMissing =
-      guestSessionId != null && !raw.guests.some((g) => g.id === guestSessionId);
-
-    if (!resetChanged && !guestMissing) return;
+    if (raw.resetSeq === lastResetSeq.current) return;
     if (rejoining.current) return;
 
-    if (resetChanged) {
-      lastResetSeq.current = raw.resetSeq;
-      lastVersion.current = undefined;
-    }
-
+    lastResetSeq.current = raw.resetSeq;
+    lastVersion.current = undefined;
     clearStoredGuestId(token);
+    demoDebug("rejoin", "resetSeq changed", { resetSeq: raw.resetSeq });
     void joinTable({ clearStored: true });
-    demoDebug("rejoin", resetChanged ? "resetSeq changed" : "guest missing", {
-      resetSeq: raw.resetSeq,
-      guestSessionId: guestSessionId?.slice(0, 8),
-    });
-  }, [raw, raw?.resetSeq, raw?.guests, guestSessionId, joinTable, token]);
+  }, [raw?.resetSeq, joinTable, token]);
 
   useEffect(() => {
     if (!guestSessionId) return;
@@ -382,12 +393,30 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     (name: string) => {
       if (!guestSessionId) return;
       const trimmed = name.trim().slice(0, NAME_PILL_MAX);
+      setRaw((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          guests: prev.guests.map((g) =>
+            g.id === guestSessionId
+              ? {
+                  ...g,
+                  name:
+                    trimmed && trimmed.toLowerCase() !== "invitado"
+                      ? trimmed
+                      : g.label,
+                  updatedAt: new Date().toISOString(),
+                }
+              : g,
+          ),
+        };
+      });
       if (renameTimer.current) clearTimeout(renameTimer.current);
       renameTimer.current = setTimeout(() => {
         void postAction({ action: "rename", guestId: guestSessionId, name: trimmed }).catch(
           console.error,
         );
-      }, 400);
+      }, 150);
     },
     [guestSessionId, postAction],
   );

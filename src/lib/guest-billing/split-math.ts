@@ -83,6 +83,21 @@ export function guestAvatarHue(guestIndex: number): number {
   return GUEST_HUE_PALETTE[idx];
 }
 
+/** Parse "Persona 3" → 3 (stable slot for hue + label). */
+export function personNumberFromLabel(label: string | null | undefined): number | null {
+  const m = /^Persona\s+(\d+)$/i.exec((label ?? "").trim());
+  return m ? Number(m[1]) : null;
+}
+
+/** Stable hue for a guest id when roster row is missing (same on all devices). */
+export function hueFromGuestId(guestId: string): number {
+  let hash = 0;
+  for (let i = 0; i < guestId.length; i++) {
+    hash = (hash * 31 + guestId.charCodeAt(i)) | 0;
+  }
+  return guestAvatarHue(Math.abs(hash) % GUEST_HUE_PALETTE.length);
+}
+
 /** Never show "Invitado" — fall back to Persona N label. */
 export function normalizeMemberName(
   name: string | null | undefined,
@@ -203,15 +218,12 @@ export function resolveClaimantMember(
     return { ...found, name: normalized };
   }
   const isYou = id === youId;
-  const ordinal = roster.length + 1;
-  const fallbackName = isYou
-    ? youName?.trim() || "Tú"
-    : guestLabel(ordinal);
+  const fallbackName = isYou ? youName?.trim() || "Tú" : guestLabel(1);
   return {
     id,
     name: fallbackName,
     initials: initialsFor(fallbackName),
-    hue: guestAvatarHue(ordinal - 1),
+    hue: hueFromGuestId(id),
     isYou,
   };
 }

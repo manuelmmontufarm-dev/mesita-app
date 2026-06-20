@@ -150,17 +150,14 @@ function MesaProgressRing({
 function TodoChampionHero({
   member,
 }: {
-  member: { initials?: string; hue?: number; isYou?: boolean };
+  member: { name?: string; initials?: string; hue?: number; isYou?: boolean };
 }) {
   return (
     <div className="ws-king-hero" data-testid="ws-todo-champion">
-      <span className="ws-king-crown" aria-hidden="true">
+      <span className="ws-hero-emoji-row" aria-hidden="true">
         👑
       </span>
-      <NamePill member={member} size={76} />
-      <span className="ws-king-scepter" aria-hidden="true">
-        🪄
-      </span>
+      <NamePill member={member} size={56} />
       <p className="ws-king-title">Rey de la mesa</p>
       <p className="ws-king-sub">Pagaste TODO. Leyenda.</p>
     </div>
@@ -179,13 +176,10 @@ function PayerCelebrationHero({
   const emoji = PAYER_EMOJIS[Math.abs(member.id.charCodeAt(0)) % PAYER_EMOJIS.length];
   return (
     <div className="ws-payer-hero" data-testid="ws-payer-celebration">
-      <span className="ws-payer-emoji ws-payer-emoji-left" aria-hidden="true">
+      <span className="ws-hero-emoji-row" aria-hidden="true">
         {emoji}
       </span>
-      <NamePill member={member} name={name} size={76} />
-      <span className="ws-payer-emoji ws-payer-emoji-right" aria-hidden="true">
-        🍽️
-      </span>
+      <NamePill member={member} name={name} size={56} />
       <p className="ws-payer-title">¡Listo, pagaste!</p>
       <p className="ws-payer-sub">Tu parte quedó registrada. Buen provecho.</p>
     </div>
@@ -597,7 +591,6 @@ export function WaitingSuccessStage({
           <Ic.instagram s={17} /> Síguenos en Instagram
         </button>
       </div>
-      <div style={{ height: 84, flex: "0 0 auto" }} aria-hidden="true" />
     </div>
   );
 
@@ -628,8 +621,8 @@ export function WaitingSuccessStage({
           </div>
         </>
       ) : (
-        <div className={"ws-content" + (fading ? " ws-fading" : "")}>
-          {successContent}
+        <div className={"ws-content ws-success-wrap" + (fading ? " ws-fading" : "")}>
+          <div className="wait-scroll ws-success-scroll">{successContent}</div>
         </div>
       )}
     </div>

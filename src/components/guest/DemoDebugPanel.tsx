@@ -51,7 +51,7 @@ export function DemoDebugPanel({
             <span>v{version}</span>
             <span>reset {resetSeq}</span>
             <span>SSE {sseConnected ? "on" : "off"}</span>
-            <span>poll 1s</span>
+            <span>poll 500ms</span>
           </div>
           <div className="demo-debug-row">
             <span>guest {guestSessionId?.slice(0, 8) ?? "—"}</span>
