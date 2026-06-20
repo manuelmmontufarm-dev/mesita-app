@@ -152,6 +152,13 @@ function GuestPayShell({
           yourDisplayName={live.yourDisplayName}
           memberCount={live.members.length}
           sseConnected={live.sseConnected}
+          guests={live.members.map((m) => ({
+            id: m.id,
+            name: m.name,
+            seatLabel: m.seatLabel ?? "",
+            hue: m.hue,
+          }))}
+          token={token}
         />
       ) : null}
       <GuestBillFlow

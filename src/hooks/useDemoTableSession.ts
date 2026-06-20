@@ -35,6 +35,8 @@ import type {
 const SESSION_KEY = (token: string) => `mesita:demo-guest:${token}`;
 const ENTERED_KEY = (token: string) => `mesita:demo-entered:${token}`;
 const RESET_SEQ_KEY = (token: string) => `mesita:demo-reset-seq:${token}`;
+/** Device-scoped (NOT token-scoped) — survives nav/refresh/QR. Idempotency key for join. */
+const DEVICE_ID_KEY = "mesita:device-id";
 
 /** Live sync every 500ms — version guard prevents stale overwrites. */
 const SYNC_INTERVAL_MS = 500;
@@ -211,6 +213,21 @@ function clearStoredResetSeq(token: string): void {
   sessionStorage.removeItem(RESET_SEQ_KEY(token));
 }
 
+/** Stable per-browser id in localStorage — same across tabs/refresh/QR re-scan. */
+function getOrCreateDeviceId(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    let id = window.localStorage.getItem(DEVICE_ID_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      window.localStorage.setItem(DEVICE_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return undefined;
+  }
+}
+
 /** True when the server wiped the table (reset) — not a normal sync tick. */
 function isRemoteTableReset(
   demo: DemoTableState,
@@ -262,6 +279,10 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   const lastResetSeq = useRef<number | undefined>(undefined);
   const guestSessionIdRef = useRef<string | null>(null);
   const rejoining = useRef(false);
+  const joinTableRef = useRef<
+    | ((opts?: { guestId?: string; clearStored?: boolean }) => Promise<string | null>)
+    | null
+  >(null);
 
   guestSessionIdRef.current = guestSessionId;
 
@@ -324,6 +345,21 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         lastResetSeq.current = demo.resetSeq;
         writeStoredResetSeq(token, demo.resetSeq);
       }
+
+      // Lost-update heal: entered + has guestId + no reset + guest NOT in roster → silent re-join.
+      // deviceId on server makes this idempotent (same Persona N reused).
+      if (
+        readStoredEntered(token) &&
+        gid &&
+        demo.resetSeq === (prevReset ?? demo.resetSeq) &&
+        !demo.guests.some((g) => g.id === gid) &&
+        !rejoining.current
+      ) {
+        demoDebug("rejoin", "ghost detected — silent re-join via deviceId");
+        void joinTableRef.current?.().catch(() => {
+          /* swallow — next sync will retry */
+        });
+      }
     },
     [applyDemo, exitToLobby, token],
   );
@@ -335,11 +371,12 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       try {
         if (opts?.clearStored) clearStoredGuestId(token);
         const savedId = opts?.guestId ?? readStoredGuestId(token);
+        const deviceId = getOrCreateDeviceId();
         try {
           const { state: joined, guest } = await postDemo<{
             state: DemoTableState;
             guest: { id: string };
-          }>(token, { action: "join", guestId: savedId });
+          }>(token, { action: "join", guestId: savedId, deviceId });
           writeStoredGuestId(token, guest.id);
           setGuestSessionId(guest.id);
           ingestDemoState(joined, { force: true, source: "join" });
@@ -357,7 +394,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
             const { state: joined, guest } = await postDemo<{
               state: DemoTableState;
               guest: { id: string };
-            }>(token, { action: "join" });
+            }>(token, { action: "join", deviceId });
             writeStoredGuestId(token, guest.id);
             setGuestSessionId(guest.id);
             ingestDemoState(joined, { force: true, source: "join-fresh" });
@@ -373,6 +410,8 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     },
     [token, ingestDemoState],
   );
+
+  joinTableRef.current = joinTable;
 
   useEffect(() => {
     if (isFreshDocumentNavigation()) {

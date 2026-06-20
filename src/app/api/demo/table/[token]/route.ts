@@ -18,6 +18,7 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("join"),
     guestId: z.string().optional(),
+    deviceId: z.string().optional(),
   }),
   z.object({
     action: z.literal("rename"),
@@ -78,7 +79,10 @@ export async function POST(
 
     const body = parsed.data;
     if (body.action === "join") {
-      const joined = await joinDemoTable(token, body.guestId);
+      const joined = await joinDemoTable(token, {
+        guestId: body.guestId,
+        deviceId: body.deviceId,
+      });
       return successResponse(joined, 200);
     }
     if (body.action === "rename") {

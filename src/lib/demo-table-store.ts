@@ -1,6 +1,16 @@
 import { Redis } from "@upstash/redis";
 
-import { guestLabel, guestAvatarHue, personNumberFromLabel } from "@/lib/guest-billing/split-math";
+import {
+  guestLabel,
+  guestAvatarHue,
+  personNumberFromLabel,
+} from "@/lib/guest-billing/split-math";
+
+export interface JoinDemoTableOpts {
+  guestId?: string;
+  /** Stable per-browser id (localStorage) — primary idempotency key. */
+  deviceId?: string;
+}
 
 /** Vercel-safe demo table state — persisted in Upstash when configured. */
 
@@ -25,6 +35,8 @@ export interface DemoGuest {
   status: DemoGuestStatus;
   joinedAt: string;
   updatedAt: string;
+  /** Stable per-browser identifier — survives nav/refresh/409. Idempotency key. */
+  deviceId?: string;
 }
 
 export interface DemoPayment {
@@ -239,24 +251,53 @@ export async function resetDemoTableState(token: string): Promise<DemoTableState
   return saveState(token, state);
 }
 
+/** Derive next Persona N from existing labels — recycles gaps, immune to ghost increments. */
+function nextPersonaNumber(state: DemoTableState): number {
+  let max = 0;
+  for (const g of state.guests) {
+    const n = personNumberFromLabel(g.label);
+    if (n != null && n > max) max = n;
+  }
+  return Math.max(max + 1, state.nextGuestNumber);
+}
+
 export async function joinDemoTable(
   token: string,
-  guestId?: string,
+  opts?: JoinDemoTableOpts | string,
 ): Promise<{ state: DemoTableState; guest: DemoGuest }> {
+  // Back-compat: accept a plain guestId string from legacy callers.
+  const { guestId, deviceId } =
+    typeof opts === "string" ? { guestId: opts, deviceId: undefined } : opts ?? {};
+
   const state = await getDemoTableState(token);
-  if (guestId) {
-    const existing = state.guests.find((guest) => guest.id === guestId);
-    if (existing) {
-      existing.status = existing.status === "paid" ? "paid" : "selecting";
-      existing.updatedAt = nowIso();
-      return { state: await saveState(token, touch(state)), guest: existing };
+  const ts = nowIso();
+
+  // 1) Primary idempotency: deviceId — survives lost-update + 409 cycles.
+  if (deviceId) {
+    const byDevice = state.guests.find((g) => g.deviceId === deviceId);
+    if (byDevice) {
+      byDevice.status = byDevice.status === "paid" ? "paid" : "selecting";
+      byDevice.updatedAt = ts;
+      return { state: await saveState(token, touch(state)), guest: byDevice };
     }
-    throw new DemoGuestNotFoundError(guestId);
   }
 
-  const ts = nowIso();
-  const number = state.nextGuestNumber;
-  state.nextGuestNumber += 1;
+  // 2) Fallback: guestId — heal storage by binding deviceId for next time.
+  if (guestId) {
+    const byId = state.guests.find((g) => g.id === guestId);
+    if (byId) {
+      if (deviceId && !byId.deviceId) byId.deviceId = deviceId;
+      byId.status = byId.status === "paid" ? "paid" : "selecting";
+      byId.updatedAt = ts;
+      return { state: await saveState(token, touch(state)), guest: byId };
+    }
+    // guestId provided but not found — only throw if NO deviceId fallback to create with.
+    if (!deviceId) throw new DemoGuestNotFoundError(guestId);
+  }
+
+  // 3) Create — derive number from existing labels (no monotonic counter).
+  const number = nextPersonaNumber(state);
+  state.nextGuestNumber = number + 1;
   const guest: DemoGuest = {
     id: crypto.randomUUID(),
     label: guestLabel(number),
@@ -265,6 +306,7 @@ export async function joinDemoTable(
     status: "selecting",
     joinedAt: ts,
     updatedAt: ts,
+    deviceId,
   };
   state.guests.unshift(guest);
   return { state: await saveState(token, touch(state)), guest };

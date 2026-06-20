@@ -64,6 +64,11 @@ export function getDemoDebugLog(): readonly DemoDebugEntry[] {
   return logBuffer;
 }
 
+/** Count join attempts in the current session — duplicates = symptom of races. */
+export function getDemoJoinCount(): number {
+  return logBuffer.filter((e) => e.event === "join" || e.event === "rejoin").length;
+}
+
 export function demoDebug(
   event: DemoDebugEvent,
   message: string,
