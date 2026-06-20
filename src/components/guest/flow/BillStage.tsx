@@ -32,6 +32,7 @@ import {
   fmt,
   freeUnits,
   guestAvatarHue,
+  guestLabel,
   initialsFor,
   isItemPaid,
   itemOwed,
@@ -567,7 +568,11 @@ export function BillStage({
           invalid={state.nameErr}
           onChange={(v) => flow.setName(v)}
           youHue={youMember.hue}
-          fallbackLabel={youMember.seatLabel ?? undefined}
+          fallbackLabel={
+            youMember.seatLabel ??
+            members.find((m) => m.id === flow.youId)?.seatLabel ??
+            guestLabel(Math.max(1, members.findIndex((m) => m.id === flow.youId) + 1))
+          }
         />
       </div>
 

@@ -11,7 +11,7 @@ import type { FlowInit, PaidPayload } from "@/hooks/useGuestPaymentFlow";
 import { mapSplitModeToDemo } from "@/lib/demo-live-adapter";
 import { isDemoTableToken } from "@/lib/demo-restaurant";
 import { deriveDemoTableProgress } from "@/lib/guest-billing/demo-table-progress";
-import { guestLabel } from "@/lib/guest-billing/split-math";
+import { guestLabel, personNumberFromLabel } from "@/lib/guest-billing/split-math";
 
 import "@/app/pay/customer.css";
 
@@ -67,8 +67,14 @@ function GuestPayShell({
       initialClaims: live.claims,
       initialPaidItemIds: live.paidItemIds,
       initialPaidIds: paidIds,
-      initialName:
-        "yourDisplayName" in live ? live.yourDisplayName : undefined,
+      initialName: (() => {
+        if (!("yourDisplayName" in live)) return undefined;
+        const name = live.yourDisplayName?.trim();
+        // Skip seeding the input with a "Persona N" auto-label — leave it
+        // empty so the placeholder ("Ej: Juanito") signals editability.
+        if (!name || personNumberFromLabel(name) != null) return undefined;
+        return name;
+      })(),
     }),
     [
       live.claims,
