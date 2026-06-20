@@ -1,4 +1,5 @@
 import { chargeCard, refundPayment } from "../adapters/kushki/client";
+import { chargeDemoCard, isDemoPaymentToken } from "../adapters/demo/client";
 import type { ProviderConfig } from "../domain/payment.port";
 import { buildPosConfig } from "@/modules/pos/adapters/pos-config";
 import { ContificoAdapter } from "@/modules/pos/adapters/contifico.adapter";
@@ -195,14 +196,22 @@ export async function processPayment(
   }
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Kushki charge
+  // Card charge (demo token or live provider)
   // ────────────────────────────────────────────────────────────────────────────
   let kushkiResponse;
   try {
-    kushkiResponse = await chargeCard(
-      { kushkiToken, amount: Math.round(amount * 100) / 100, voluntaryTip: voluntaryTipAmount },
-      providerConfig
-    );
+    if (isDemoPaymentToken(kushkiToken)) {
+      kushkiResponse = await chargeDemoCard({
+        kushkiToken,
+        amount: Math.round(amount * 100) / 100,
+        voluntaryTip: voluntaryTipAmount,
+      });
+    } else {
+      kushkiResponse = await chargeCard(
+        { kushkiToken, amount: Math.round(amount * 100) / 100, voluntaryTip: voluntaryTipAmount },
+        providerConfig
+      );
+    }
   } catch (error) {
     throw error instanceof Error ? error : new Error("Payment processing failed");
   }
@@ -303,28 +312,30 @@ export async function processPayment(
       alreadyProcessed: false,
     };
   } catch (error) {
-    console.error("Transaction error — attempting Kushki void:", error);
-    try {
-      await refundPayment(
-        { ticketNumber: kushkiResponse.ticketNumber ?? "", amount },
-        providerConfig
-      );
-    } catch (voidError) {
-      console.error(
-        JSON.stringify(
-          redact({
-            event: "PAYMENT_COMPENSATION_FAILED",
-            severity: "CRITICAL",
-            billId: hashForLog(billId),
-            restaurantId: hashForLog(restaurantId),
-            ticketNumber: hashForLog(kushkiResponse.ticketNumber ?? ""),
-            amount,
-            dbError: error instanceof Error ? error.message : String(error),
-            refundError: voidError instanceof Error ? voidError.message : String(voidError),
-            ts: new Date().toISOString(),
-          })
-        )
-      );
+    console.error("Transaction error — attempting void:", error);
+    if (!isDemoPaymentToken(kushkiToken)) {
+      try {
+        await refundPayment(
+          { ticketNumber: kushkiResponse.ticketNumber ?? "", amount },
+          providerConfig
+        );
+      } catch (voidError) {
+        console.error(
+          JSON.stringify(
+            redact({
+              event: "PAYMENT_COMPENSATION_FAILED",
+              severity: "CRITICAL",
+              billId: hashForLog(billId),
+              restaurantId: hashForLog(restaurantId),
+              ticketNumber: hashForLog(kushkiResponse.ticketNumber ?? ""),
+              amount,
+              dbError: error instanceof Error ? error.message : String(error),
+              refundError: voidError instanceof Error ? voidError.message : String(voidError),
+              ts: new Date().toISOString(),
+            })
+          )
+        );
+      }
     }
     throw error;
   }

@@ -79,6 +79,16 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Backend live sync + demo Postgres en Vercel
+- **Qué:** `useLiveTableSession`, `GuestPayPage`, seed Mesita Demo (`/pay/demo`), `DemoPaymentAdapter`, `GuestBillFlow` live callbacks, SSE `maxDuration`, rutas `/pay/[token]` y `/pay/demo` unificadas.
+- **Por qué:** El flujo nuevo era solo local; multi-dispositivo y deploy en Vercel necesitan Postgres + SSE, no `localStorage` ni Map en memoria.
+- **Qué hace:** Unir mesa, renombrar y reclamar platos se sincroniza en vivo entre teléfonos; demo usa ítems ecuatorianos sembrados y tarjeta de prueba (`demo:4242`) sin proveedor externo.
+
+### 2026-06-19 — Commit NamePill + Persona N
+- **Qué:** commit `71328cc` — píldoras, labels Persona N, tests.
+- **Por qué:** UX aprobada antes del backend.
+- **Qué hace:** Base visual estable en `main` antes de cablear live sync.
+
 ### 2026-06-19 — Ajuste fino tipografía cilindros (un poco más chico)
 - **Qué:** `_shared.tsx`, `customer.css`, tamaños de pill en stages.
 - **Por qué:** Texto quedó demasiado grande tras el bump anterior.

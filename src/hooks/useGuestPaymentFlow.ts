@@ -43,7 +43,7 @@ import type {
 
 /* ---------------- payment / receipt payloads ---------------- */
 
-export type PaymentMethod = "datafast" | "diners" | "kushki";
+export type PaymentMethod = "datafast" | "diners" | "kushki" | "card";
 
 export interface EInvoicePayload {
   /** "Cédula" (10) or "RUC" (13). */
@@ -60,6 +60,12 @@ export interface PaidPayload {
   amount: number;
   card: { last4: string };
   eInvoice: EInvoicePayload | null;
+  /** Provider-agnostic charge token (e.g. demo:4242). */
+  paymentToken?: string;
+  splitMode?: "FULL" | "EQUAL" | "BY_ITEM";
+  selectedItemIds?: string[];
+  equalSplitPeople?: number;
+  voluntaryTipAmount?: number;
 }
 
 export interface ReceiptLineItem {
@@ -164,6 +170,13 @@ export type FlowAction =
   | { type: "stage/goSuccess" }
   | { type: "payment/cacheMethod"; method: PaymentMethod; eInvoice: EInvoicePayload | null }
   | { type: "payment/complete"; receipt: Receipt; markedItems: ItemId[]; youId: MemberId }
+  | {
+      type: "sync/fromServer";
+      claims: Claims;
+      paidItemIds: ItemId[];
+      paidIds: MemberId[];
+      people: number;
+    }
   | { type: "reset"; init: FlowInit };
 
 /* ---------------- reducer ---------------- */
@@ -259,6 +272,15 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
       };
     }
 
+    case "sync/fromServer":
+      return {
+        ...state,
+        claims: action.claims,
+        paidItemIds: action.paidItemIds,
+        paidIds: action.paidIds,
+        people: Math.max(1, action.people),
+      };
+
     case "reset":
       return createInitialState(action.init);
   }
@@ -271,7 +293,8 @@ const GUEST_NAME = guestLabel(1);
 const METHOD_LABELS: Record<PaymentMethod, string> = {
   datafast: "Datafast",
   diners: "Diners Club",
-  kushki: "Kushki",
+  kushki: "Tarjeta",
+  card: "Tarjeta",
 };
 
 export interface DerivedTotals {
@@ -508,8 +531,29 @@ export function useGuestPaymentFlow(opts: UseGuestPaymentFlowOptions) {
         method: payload.method,
         eInvoice: payload.eInvoice,
       });
+      const splitMode: PaidPayload["splitMode"] =
+        state.mode === "item"
+          ? "BY_ITEM"
+          : state.mode === "equal"
+            ? "EQUAL"
+            : "FULL";
+      const selectedItemIds =
+        state.mode === "item"
+          ? itemsToMarkPaid(state, opts.items, youId)
+          : state.mode === "todo"
+            ? opts.items
+                .filter((it) => !state.paidItemIds.includes(it.id))
+                .map((it) => it.id)
+            : undefined;
+      const enriched: PaidPayload = {
+        ...payload,
+        splitMode,
+        selectedItemIds,
+        equalSplitPeople: state.people,
+        voluntaryTipAmount: derived.totals.propina,
+      };
       if (opts.onPaid) {
-        await opts.onPaid(payload);
+        await opts.onPaid(enriched);
       }
       const now = opts.now ? opts.now() : new Date();
       const receipt = buildReceipt({
@@ -557,6 +601,12 @@ export function useGuestPaymentFlow(opts: UseGuestPaymentFlowOptions) {
     submitPayment,
     finishWaiting: () => dispatch({ type: "stage/goSuccess" }),
     reset: (init: FlowInit) => dispatch({ type: "reset", init }),
+    syncFromServer: (patch: {
+      claims: Claims;
+      paidItemIds: ItemId[];
+      paidIds: MemberId[];
+      people: number;
+    }) => dispatch({ type: "sync/fromServer", ...patch }),
   };
 }
 

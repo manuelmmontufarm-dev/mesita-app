@@ -351,7 +351,7 @@ describe("buildReceipt", () => {
     });
     expect(r.items).toHaveLength(items.length);
     expect(r.how).toBe("Pagaste toda la cuenta de la mesa");
-    expect(r.methodLabel).toBe("Kushki");
+    expect(r.methodLabel).toBe("Tarjeta");
   });
 
   it("equal mode: no item lines, uses 'división en partes iguales' copy", () => {

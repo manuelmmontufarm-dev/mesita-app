@@ -48,6 +48,8 @@ export interface RestaurantConfig {
   serviceEnabled: boolean;
   tipPresets: number[];
   defaultTip: number;
+  /** When true, card charges use the in-app demo adapter (no external provider). */
+  demoMode?: boolean;
 }
 
 export interface BillTotals {

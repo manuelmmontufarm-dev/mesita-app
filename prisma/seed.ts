@@ -312,9 +312,136 @@ async function main() {
     },
   });
 
+  // ── Mesita Demo — public /pay/demo (Postgres live sync, no POS) ───────────
+  const mesitaDemo = await prisma.restaurant.upsert({
+    where: { name: "Mesita Demo" },
+    update: { paymentsEnabled: true, invoiceMode: "DISABLED" },
+    create: {
+      id: "rest-mesita-demo",
+      name: "Mesita Demo",
+      address: "Quito, Ecuador",
+      status: "ACTIVE",
+      paymentsEnabled: true,
+      invoiceMode: "DISABLED",
+    },
+  });
+
+  await prisma.table.upsert({
+    where: { token: "demo" },
+    update: { name: "12", restaurantId: mesitaDemo.id },
+    create: {
+      id: "tbl-mesita-demo",
+      name: "12",
+      token: "demo",
+      restaurantId: mesitaDemo.id,
+    },
+  });
+
+  await prisma.payment.deleteMany({ where: { restaurantId: mesitaDemo.id } });
+  await prisma.billGuestSession.deleteMany({
+    where: { bill: { restaurantId: mesitaDemo.id } },
+  });
+  await prisma.billItemClaim.deleteMany({
+    where: { bill: { restaurantId: mesitaDemo.id } },
+  });
+  await prisma.billItem.deleteMany({ where: { restaurantId: mesitaDemo.id } });
+  await prisma.bill.deleteMany({ where: { restaurantId: mesitaDemo.id } });
+
+  const demoLocroId = "demo-item-locro";
+  const demoBillId = "bill-mesita-demo";
+  await prisma.bill.create({
+    data: {
+      id: demoBillId,
+      tableId: "tbl-mesita-demo",
+      restaurantId: mesitaDemo.id,
+      status: BillStatus.PARTIALLY_PAID,
+      createdAt: minsAgo(5),
+      items: {
+        create: [
+          {
+            id: demoLocroId,
+            name: "Locro de papa",
+            price: 4.5,
+            quantity: 1,
+            isPaid: true,
+            paidAt: minsAgo(3),
+            restaurantId: mesitaDemo.id,
+          },
+          {
+            id: "demo-item-seco",
+            name: "Seco de chivo",
+            price: 8.9,
+            quantity: 1,
+            isPaid: false,
+            restaurantId: mesitaDemo.id,
+          },
+          {
+            id: "demo-item-encebollado",
+            name: "Encebollado",
+            price: 6,
+            quantity: 1,
+            isPaid: false,
+            restaurantId: mesitaDemo.id,
+          },
+          {
+            id: "demo-item-ceviche",
+            name: "Ceviche de camarón",
+            price: 9.5,
+            quantity: 1,
+            isPaid: false,
+            restaurantId: mesitaDemo.id,
+          },
+          {
+            id: "demo-item-jugo",
+            name: "Jugo de naranjilla",
+            price: 2.5,
+            quantity: 2,
+            isPaid: false,
+            restaurantId: mesitaDemo.id,
+          },
+          {
+            id: "demo-item-club",
+            name: "Club Verde",
+            price: 2.75,
+            quantity: 2,
+            isPaid: false,
+            restaurantId: mesitaDemo.id,
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.payment.create({
+    data: {
+      id: id(),
+      billId: demoBillId,
+      restaurantId: mesitaDemo.id,
+      amount: 5.63,
+      status: PaymentStatus.COMPLETED,
+      kushkiTransactionId: "DEMO-LOCRO",
+      idempotencyKey: id(),
+      splitMode: SplitMode.BY_ITEM,
+      createdAt: minsAgo(3),
+      paymentItems: {
+        create: [
+          {
+            id: id(),
+            billItemId: demoLocroId,
+            name: "Locro de papa",
+            units: 1,
+            unitPrice: 4.5,
+            amount: 4.5,
+          },
+        ],
+      },
+    },
+  });
+
   console.log("\n✅ Demo data seeded successfully!\n");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("  Restaurant : La Floresta Bistró");
+  console.log("  Guest demo : http://localhost:3000/pay/demo");
   console.log("  Login URL  : http://localhost:3000/login");
   console.log("  ─────────────────────────────────────");
   console.log("  OWNER      : owner@lafloresta.ec");

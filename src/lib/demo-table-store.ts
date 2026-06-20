@@ -1,5 +1,7 @@
 import { guestLabel } from "@/lib/guest-billing/split-math";
 
+/** @deprecated Use Postgres-backed `/api/guest/table-session` + `/pay/demo` instead. */
+
 export type DemoSplitMode = "item" | "equal" | "todo";
 export type DemoGuestStatus = "selecting" | "reviewing" | "in_payment" | "paid";
 

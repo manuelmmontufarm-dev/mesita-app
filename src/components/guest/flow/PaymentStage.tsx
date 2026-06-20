@@ -1,8 +1,7 @@
 "use client";
 
 /**
- * PaymentStage — pago exclusivo con Kushki.
- * El selector de método fue eliminado; siempre se usa Kushki.
+ * PaymentStage — tarjeta de crédito/débito (demo o proveedor en producción).
  */
 
 import { useState, type InputHTMLAttributes } from "react";
@@ -65,9 +64,10 @@ export interface PaymentStageProps {
   config: RestaurantConfig;
 }
 
-export function PaymentStage({ flow, config: _config }: PaymentStageProps) {
+export function PaymentStage({ flow, config }: PaymentStageProps) {
   const yourTotal = flow.derived.totals.total;
   const isLastPayer = flow.derived.isLastPayer;
+  const demoMode = config.demoMode ?? false;
 
   const [card, setCard] = useState({
     num: "",
@@ -152,10 +152,13 @@ export function PaymentStage({ flow, config: _config }: PaymentStageProps) {
     }
     setBusy(true);
     const payload: PaidPayload = {
-      method: "kushki",
+      method: "card",
       amount: round2(yourTotal),
       card: { last4: card.num.replace(/\s/g, "").slice(-4) },
       eInvoice: wantBilling ? { ...bill } : null,
+      paymentToken: demoMode
+        ? `demo:${card.num.replace(/\s/g, "").slice(-4)}`
+        : undefined,
     };
     setTimeout(() => {
       void flow.submitPayment(payload);

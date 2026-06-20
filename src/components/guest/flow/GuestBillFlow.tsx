@@ -11,6 +11,7 @@
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type UIEvent,
@@ -28,9 +29,13 @@ import {
   type PaidPayload,
   useGuestPaymentFlow,
 } from "@/hooks/useGuestPaymentFlow";
+import type { LiveSessionActions } from "@/hooks/useLiveTableSession";
 import { fmt } from "@/lib/guest-billing";
+import { freeUnits, unitsOf } from "@/lib/guest-billing/split-math";
 import type {
   BillItem,
+  Claims,
+  ItemId,
   MemberId,
   RestaurantConfig,
   TableMember,
@@ -58,6 +63,16 @@ export interface GuestBillFlowProps {
   externalError?: string | null;
   /** Deterministic clock for tests/storybook. */
   now?: () => Date;
+  /** Postgres-backed live table session mutations. */
+  liveSession?: LiveSessionActions | null;
+  /** Server-authoritative sync payload (SSE / poll version bump). */
+  serverSync?: {
+    version: number;
+    claims: Claims;
+    paidItemIds: ItemId[];
+    paidIds: MemberId[];
+    people: number;
+  };
 }
 
 export function GuestBillFlow(props: GuestBillFlowProps) {
@@ -71,17 +86,95 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     externalLoading,
     externalError,
     now,
+    liveSession,
+    serverSync,
   } = props;
+
+  const resolvedYouId = youId ?? liveSession?.guestSessionId ?? "you";
 
   const flow = useGuestPaymentFlow({
     items,
     members,
     config,
     init,
-    youId,
+    youId: resolvedYouId,
     onPaid,
     now,
   });
+
+  const liveFlow = useMemo(() => {
+    if (!liveSession) return flow;
+    const sid = liveSession.guestSessionId;
+    return {
+      ...flow,
+      setName: (name: string) => {
+        flow.setName(name);
+        liveSession.onRename(name);
+      },
+      toggleMine: (item: BillItem) => {
+        if (flow.state.paidItemIds.includes(item.id)) return;
+        const yours = unitsOf(flow.state.claims, item.id, sid);
+        if (yours > 0) {
+          flow.toggleMine(item);
+          liveSession.onRelease(item.id);
+          return;
+        }
+        const free = freeUnits(item, flow.state.claims);
+        if (free > 0.001) {
+          flow.toggleMine(item);
+          liveSession.onClaim(item.id, free);
+        }
+      },
+      setClaimUnits: (itemId: MemberId, memberId: MemberId, units: number) => {
+        flow.setClaimUnits(itemId, memberId, units);
+        if (memberId === sid) {
+          if (units <= 0) liveSession.onRelease(itemId);
+          else liveSession.onClaim(itemId, units);
+        }
+      },
+      replaceClaim: (itemId: MemberId, unitsMap: Record<MemberId, number>) => {
+        flow.replaceClaim(itemId, unitsMap);
+        const yours = unitsMap[sid] ?? 0;
+        if (yours <= 0) liveSession.onRelease(itemId);
+        else liveSession.onClaim(itemId, yours);
+      },
+      goToConfirm: () => {
+        flow.goToConfirm();
+        liveSession.onStatus("REVIEWING");
+      },
+      confirmPay: () => {
+        flow.confirmPay();
+        liveSession.onStatus("IN_PAYMENT");
+      },
+      submitPayment: async (payload: PaidPayload) => {
+        await flow.submitPayment(payload);
+        liveSession.onStatus("PAID");
+      },
+    };
+  }, [flow, liveSession]);
+
+  const activeFlow = liveSession ? liveFlow : flow;
+
+  useEffect(() => {
+    if (!serverSync) return;
+    flow.syncFromServer({
+      claims: serverSync.claims,
+      paidItemIds: serverSync.paidItemIds,
+      paidIds: serverSync.paidIds,
+      people: serverSync.people,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverSync?.version]);
+
+  const youMember = members.find((m) => m.isYou);
+  const seededName = useRef(false);
+  useEffect(() => {
+    if (seededName.current || !youMember?.name.trim()) return;
+    if (!flow.state.name.trim()) {
+      activeFlow.setName(youMember.name);
+      seededName.current = true;
+    }
+  }, [youMember?.name, flow.state.name, activeFlow]);
 
   // Mirror external data-layer signals onto the flow state machine.
   useEffect(() => {
@@ -98,7 +191,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalLoading, externalError]);
 
-  const stageProps: StageProps = { flow, items, members, config };
+  const stageProps: StageProps = { flow: activeFlow, items, members, config };
   const stage = flow.state.stage;
   const receiptDrawer =
     flow.state.receipts.length > 0 ? (
