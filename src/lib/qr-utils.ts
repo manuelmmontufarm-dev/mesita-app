@@ -1,5 +1,11 @@
 import QRCode from "qrcode";
-import jsPDF from "jspdf";
+import jsPDFDefault, { jsPDF as jsPDFNamed } from "jspdf";
+
+import type { DemoTableDefinition } from "@/lib/demo-table-catalog";
+
+// jsPDF ships both a CJS default and a named export; under Next.js (webpack)
+// the default is callable, under raw Node + tsx only the named one is.
+const jsPDF = (typeof jsPDFDefault === "function" ? jsPDFDefault : jsPDFNamed) as typeof jsPDFNamed;
 
 /** MesitaQR brand tokens for printable / shareable QR assets */
 export const QR_BRAND = {
@@ -11,6 +17,17 @@ export const QR_BRAND = {
 
 export const DEMO_PAY_URL =
   process.env.NEXT_PUBLIC_DEMO_PAY_URL ?? "https://mesita-demo.vercel.app/pay/demo";
+
+const DEMO_BASE_URL =
+  process.env.NEXT_PUBLIC_APP_URL ?? "https://mesita-demo.vercel.app";
+
+/** Build the public `/pay/...` URL for a demo token (`demo` or `demo-{slug}`). */
+export function buildDemoPayUrl(token: string): string {
+  const base = DEMO_BASE_URL.replace(/\/+$/, "");
+  if (token === "demo") return `${base}/pay/demo`;
+  const slug = token.replace(/^demo-/, "");
+  return `${base}/pay/demo/${slug}`;
+}
 
 export interface BrandedQROptions {
   width?: number;
@@ -168,4 +185,90 @@ export async function generateQRPdf(
     console.error("Error generating QR code PDF:", error);
     throw new Error("Failed to generate QR code PDF");
   }
+}
+
+/**
+ * Multi-page A4 PDF — one page per demo table definition.
+ * Header → QR → URL → scenario → items → operator notes (bottom).
+ */
+export async function generateDemoTableQrPdfPack(
+  definitions: DemoTableDefinition[],
+): Promise<Buffer> {
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+
+  for (let i = 0; i < definitions.length; i++) {
+    if (i > 0) pdf.addPage();
+    const def = definitions[i];
+    const url = buildDemoPayUrl(def.token);
+
+    // Header
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(16);
+    pdf.text(def.restaurant.name, pageWidth / 2, 18, { align: "center" });
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(12);
+    pdf.text(`Mesa ${def.table.name}`, pageWidth / 2, 26, { align: "center" });
+
+    // QR
+    const qrDataUrl = await QRCode.toDataURL(url, {
+      width: 720,
+      margin: 2,
+      errorCorrectionLevel: "H",
+      color: { dark: QR_BRAND.dark, light: QR_BRAND.light },
+    });
+    const qrSize = 100;
+    const qrX = (pageWidth - qrSize) / 2;
+    const qrY = 34;
+    pdf.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
+
+    // URL (mono-ish)
+    pdf.setFont("courier", "normal");
+    pdf.setFontSize(10);
+    pdf.text(url, pageWidth / 2, qrY + qrSize + 8, { align: "center" });
+
+    // Scenario
+    pdf.setFont("helvetica", "italic");
+    pdf.setFontSize(10);
+    const scenarioY = qrY + qrSize + 16;
+    const wrappedScenario = pdf.splitTextToSize(
+      def.scenarioDescription,
+      pageWidth - 30,
+    );
+    pdf.text(wrappedScenario, pageWidth / 2, scenarioY, { align: "center" });
+
+    // Items
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    let cursorY = scenarioY + 6 + wrappedScenario.length * 4;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Menú", 20, cursorY);
+    cursorY += 5;
+    pdf.setFont("helvetica", "normal");
+    for (const item of def.items) {
+      const line = `${item.qty} × ${item.name} — $${item.unitPrice.toFixed(2)}`;
+      pdf.text(line, 22, cursorY);
+      cursorY += 4.5;
+    }
+
+    // Operator notes (bottom)
+    if (def.operatorNotes.length > 0) {
+      pdf.setFont("helvetica", "italic");
+      pdf.setFontSize(9);
+      let notesY = pageHeight - 18 - def.operatorNotes.length * 4.5;
+      if (notesY < cursorY + 6) notesY = cursorY + 6;
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Notas para operador:", 20, notesY);
+      notesY += 4.5;
+      pdf.setFont("helvetica", "italic");
+      for (const note of def.operatorNotes) {
+        const wrapped = pdf.splitTextToSize(`• ${note}`, pageWidth - 40);
+        pdf.text(wrapped, 22, notesY);
+        notesY += wrapped.length * 4.5;
+      }
+    }
+  }
+
+  return Buffer.from(pdf.output("arraybuffer"));
 }

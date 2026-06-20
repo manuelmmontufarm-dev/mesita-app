@@ -16,7 +16,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "qr:demo": "node scripts/generate-demo-qr.mjs"
+    "qr:demo": "node scripts/generate-demo-qr.mjs",
+    "demo:qr-pack": "node --import tsx scripts/generate-demo-qr-pack.mjs",
+    "demo:smoke": "node scripts/smoke-demo-tables.mjs"
   },
   "keywords": [],
   "author": "",

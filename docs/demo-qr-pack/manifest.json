@@ -1,0 +1,57 @@
+[
+  {
+    "token": "demo",
+    "slug": "default",
+    "url": "https://mesita-demo.vercel.app/pay/demo",
+    "restaurant": "La Doña Pepa",
+    "table": "12",
+    "itemCount": 8,
+    "totalBill": 39.4,
+    "itemsSummary": "1×Locro de papa, 1×Seco de chivo, 1×Encebollado, 1×Ceviche de camarón, 1×Jugo de naranjilla, 1×Jugo de naranjilla, 1×Club Verde, 1×Club Verde",
+    "scenarioDescription": "Baseline — escenario actual de `/pay/demo`."
+  },
+  {
+    "token": "demo-mesa-1",
+    "slug": "mesa-1",
+    "url": "https://mesita-demo.vercel.app/pay/demo/mesa-1",
+    "restaurant": "La Doña Pepa",
+    "table": "1",
+    "itemCount": 6,
+    "totalBill": 27,
+    "itemsSummary": "1×Bolón de verde, 1×Churrasco, 1×Llapingachos, 1×Jugo de mora, 1×Agua sin gas, 1×Cerveza Pilsener",
+    "scenarioDescription": "Mesa limpia — prueba join + split by item + pay desde cero."
+  },
+  {
+    "token": "demo-mesa-2",
+    "slug": "mesa-2",
+    "url": "https://mesita-demo.vercel.app/pay/demo/mesa-2",
+    "restaurant": "La Doña Pepa",
+    "table": "2",
+    "itemCount": 6,
+    "totalBill": 25.5,
+    "itemsSummary": "1×Fritada, 1×Tigrillo, 2×Empanada de viento, 1×Cola nacional, 1×Café pasado, 1×Humita",
+    "scenarioDescription": "Pagos parciales — prueba % progreso y gracias parcial sin cerrar mesa."
+  },
+  {
+    "token": "demo-mesa-3",
+    "slug": "mesa-3",
+    "url": "https://mesita-demo.vercel.app/pay/demo/mesa-3",
+    "restaurant": "La Doña Pepa",
+    "table": "3",
+    "itemCount": 9,
+    "totalBill": 78,
+    "itemsSummary": "2×Ceviche mixto, 1×Encocado de pescado, 1×Seco de pollo, 1×Arroz marinero, 2×Patacones, 3×Cerveza Club Verde, 2×Jugo de maracuyá, 1×Agua con gas, 2×Tres leches",
+    "scenarioDescription": "Cuenta larga — prueba scroll bill, dock, recibo, performance sync."
+  },
+  {
+    "token": "demo-mesa-4",
+    "slug": "mesa-4",
+    "url": "https://mesita-demo.vercel.app/pay/demo/mesa-4",
+    "restaurant": "La Doña Pepa",
+    "table": "4",
+    "itemCount": 6,
+    "totalBill": 61.5,
+    "itemsSummary": "1×Parrillada para dos, 1×Langostinos al ajillo, 1×Arroz verde, 1×Ensalada de la casa, 2×Copa de vino tinto, 1×Volcán de chocolate",
+    "scenarioDescription": "Modo Todo — cuenta ≥$50, factura obligatoria, cierre mesa."
+  }
+]
