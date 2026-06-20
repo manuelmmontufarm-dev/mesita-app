@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Demo: pantalla de entrada + reset expulsa a lobby
+- **Qué:** `DemoTableEntry`, `useDemoTableSession`, `GuestPayPage`, `demo-restaurant`, `demo-table-store`, `customer.css`.
+- **Por qué:** Abrir el link no debe unir a la mesa solo por abrirlo; solo quien toca Entrar participa; reiniciar demo debe sacar a todos a la entrada.
+- **Qué hace:** Lobby “La Doña Pepa · Mesa 12” con CTA verde; join solo tras Entrar; `sessionStorage` de consentimiento; reset → lobby en todos los dispositivos.
+
 ### 2026-06-19 — Demo: 1 usuario = 1 ID, sync 500ms, éxito scroll + emojis
 - **Qué:** `useDemoTableSession`, `demo-table-store`, `split-math`, `WaitingSuccessStage`, `customer.css`, API join.
 - **Por qué:** Mismo usuario aparecía como Persona 3 con otro color; sync lento; emojis tapaban el pill en éxito; recibo bloqueaba botones en mobile.

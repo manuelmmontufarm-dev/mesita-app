@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { mapDemoStateToSession } from "@/lib/demo-live-adapter";
 import { demoDebug } from "@/lib/demo-debug";
-import { emojiForItemName } from "@/lib/demo-restaurant";
+import { DEMO_LOBBY, emojiForItemName } from "@/lib/demo-restaurant";
 import type { DemoTableState } from "@/lib/demo-table-store";
 import { shouldApplyDemoVersion } from "@/lib/demo-table-store";
 import type {
@@ -32,6 +32,7 @@ import type {
 
 /** Tab-scoped — each browser tab is a separate demo guest. */
 const SESSION_KEY = (token: string) => `mesita:demo-guest:${token}`;
+const ENTERED_KEY = (token: string) => `mesita:demo-entered:${token}`;
 
 /** Live sync every 500ms — version guard prevents stale overwrites. */
 const SYNC_INTERVAL_MS = 500;
@@ -69,6 +70,18 @@ export interface UseDemoTableSessionResult {
   paidSummaries: TablePaymentSummary[];
   isDemo: true;
   sseConnected: boolean;
+  /** User tapped "Entrar a la mesa" (or returning with that consent saved). */
+  hasEntered: boolean;
+  /** Client hydrated sessionStorage — avoid flash of bill before lobby. */
+  hydrated: boolean;
+  entering: boolean;
+  enterTable: () => Promise<void>;
+  lobby: {
+    restaurantName: string;
+    tagline: string;
+    table: string;
+    city: string;
+  };
 }
 
 function mapClaimsFromDemo(state: TableSessionState): Claims {
@@ -162,6 +175,19 @@ function clearStoredGuestId(token: string): void {
   sessionStorage.removeItem(SESSION_KEY(token));
 }
 
+function readStoredEntered(token: string): boolean {
+  if (typeof window === "undefined") return false;
+  return sessionStorage.getItem(ENTERED_KEY(token)) === "1";
+}
+
+function writeStoredEntered(token: string): void {
+  sessionStorage.setItem(ENTERED_KEY(token), "1");
+}
+
+function clearStoredEntered(token: string): void {
+  sessionStorage.removeItem(ENTERED_KEY(token));
+}
+
 async function postDemo<T>(token: string, body: Record<string, unknown>): Promise<T> {
   const res = await fetch(`/api/demo/table/${encodeURIComponent(token)}`, {
     method: "POST",
@@ -190,14 +216,32 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   const [raw, setRaw] = useState<DemoTableState | null>(null);
   const [state, setState] = useState<TableSessionState | null>(null);
   const [guestSessionId, setGuestSessionId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasEntered, setHasEntered] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const [entering, setEntering] = useState(false);
   const [joinAttempt, setJoinAttempt] = useState(0);
   const [sseConnected, setSseConnected] = useState(false);
   const renameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastVersion = useRef<number | undefined>(undefined);
   const lastResetSeq = useRef<number | undefined>(undefined);
   const rejoining = useRef(false);
+
+  const exitToLobby = useCallback(() => {
+    clearStoredGuestId(token);
+    clearStoredEntered(token);
+    setHasEntered(false);
+    setGuestSessionId(null);
+    setRaw(null);
+    setState(null);
+    setError(null);
+    setLoading(false);
+    setEntering(false);
+    lastVersion.current = undefined;
+    lastResetSeq.current = undefined;
+    demoDebug("lobby", "back to entry screen");
+  }, [token]);
 
   const applyDemo = useCallback((demo: DemoTableState, opts?: { force?: boolean; source?: string }) => {
     const incoming = demo.version;
@@ -263,29 +307,62 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   );
 
   useEffect(() => {
+    setHasEntered(readStoredEntered(token));
+    setHydrated(true);
+  }, [token]);
+
+  /** Re-join only when user already consented (refresh mid-session). */
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!readStoredEntered(token)) {
+      setHasEntered(false);
+      setLoading(false);
+      return;
+    }
+    if (guestSessionId) {
+      setHasEntered(true);
+      return;
+    }
+
     let cancelled = false;
+    setHasEntered(true);
     setLoading(true);
     setError(null);
 
     joinTable()
       .then(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setEntering(false);
+        }
       })
       .catch((err) => {
         if (cancelled) return;
         console.error(err);
-        setError(err instanceof Error ? err.message : "No pudimos abrir la demo.");
+        clearStoredEntered(token);
+        setHasEntered(false);
+        setError(err instanceof Error ? err.message : "No pudimos entrar a la mesa.");
         setLoading(false);
+        setEntering(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [token, joinAttempt, joinTable]);
+  }, [hydrated, token, joinAttempt, joinTable, guestSessionId]);
 
-  /** Re-join ONLY on table reset — never on transient guestMissing (prevents duplicate Persona). */
+  const enterTable = useCallback(async () => {
+    if (readStoredEntered(token) && guestSessionId) return;
+    setEntering(true);
+    setError(null);
+    writeStoredEntered(token);
+    setHasEntered(true);
+    setJoinAttempt((n) => n + 1);
+  }, [guestSessionId, token]);
+
+  /** Table reset elsewhere — kick everyone back to the entry screen. */
   useEffect(() => {
-    if (!raw) return;
+    if (!raw || !hasEntered) return;
 
     if (lastResetSeq.current === undefined) {
       lastResetSeq.current = raw.resetSeq;
@@ -293,14 +370,11 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     }
 
     if (raw.resetSeq === lastResetSeq.current) return;
-    if (rejoining.current) return;
 
     lastResetSeq.current = raw.resetSeq;
-    lastVersion.current = undefined;
-    clearStoredGuestId(token);
-    demoDebug("rejoin", "resetSeq changed", { resetSeq: raw.resetSeq });
-    void joinTable({ clearStored: true });
-  }, [raw?.resetSeq, joinTable, token]);
+    demoDebug("lobby", "resetSeq changed — exit to entry", { resetSeq: raw.resetSeq });
+    exitToLobby();
+  }, [raw?.resetSeq, raw, hasEntered, exitToLobby]);
 
   useEffect(() => {
     if (!guestSessionId) return;
@@ -381,12 +455,12 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         return next;
       } catch (err) {
         if (err instanceof Error && err.message === "SESSION_EXPIRED") {
-          await joinTable({ clearStored: true });
+          exitToLobby();
         }
         throw err;
       }
     },
-    [token, applyDemo, joinTable],
+    [token, applyDemo, exitToLobby],
   );
 
   const onRename = useCallback(
@@ -464,8 +538,12 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   );
 
   const resetDemo = useCallback(async () => {
-    await postAction({ action: "reset" });
-  }, [postAction]);
+    try {
+      await postAction({ action: "reset" });
+    } finally {
+      exitToLobby();
+    }
+  }, [postAction, exitToLobby]);
 
   const payDemo = useCallback(
     async (body: {
@@ -508,10 +586,10 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
 
   const config: RestaurantConfig = useMemo(
     () => ({
-      name: "Mesita Demo",
-      tagline: "Comida ecuatoriana",
-      table: "12",
-      city: "Quito",
+      name: raw?.restaurant.name ?? DEMO_LOBBY.restaurantName,
+      tagline: raw?.restaurant.tagline ?? DEMO_LOBBY.tagline,
+      table: raw?.table.name ?? DEMO_LOBBY.table,
+      city: raw?.restaurant.city ?? DEMO_LOBBY.city,
       currency: "USD",
       ivaRate: IVA_RATE,
       serviceRate: PROPINA_RATE,
@@ -520,7 +598,17 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       defaultTip: 15,
       demoMode: true,
     }),
-    [],
+    [raw],
+  );
+
+  const lobby = useMemo(
+    () => ({
+      restaurantName: raw?.restaurant.name ?? DEMO_LOBBY.restaurantName,
+      tagline: raw?.restaurant.tagline ?? DEMO_LOBBY.tagline,
+      table: raw?.table.name ?? DEMO_LOBBY.table,
+      city: raw?.restaurant.city ?? DEMO_LOBBY.city,
+    }),
+    [raw],
   );
   const people = state?.guests.length ?? 1;
 
@@ -546,5 +634,10 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     paidSummaries,
     isDemo: true,
     sseConnected,
+    hasEntered,
+    hydrated,
+    entering,
+    enterTable,
+    lobby,
   };
 }

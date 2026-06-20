@@ -16,6 +16,7 @@ export type DemoDebugEvent =
   | "pay"
   | "reset"
   | "name:normalize"
+  | "lobby"
   | "error";
 
 export interface DemoDebugEntry {

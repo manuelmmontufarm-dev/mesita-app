@@ -120,8 +120,8 @@ function createState(token: string): DemoTableState {
   return {
     token,
     restaurant: {
-      name: "Mesita Demo",
-      tagline: "Comida ecuatoriana",
+      name: "La Doña Pepa",
+      tagline: "Comida casera ecuatoriana",
       city: "Quito",
       ivaRate: 0.15,
       serviceRate: 0.1,

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import { GuestBillFlow } from "@/components/guest/flow/GuestBillFlow";
 import { DemoDebugPanel } from "@/components/guest/DemoDebugPanel";
+import { DemoTableEntry } from "@/components/guest/DemoTableEntry";
 import { useDemoTableSession } from "@/hooks/useDemoTableSession";
 import { useLiveTableSession } from "@/hooks/useLiveTableSession";
 import type { FlowInit, PaidPayload } from "@/hooks/useGuestPaymentFlow";
@@ -168,6 +169,39 @@ export function GuestPayPage({ token }: GuestPayPageProps) {
 
 function GuestDemoPayPage({ token }: { token: string }) {
   const live = useDemoTableSession(token);
+
+  if (!live.hydrated) {
+    return <div className="cust-root cust-app demo-entry-hydrate" aria-busy="true" />;
+  }
+
+  const inTable = live.hasEntered && live.guestSessionId;
+
+  if (!inTable) {
+    return (
+      <>
+        <DemoTableEntry
+          restaurantName={live.lobby.restaurantName}
+          tagline={live.lobby.tagline}
+          table={live.lobby.table}
+          city={live.lobby.city}
+          onEnter={() => void live.enterTable()}
+          entering={live.entering || live.loading}
+          error={live.error}
+        />
+        {"sseConnected" in live ? (
+          <DemoDebugPanel
+            version={live.version}
+            resetSeq={live.resetSeq}
+            guestSessionId={live.guestSessionId}
+            yourDisplayName={live.yourDisplayName}
+            memberCount={live.members.length}
+            sseConnected={live.sseConnected}
+          />
+        ) : null}
+      </>
+    );
+  }
+
   return <GuestPayShell token={token} live={live} isDemo />;
 }
 

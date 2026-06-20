@@ -12,6 +12,14 @@ export function isDemoTableToken(token: string): boolean {
   return token === DEMO_TABLE_TOKEN;
 }
 
+/** Copy + defaults for the public demo lobby (/pay/demo). */
+export const DEMO_LOBBY = {
+  restaurantName: "La Doña Pepa",
+  tagline: "Comida casera ecuatoriana",
+  table: "12",
+  city: "Quito",
+} as const;
+
 /** Client-side emoji hints for seeded demo menu copy. */
 export function emojiForItemName(name: string): string | undefined {
   const rules: Array<[RegExp, string]> = [
