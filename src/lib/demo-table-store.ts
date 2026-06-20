@@ -276,10 +276,9 @@ async function mutateDemoState(
     for (let attempt = 0; attempt < MUTATE_MAX_RETRIES; attempt++) {
       let state = await loadState(token);
       if (!state) {
-        state = createState(token);
-        if (!(await tryCommitDemoState(token, state, 0))) {
-          continue;
-        }
+        // Seed via getDemoTableState (direct save) — tryCommit(…, 0) cannot insert.
+        await getDemoTableState(token);
+        continue;
       }
       if ((state.stateVersion ?? 1) < DEMO_STATE_VERSION) {
         state = migrateState(state);

@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-20 — Fix: "Internal server error" al Entrar (join en Redis vacío)
+- **Qué:** `demo-table-store.ts` (`mutateDemoState` bootstrap), test `cold-join.test.ts`.
+- **Por qué:** Primer join en Upstash sin GET previo usaba `tryCommit(…, 0)` que nunca inserta → 10 retries → 500 en "Entrar a la mesa".
+- **Qué hace:** Si no hay estado, seed con `getDemoTableState` antes de mutar; entrar al demo funciona en producción.
+
 ### 2026-06-19 — Fix: build Vercel — typecheck demo (BillStage, debug, actionChain)
 - **Qué:** `BillStage.tsx` (`itemOwed` args), `demo-debug.ts` (`sync:reset` event), `useDemoTableSession.ts` (`actionChain` typing).
 - **Por qué:** Deploy en Vercel falló en `npm run build` — typecheck estricto no corre igual en dev.
