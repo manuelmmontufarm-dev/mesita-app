@@ -14,6 +14,63 @@
 > No omitas esto aunque el cambio parezca pequeño. El formato exacto de cada
 > entrada está descrito dentro de `TODAY.md`.
 
+> ## 🧪 REGLA OBLIGATORIA — Red de regresión multi-usuario
+>
+> **Cada vez que aparece un bug en uso real de `/pay/demo` (o de cualquier
+> parte del flujo guest/pago multi-dispositivo), antes de arreglarlo se
+> agrega como un nuevo escenario en
+> [`src/lib/demo-scenarios.ts`](./src/lib/demo-scenarios.ts)** (el catálogo
+> compartido entre Layer 1 vitest y Layer 2 Playwright).
+>
+> El bug primero queda como un **test rojo que reproduce el problema**, luego
+> se arregla el código hasta que el test pase. Así la suite crece como red
+> de regresión permanente — cada bug encontrado ya no vuelve.
+>
+> ### Pasos concretos
+>
+> 1. **Reproducir el bug como escenario.** Abre `src/lib/demo-scenarios.ts`
+>    y añade una entrada al array `SCENARIOS` con el próximo id (`"21"`,
+>    `"22"`...), una `category`, un `name` corto y un `run(token)` que use
+>    `SimulatedDevice` para reproducir los pasos.
+>    - Si el bug NO tiene cara visible (solo afecta el store), marca
+>      `storeOnly: true`. Layer 2 lo saltea automáticamente.
+> 2. **Correr Layer 1 para confirmar que falla.**
+>    ```bash
+>    npm test -- multi-user-scenarios
+>    ```
+>    El nuevo escenario debería salir rojo. Si sale verde, el repro está
+>    mal escrito y no captura el bug — reescríbelo antes de tocar código.
+> 3. **Arreglar el código** en `demo-table-store.ts` /
+>    `useDemoTableSession.ts` / etc. Re-corre hasta que TODOS los escenarios
+>    queden verdes (cada uno corre 20× con jitter — si falla 1/20, es bug).
+> 4. **Si el bug tiene UI observable**, añade un test correspondiente en
+>    [`tests/e2e/demo-multi-device.spec.ts`](./tests/e2e/demo-multi-device.spec.ts)
+>    que ejercite el mismo flujo con BrowserContexts reales. Reusa el helper
+>    `enterTable()` y los testids existentes (`demo-enter-table-btn`,
+>    `bill-name-input`, `demo-debug-panel`).
+> 5. **Correr ambas capas verdes:**
+>    ```bash
+>    npm test          # Layer 1
+>    npm run test:e2e  # Layer 2
+>    ```
+> 6. **Anotar en `TODAY.md`** qué bug se arregló, cómo, y que el escenario
+>    N quedó en el catálogo.
+> 7. **Commit + push.** El mensaje del commit debe nombrar el escenario:
+>    `fix(demo): scenario [21] — <descripción> + repro test`.
+>
+> ### Para asistentes AI
+>
+> Si te dicen "hay un bug donde X cuando Y", **NO toques código de
+> producción primero**. Empieza por:
+> - Leer el último escenario en `SCENARIOS` para entender el patrón.
+> - Escribir un nuevo escenario que reproduzca exactamente X-cuando-Y.
+> - Correr Layer 1 y verificar que el nuevo test falla por la razón
+>   correcta.
+> - Solo entonces arreglar el código.
+>
+> Esta disciplina es lo que mantiene la demo airtight bajo carga real de
+> 3-5 celulares simultáneos.
+
 ## Product Context
 PagaYa es una app de pagos para restaurantes.
 
