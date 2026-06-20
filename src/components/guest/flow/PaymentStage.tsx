@@ -10,6 +10,7 @@ import type { CameraCardData } from "@/components/guest/CameraScanner";
 import { CameraScanner } from "@/components/guest/CameraScanner";
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
 import type { EInvoicePayload, PaidPayload } from "@/hooks/useGuestPaymentFlow";
+import { INVOICE_MANDATORY_THRESHOLD } from "@/hooks/useGuestPaymentFlow";
 import { fmt, round2 } from "@/lib/guest-billing/split-math";
 import {
   readStoredPaymentForm,
@@ -71,7 +72,8 @@ export interface PaymentStageProps {
 
 export function PaymentStage({ flow, config, tableToken }: PaymentStageProps) {
   const yourTotal = flow.derived.totals.total;
-  const isLastPayer = flow.derived.isLastPayer;
+  const { isLastPayer, requiresFullBillInvoice } = flow.derived;
+  const mandatoryInvoice = isLastPayer || requiresFullBillInvoice;
   const demoMode = config.demoMode ?? false;
 
   const [card, setCard] = useState({
@@ -104,21 +106,21 @@ export function PaymentStage({ flow, config, tableToken }: PaymentStageProps) {
     if (stored) {
       setCard(stored.card);
       setBill(stored.bill);
-      if (!isLastPayer) setBillChoice(stored.billChoice);
+      if (!mandatoryInvoice) setBillChoice(stored.billChoice);
     }
     setFormHydrated(true);
-  }, [tableToken, isLastPayer]);
+  }, [tableToken, mandatoryInvoice]);
 
   useEffect(() => {
     if (!tableToken || !formHydrated) return;
     writeStoredPaymentForm(tableToken, {
       card,
       bill,
-      billChoice: isLastPayer ? "me" : billChoice,
+      billChoice: mandatoryInvoice ? "me" : billChoice,
     });
-  }, [tableToken, formHydrated, card, bill, billChoice, isLastPayer]);
+  }, [tableToken, formHydrated, card, bill, billChoice, mandatoryInvoice]);
 
-  const wantBilling = isLastPayer || billChoice === "me";
+  const wantBilling = mandatoryInvoice || billChoice === "me";
 
   const fmtNum = (v: string) =>
     v
@@ -312,13 +314,19 @@ export function PaymentStage({ flow, config, tableToken }: PaymentStageProps) {
               <span className="sec-label" style={{ margin: 0 }}>
                 Factura electrónica
               </span>
-              {isLastPayer && <span className="req-pill">Obligatoria</span>}
+              {mandatoryInvoice && <span className="req-pill">Obligatoria</span>}
             </div>
 
             {isLastPayer ? (
               <p className="field-note">
                 Eres <b>la última persona</b> en pagar, así que la factura de
                 la mesa va con tus datos (norma SRI).
+              </p>
+            ) : requiresFullBillInvoice ? (
+              <p className="field-note">
+                Pagas <b>toda la cuenta</b> (más de ${INVOICE_MANDATORY_THRESHOLD}).
+                La factura va con tus datos — aunque haya más gente en la mesa,
+                nadie más la recibirá.
               </p>
             ) : (
               <>

@@ -1337,7 +1337,7 @@
 }
 .wait-thanks .flow-title { margin: 4px 0 0; font-size: 26px; line-height: 1.15; }
 .wait-thanks .flow-lede { margin: 0; }
-.wait-scroll { gap: 14px; overflow: hidden; padding-bottom: 86px; }
+.wait-scroll { gap: 14px; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 86px; }
 .wait-meter { display: flex; flex-direction: column; gap: 9px; flex: 0 0 auto; }
 .wait-meter-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .wait-meter-k {
@@ -1500,7 +1500,7 @@
   --paper: #fdfaf2;
   --peek: 84px;
   position: absolute; left: 0; right: 0; bottom: 0;
-  width: 100%; max-width: none; height: 78%;
+  width: 100%; max-width: none; height: min(88dvh, 720px);
   background: var(--paper);
   border-radius: 22px 22px 0 0;
   box-shadow: 0 -18px 50px -28px rgba(27,23,20,.55);
@@ -1967,7 +1967,7 @@
   --paper: #fdfaf2;
   --peek: 84px;
   position: absolute; left: 0; right: 0; bottom: 0;
-  width: 100%; max-width: none; height: 78%;
+  width: 100%; max-width: none; height: min(88dvh, 720px);
   background: var(--paper);
   border-radius: 22px 22px 0 0;
   box-shadow: 0 -18px 50px -28px rgba(27,23,20,.55);
@@ -3542,8 +3542,8 @@ html.has-receipt-peek .cust-scroll {
 html.has-receipt-peek .flow-scroll,
 html.has-receipt-peek .wait-scroll,
 html.has-receipt-peek .ws-success-scroll {
-  padding-bottom: calc(16px + var(--receipt-peek, 84px) + env(safe-area-inset-bottom, 0px)) !important;
-  scroll-padding-bottom: calc(16px + var(--receipt-peek, 84px) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(96px + var(--receipt-peek, 84px) + env(safe-area-inset-bottom, 0px)) !important;
+  scroll-padding-bottom: calc(96px + var(--receipt-peek, 84px) + env(safe-area-inset-bottom, 0px));
 }
 .ws-success-wrap {
   flex: 1;
@@ -3589,6 +3589,17 @@ html.has-receipt-peek .ws-wait-foot {
   background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+.ws-waiting-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ws-waiting-body {
+  flex: 1;
+  min-height: 0;
 }
 .ws-back-mesa-btn {
   min-height: 52px;
@@ -3638,6 +3649,19 @@ html.has-receipt-peek .ws-wait-foot {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--accent-strong);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.ws-reg-eyebrow.ws-pay-count-pop,
+.ws-mesa-ring-count.ws-pay-count-pop {
+  animation: wsPayCountPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes wsPayCountPop {
+  0% { transform: scale(0.85); opacity: 0.5; }
+  45% { transform: scale(1.12); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.ws-mesa-ring-pct.bump {
+  animation: bumpL 0.42s var(--ease);
 }
 .ws-reg-title { margin: 0; font-size: 28px; }
 .ws-reg-lede { margin: 0; max-width: 280px; }

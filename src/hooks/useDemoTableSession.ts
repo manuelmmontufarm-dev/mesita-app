@@ -87,6 +87,10 @@ export interface UseDemoTableSessionResult {
   retry: () => void;
   resetSeq: number;
   paidSummaries: TablePaymentSummary[];
+  /** Cumulative partial item payments from demo store. */
+  itemPaidUnits: Readonly<Record<string, number>>;
+  /** Number of payment transactions on the table. */
+  paymentCount: number;
   /** Bumps on optimistic local patches — keeps flow claims in sync before server version. */
   syncRevision: number;
   /** Item ids with in-flight claim/release on this device — show loading until server confirms. */
@@ -820,6 +824,11 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     [raw, guestSessionId],
   );
   const paidSummaries = useMemo(() => mapPaidSummaries(raw), [raw]);
+  const itemPaidUnits = useMemo(
+    () => raw?.itemPaidUnits ?? {},
+    [raw?.itemPaidUnits],
+  );
+  const paymentCount = raw?.payments.length ?? 0;
 
   const yourDisplayName = useMemo(() => {
     if (!raw || !guestSessionId) return "";
@@ -878,6 +887,8 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     retry: () => setJoinAttempt((n) => n + 1),
     resetSeq: raw?.resetSeq ?? 0,
     paidSummaries,
+    itemPaidUnits,
+    paymentCount,
     syncRevision,
     isDemo: true,
     sseConnected,

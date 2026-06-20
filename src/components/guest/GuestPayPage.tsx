@@ -49,12 +49,18 @@ function GuestPayShell({
       (sum, p) => sum + (p.subtotal ?? p.amount / 1.25),
       0,
     );
+    const itemPaidUnits =
+      "itemPaidUnits" in live ? live.itemPaidUnits : undefined;
+    const paymentCount =
+      "paymentCount" in live ? live.paymentCount : live.paidSummaries?.length;
     return deriveDemoTableProgress({
       items: live.items,
       paidItemIds: live.paidItemIds,
       paidGuestIds: paidIds,
       guestCount: Math.max(live.members.length, live.people, paidIds.length),
       paymentsSubtotal,
+      itemPaidUnits,
+      paymentCount,
       config: live.config,
     });
   }, [isDemo, live, paidIds]);

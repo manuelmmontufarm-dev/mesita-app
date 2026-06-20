@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-20 — Gracias: factura todo ≥$50, sync %, scroll, animación pagos
+- **Qué:** `PaymentStage.tsx`, `WaitingSuccessStage.tsx`, `GuestBillFlow.tsx`, `GuestPayPage.tsx`, `useGuestPaymentFlow.ts`, `demo-table-progress.ts`, `useDemoTableSession.ts`, `customer.css`, tests.
+- **Por qué:** Pagar toda la cuenta ≥$50 debe pedir factura aunque haya más gente; quien no pagó debe ver mesa cerrada; % y “1 pago” no se actualizaban con pagos por ítem; scroll/recibo tapaba contenido; falta “Ver mesa” en éxito.
+- **Qué hace:** Factura obligatoria en modo Todo ≥$50; todos avanzan a éxito al cerrar mesa; progreso usa `itemPaidUnits` + conteo de pagos; eyebrow animado “N pagos registrados”; botón Ver mesa en éxito; mejor scroll con recibo abierto.
+
 ### 2026-06-20 — Fix join 500 + swarm 20×10 + personas Grandpa/Child
 - **Qué:** `demo-table-store.ts`, `demo-rigorous-swarm.ts`, `demo-persona-simulation.ts`, `demo-scenarios.ts`, tests (`rigorous-swarm`, `persona-simulation`, `cold-join`), `docs/PERSONA_RECOMMENDATIONS.md`.
 - **Por qué:** "Internal server error" al pulsar Entrar en Vercel demo; necesidad de stress-test 20 escenarios × 10 comensales y simular usuarios reales (abuelo / niño).

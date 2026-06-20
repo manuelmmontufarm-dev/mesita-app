@@ -7,6 +7,10 @@ export interface DemoTableProgressInput {
   paidGuestIds: readonly MemberId[];
   guestCount: number;
   paymentsSubtotal?: number;
+  /** Partial BY_ITEM units settled (item id → units paid). */
+  itemPaidUnits?: Readonly<Record<string, number>>;
+  /** Distinct payment transactions — drives "N pagos registrados". */
+  paymentCount?: number;
   config: Pick<RestaurantConfig, "ivaRate" | "serviceRate" | "serviceEnabled">;
 }
 
@@ -18,12 +22,34 @@ export interface DemoTableProgress {
   tableClosed: boolean;
 }
 
+/** Subtotal covered by fully paid items plus partial unit payments. */
+function paidSubtotalWithPartials(
+  items: readonly BillItem[],
+  paidItemIds: readonly ItemId[],
+  itemPaidUnits?: Readonly<Record<string, number>>,
+): number {
+  return items.reduce((sum, it) => {
+    if (paidItemIds.includes(it.id)) {
+      return sum + it.qty * it.unitPrice;
+    }
+    const units = itemPaidUnits?.[it.id] ?? 0;
+    if (units > 0.001) {
+      return sum + Math.min(units, it.qty) * it.unitPrice;
+    }
+    return sum;
+  }, 0);
+}
+
 /** Authoritative demo progress — merges items, payers, and payment totals. */
 export function deriveDemoTableProgress(input: DemoTableProgressInput): DemoTableProgress {
   const fullSub = billSubtotal(input.items);
   const mesaTotal = computeTotals(fullSub, input.config, 0).total;
 
-  const itemPaidSub = paidSubtotal(input.items, input.paidItemIds);
+  const itemPaidSub = paidSubtotalWithPartials(
+    input.items,
+    input.paidItemIds,
+    input.itemPaidUnits,
+  );
   const remainingFromItems = Math.max(0, fullSub - itemPaidSub);
 
   const paymentsSub =
@@ -55,7 +81,10 @@ export function deriveDemoTableProgress(input: DemoTableProgressInput): DemoTabl
     mesaTotal,
     remainingSub: tableClosed ? 0 : remainingSub,
     paidPct: tableClosed ? 100 : paidPctRaw,
-    paidCount: input.paidGuestIds.length,
+    paidCount:
+      input.paymentCount != null && input.paymentCount > 0
+        ? input.paymentCount
+        : input.paidGuestIds.length,
     tableClosed,
   };
 }

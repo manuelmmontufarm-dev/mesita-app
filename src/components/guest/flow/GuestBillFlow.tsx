@@ -241,13 +241,11 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
 
   useEffect(() => {
     if (!serverSync || items.length === 0) return;
-    const tableClosed = serverSync.tableClosed === true;
-    if (!tableClosed) return;
+    if (!serverSync.tableClosed) return;
     const { stage } = flow.state;
-    // Solo avanzar a éxito desde waiting — no saltar confirm/pago ni cerrar mesa parcial.
-    if (stage === "waiting") {
-      flow.finishWaiting();
-    }
+    if (stage === "success") return;
+    // Mesa cerrada: todos ven la pantalla final (pagaron o no).
+    flow.finishWaiting();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverSync?.version, serverSync?.tableClosed, items.length, flow.state.stage]);
 

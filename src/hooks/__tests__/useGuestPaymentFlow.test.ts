@@ -12,6 +12,7 @@ import {
   deriveTotals,
   flowReducer,
   itemsToMarkPaid,
+  requiresMandatoryInvoice,
   type FlowInit,
   type FlowState,
 } from "../useGuestPaymentFlow";
@@ -263,6 +264,26 @@ describe("deriveTotals", () => {
       "you",
     );
     expect(d.subtotal).toBeCloseTo(24.4, 5);
+  });
+
+  it("requiresFullBillInvoice when todo mode total ≥ 50", () => {
+    const bigItems = [
+      { id: "a", name: "A", qty: 1, unitPrice: 40 },
+      { id: "b", name: "B", qty: 1, unitPrice: 10 },
+    ];
+    const d = deriveTotals(
+      withState({ mode: "todo", people: 4, paidIds: [] }),
+      bigItems,
+      config,
+      "you",
+    );
+    expect(d.isLastPayer).toBe(false);
+    expect(d.requiresFullBillInvoice).toBe(true);
+    expect(requiresMandatoryInvoice({
+      isLastPayer: d.isLastPayer,
+      mode: "todo",
+      paymentTotal: d.totals.total,
+    })).toBe(true);
   });
 
   it("isLastPayer is true when remainingPeople ≤ 1", () => {

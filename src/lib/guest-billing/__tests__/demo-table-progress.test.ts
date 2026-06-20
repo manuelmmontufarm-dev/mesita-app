@@ -28,17 +28,32 @@ describe("deriveDemoTableProgress", () => {
     expect(p.remainingSub).toBe(0);
   });
 
-  it("paidPct reflects money covered, not guest headcount alone", () => {
+  it("paidPct reflects partial item units when items not fully marked paid", () => {
     const p = deriveDemoTableProgress({
       items,
       paidItemIds: [],
-      paidGuestIds: ["g1"],
+      paidGuestIds: ["g1", "g2"],
       guestCount: 2,
+      itemPaidUnits: { a: 1, b: 0.5 },
+      paymentCount: 2,
+      paymentsSubtotal: 15,
       config,
     });
+    expect(p.paidPct).toBe(75);
+    expect(p.paidCount).toBe(2);
     expect(p.tableClosed).toBe(false);
-    expect(p.paidPct).toBe(0);
-    expect(p.paidCount).toBe(1);
+  });
+
+  it("paymentCount drives paidCount not guest headcount", () => {
+    const p = deriveDemoTableProgress({
+      items,
+      paidItemIds: ["a"],
+      paidGuestIds: ["g1"],
+      guestCount: 2,
+      paymentCount: 2,
+      config,
+    });
+    expect(p.paidCount).toBe(2);
   });
 
   it("paidPct is 50 when half the subtotal is paid via items", () => {

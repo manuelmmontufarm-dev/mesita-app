@@ -48,7 +48,7 @@ import type {
 } from "@/lib/guest-billing/types";
 import type { DemoTableProgress } from "@/lib/guest-billing/demo-table-progress";
 
-import { Ic, LogoMark, NamePill } from "./_shared";
+import { Ic, LogoMark, NamePill, useBumpOnChange } from "./_shared";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
 
@@ -134,6 +134,20 @@ function CelebrateMood() {
   );
 }
 
+function PaymentRegisteredEyebrow({ count }: { count: number }) {
+  const bump = useBumpOnChange(count);
+  const label =
+    count === 1 ? "1 pago registrado" : `${count} pagos registrados`;
+  return (
+    <p
+      className={"ws-reg-eyebrow" + (bump ? " ws-pay-count-pop" : "")}
+      data-testid="ws-payment-count"
+    >
+      {label}
+    </p>
+  );
+}
+
 function MesaProgressRing({
   paidPct,
   remainingAmt,
@@ -155,6 +169,8 @@ function MesaProgressRing({
   const c = 2 * Math.PI * r;
   const clamped = Math.max(0, Math.min(100, paidPct));
   const offset = c * (1 - clamped / 100);
+  const pctBump = useBumpOnChange(clamped);
+  const countBump = useBumpOnChange(paidCount);
 
   return (
     <div
@@ -175,7 +191,9 @@ function MesaProgressRing({
           />
         </svg>
         <div className="ws-mesa-ring-center">
-          <span className="ws-mesa-ring-pct">{clamped}%</span>
+          <span className={"ws-mesa-ring-pct" + (pctBump ? " bump" : "")}>
+            {clamped}%
+          </span>
           <span className="ws-mesa-ring-lbl">pagado</span>
           <span className="ws-mesa-ring-amt">{remainingAmt}</span>
         </div>
@@ -187,7 +205,9 @@ function MesaProgressRing({
         <span className="live-pill-sm glassx">
           <span className="dot" /> En vivo
         </span>
-        <span className="ws-mesa-ring-count">
+        <span
+          className={"ws-mesa-ring-count" + (countBump ? " ws-pay-count-pop" : "")}
+        >
           {tableOpen
             ? paidCount === 1
               ? "1 pago en la mesa"
@@ -456,8 +476,10 @@ export function WaitingSuccessStage({
         )
       : 100);
   const paidGuestCount =
-    demoTableProgress?.paidCount ??
-    Math.max(paidSummaries.length, state.paidIds.length);
+    paidSummaries.length > 0
+      ? paidSummaries.length
+      : demoTableProgress?.paidCount ??
+        Math.max(paidSummaries.length, state.paidIds.length);
   const totalGuestCount = Math.max(
     members.length,
     people,
@@ -617,7 +639,7 @@ export function WaitingSuccessStage({
         <div className="ws-reg-badge" aria-hidden="true">
           <Ic.check s={22} w={3} />
         </div>
-        <p className="ws-reg-eyebrow">Un pago registrado</p>
+        <PaymentRegisteredEyebrow count={paidGuestCount} />
         <h1 className="flow-title ws-reg-title">
           ¡Gracias{displayName !== "tú" ? `, ${displayName}` : ""}!
         </h1>
@@ -714,6 +736,14 @@ export function WaitingSuccessStage({
       </div>
 
       <div className="completed-actions">
+        <button
+          type="button"
+          className="completed-btn ws-back-mesa-btn"
+          onClick={() => flow.goToBill()}
+          data-testid="success-back-mesa-btn"
+        >
+          <Ic.users s={16} /> Ver mesa
+        </button>
         {config.demoMode && onResetDemo ? (
           <button
             type="button"

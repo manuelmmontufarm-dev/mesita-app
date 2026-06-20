@@ -314,6 +314,9 @@ const METHOD_LABELS: Record<PaymentMethod, string> = {
   card: "Tarjeta",
 };
 
+/** SRI-style threshold — paying the full bill above this requires invoice data. */
+export const INVOICE_MANDATORY_THRESHOLD = 50;
+
 export interface DerivedTotals {
   fullSub: number;
   paidSub: number;
@@ -327,6 +330,21 @@ export interface DerivedTotals {
   canPay: boolean;
   /** True iff fewer than 2 people remain to pay. Drives forced e-invoice. */
   isLastPayer: boolean;
+  /** Full-table pay (Todo) with total ≥ threshold — invoice mandatory even with others at table. */
+  requiresFullBillInvoice: boolean;
+}
+
+/** Whether checkout must collect e-invoice data before charging. */
+export function requiresMandatoryInvoice(opts: {
+  isLastPayer: boolean;
+  mode: SplitMode;
+  paymentTotal: number;
+}): boolean {
+  if (opts.isLastPayer) return true;
+  return (
+    opts.mode === "todo" &&
+    opts.paymentTotal >= INVOICE_MANDATORY_THRESHOLD
+  );
 }
 
 export function deriveTotals(
@@ -356,6 +374,7 @@ export function deriveTotals(
         ? remainingSub
         : myUnpaidSub;
   const totals = computeTotals(subtotal, config, state.tip);
+  const isLastPayer = remainingPeople <= 1;
   return {
     fullSub,
     paidSub: effectivePaidSub,
@@ -366,7 +385,9 @@ export function deriveTotals(
     subtotal,
     totals,
     canPay: subtotal > 0.001,
-    isLastPayer: remainingPeople <= 1,
+    isLastPayer,
+    requiresFullBillInvoice:
+      state.mode === "todo" && totals.total >= INVOICE_MANDATORY_THRESHOLD,
   };
 }
 
