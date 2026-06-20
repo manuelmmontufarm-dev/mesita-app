@@ -1,4 +1,4 @@
-import { billSubtotal, computeTotals, isTableFullyPaid, paidSubtotal } from "./split-math";
+import { billSubtotal, computeTotals, isTableFullyPaid } from "./split-math";
 import type { BillItem, ItemId, MemberId, RestaurantConfig } from "./types";
 
 export interface DemoTableProgressInput {

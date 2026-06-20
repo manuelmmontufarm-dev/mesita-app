@@ -45,14 +45,13 @@ function GuestPayShell({
 
   const demoProgress = useMemo(() => {
     if (!isDemo || !("paidSummaries" in live)) return null;
-    const paymentsSubtotal = live.paidSummaries?.reduce(
+    const paymentsSubtotal = live.paidSummaries.reduce(
       (sum, p) => sum + (p.subtotal ?? p.amount / 1.25),
       0,
     );
     const itemPaidUnits =
       "itemPaidUnits" in live ? live.itemPaidUnits : undefined;
-    const paymentCount =
-      "paymentCount" in live ? live.paymentCount : live.paidSummaries?.length;
+    const paymentCount = live.paidSummaries.length;
     return deriveDemoTableProgress({
       items: live.items,
       paidItemIds: live.paidItemIds,

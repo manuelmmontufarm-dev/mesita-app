@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-20 — Fix build: type error en GuestPayPage demo progress
+- **Qué:** `GuestPayPage.tsx`, `demo-table-progress.ts`.
+- **Por qué:** Vercel build falló — ternario `"paymentCount" in live` narrowing a `never`; import `paidSubtotal` sin usar.
+- **Qué hace:** Usa `paidSummaries.length` en bloque demo ya acotado; quita import muerto. Build verde.
+
 ### 2026-06-20 — Gracias: factura todo ≥$50, sync %, scroll, animación pagos
 - **Qué:** `PaymentStage.tsx`, `WaitingSuccessStage.tsx`, `GuestBillFlow.tsx`, `GuestPayPage.tsx`, `useGuestPaymentFlow.ts`, `demo-table-progress.ts`, `useDemoTableSession.ts`, `customer.css`, tests.
 - **Por qué:** Pagar toda la cuenta ≥$50 debe pedir factura aunque haya más gente; quien no pagó debe ver mesa cerrada; % y “1 pago” no se actualizaban con pagos por ítem; scroll/recibo tapaba contenido; falta “Ver mesa” en éxito.
