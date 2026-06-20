@@ -5,9 +5,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { mapDemoStateToSession } from "@/lib/demo-live-adapter";
 import { demoDebug } from "@/lib/demo-debug";
 import {
+  clearPendingDemoOps,
   createPendingDemoOps,
+  deriveVisiblePendingClaims,
+  isDemoTableReset,
   mapClaimsFromDemoRaw,
   mergeDemoStateWithPending,
+  pruneResolvedPendingClaims,
+  type PendingClaimOp,
   type PendingDemoOps,
 } from "@/lib/demo-optimistic-merge";
 import { DEMO_LOBBY, emojiForItemName } from "@/lib/demo-restaurant";
@@ -82,6 +87,8 @@ export interface UseDemoTableSessionResult {
   paidSummaries: TablePaymentSummary[];
   /** Bumps on optimistic local patches — keeps flow claims in sync before server version. */
   syncRevision: number;
+  /** Item ids with in-flight claim/release on this device — show loading until server confirms. */
+  pendingClaims: Readonly<Record<string, PendingClaimOp>>;
   isDemo: true;
   sseConnected: boolean;
   /** User tapped "Entrar a la mesa" (or returning with that consent saved). */
@@ -284,6 +291,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   /** True while a pay POST is in flight — blocks the silent heal re-join. */
   const paying = useRef(false);
   const pendingOps = useRef<PendingDemoOps>(createPendingDemoOps());
+  const actionChain = useRef(Promise.resolve());
   const joinTableRef = useRef<
     | ((opts?: { guestId?: string; clearStored?: boolean }) => Promise<string | null>)
     | null
@@ -315,6 +323,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     lastVersion.current = undefined;
     lastResetSeq.current = undefined;
     pendingOps.current = createPendingDemoOps();
+    actionChain.current = Promise.resolve();
     demoDebug("lobby", "back to entry screen");
   }, [token]);
 
@@ -342,6 +351,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     (demo: DemoTableState, opts?: { force?: boolean; source?: string }) => {
       const gid = guestSessionIdRef.current;
       const prevReset = lastResetSeq.current ?? readStoredResetSeq(token);
+      const tableReset = isDemoTableReset(demo.resetSeq, prevReset);
 
       if (
         readStoredEntered(token) &&
@@ -351,17 +361,33 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
           resetSeq: demo.resetSeq,
           prevReset,
         });
+        clearPendingDemoOps(pendingOps.current);
         exitToLobby();
         return;
+      }
+
+      if (tableReset) {
+        clearPendingDemoOps(pendingOps.current);
+        pendingRename.current = null;
+        if (renameTimer.current) clearTimeout(renameTimer.current);
+        demoDebug("sync:reset", `resetSeq ${prevReset} → ${demo.resetSeq}`);
+      }
+
+      if (gid) {
+        if (pruneResolvedPendingClaims(demo, pendingOps.current, gid)) {
+          setSyncRevision((n) => n + 1);
+        }
       }
 
       const pending = pendingOps.current;
       const hasPending =
         pending.claims.size > 0 || pending.pendingNames.size > 0;
       const merged =
-        opts?.force || !hasPending
+        opts?.force || !hasPending || tableReset
           ? demo
-          : mergeDemoStateWithPending(demo, pending, gid);
+          : mergeDemoStateWithPending(demo, pending, gid, {
+              afterReset: tableReset,
+            });
 
       applyDemo(merged, opts);
 
@@ -583,7 +609,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         if (err instanceof Error && err.message === "SESSION_EXPIRED") {
           demoDebug("join", "409 on action — try recover join");
           try {
-            await joinTable({ clearStored: true });
+            await joinTable();
             return;
           } catch {
             exitToLobby();
@@ -593,6 +619,15 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       }
     },
     [token, ingestDemoState, joinTable, exitToLobby],
+  );
+
+  const enqueueAction = useCallback(
+    (body: Record<string, unknown>) => {
+      const run = actionChain.current.then(() => postAction(body));
+      actionChain.current = run.catch(() => undefined);
+      return run;
+    },
+    [postAction],
   );
 
   const onRename = useCallback(
@@ -624,14 +659,14 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         const toSend = pendingRename.current;
         if (toSend == null) return;
         pendingRename.current = null;
-        void postAction({ action: "rename", guestId: guestSessionId, name: toSend })
+        void enqueueAction({ action: "rename", guestId: guestSessionId, name: toSend })
           .then(() => {
             pendingOps.current.pendingNames.delete(guestSessionId);
           })
           .catch(console.error);
       }, 80);
     },
-    [guestSessionId, postAction, patchLocalDemo],
+    [guestSessionId, enqueueAction, patchLocalDemo],
   );
 
   /** Force-send any pending rename synchronously before a critical action (pay). */
@@ -644,12 +679,12 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     if (toSend == null || !guestSessionId) return;
     pendingRename.current = null;
     try {
-      await postAction({ action: "rename", guestId: guestSessionId, name: toSend });
+      await enqueueAction({ action: "rename", guestId: guestSessionId, name: toSend });
       pendingOps.current.pendingNames.delete(guestSessionId);
     } catch (err) {
       console.error(err);
     }
-  }, [guestSessionId, postAction]);
+  }, [guestSessionId, enqueueAction]);
 
   const onClaim = useCallback(
     (billItemId: string, _units: number) => {
@@ -663,7 +698,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         pendingOps.current.claims.set(billItemId, op);
         return { ...prev, claims };
       });
-      void postAction({ action: "claim", guestId: guestSessionId, itemId: billItemId })
+      void enqueueAction({ action: "claim", guestId: guestSessionId, itemId: billItemId })
         .then(() => {
           pendingOps.current.claims.delete(billItemId);
         })
@@ -672,7 +707,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
           console.error(err);
         });
     },
-    [guestSessionId, postAction, patchLocalDemo],
+    [guestSessionId, enqueueAction, patchLocalDemo],
   );
 
   const onRelease = useCallback(
@@ -684,7 +719,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         pendingOps.current.claims.set(billItemId, "release");
         return { ...prev, claims };
       });
-      void postAction({
+      void enqueueAction({
         action: "release",
         guestId: guestSessionId,
         itemId: billItemId,
@@ -697,7 +732,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
           console.error(err);
         });
     },
-    [guestSessionId, postAction, patchLocalDemo],
+    [guestSessionId, enqueueAction, patchLocalDemo],
   );
 
   const onStatus = useCallback(
@@ -721,6 +756,8 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   );
 
   const resetDemo = useCallback(async () => {
+    clearPendingDemoOps(pendingOps.current);
+    pendingRename.current = null;
     try {
       await postAction({ action: "reset" });
     } finally {
@@ -765,6 +802,10 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   );
 
   const claims = useMemo(() => (raw ? mapClaimsFromDemoRaw(raw) : {}), [raw]);
+  const pendingClaims = useMemo(
+    () => deriveVisiblePendingClaims(raw, pendingOps.current, guestSessionId),
+    [raw, guestSessionId, syncRevision],
+  );
   const paidItemIds = useMemo(
     () => (state ? state.items.filter((i) => i.isPaid).map((i) => i.id) : []),
     [state],
@@ -822,6 +863,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     members,
     config,
     claims,
+    pendingClaims,
     paidItemIds,
     people,
     version: state?.version ?? 0,

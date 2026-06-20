@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  clearPendingDemoOps,
   createPendingDemoOps,
+  deriveVisiblePendingClaims,
+  isDemoTableReset,
   mergeClaimsPreserveLocal,
   mergeDemoStateWithPending,
+  pruneResolvedPendingClaims,
 } from "../demo-optimistic-merge";
 import type { DemoTableState } from "@/lib/demo-table-store";
 
@@ -56,12 +60,45 @@ describe("mergeDemoStateWithPending", () => {
     expect(merged.guests[0]?.name).toBe("Manuel");
   });
 
-  it("applies pending release over stale server claim", () => {
+  it("does not replay pending claims after table reset", () => {
     const pending = createPendingDemoOps();
-    pending.claims.set("locro", "release");
-    const incoming = { ...base(), claims: { locro: "g1" } };
-    const merged = mergeDemoStateWithPending(incoming, pending, "g1");
+    pending.claims.set("locro", "claim");
+    const incoming = base();
+    incoming.resetSeq = 2;
+    incoming.claims = {};
+    const merged = mergeDemoStateWithPending(incoming, pending, "g1", {
+      afterReset: true,
+    });
     expect(merged.claims.locro).toBeUndefined();
+  });
+});
+
+describe("pruneResolvedPendingClaims", () => {
+  it("clears claim pending once server owner matches", () => {
+    const pending = createPendingDemoOps();
+    pending.claims.set("locro", "claim");
+    const demo = base();
+    demo.claims.locro = "g1";
+    expect(pruneResolvedPendingClaims(demo, pending, "g1")).toBe(true);
+    expect(pending.claims.has("locro")).toBe(false);
+  });
+});
+
+describe("deriveVisiblePendingClaims", () => {
+  it("hides pending once server already reflects claim", () => {
+    const pending = createPendingDemoOps();
+    pending.claims.set("locro", "claim");
+    const demo = base();
+    demo.claims.locro = "g1";
+    expect(deriveVisiblePendingClaims(demo, pending, "g1")).toEqual({});
+  });
+
+  it("shows pending while server lacks claim", () => {
+    const pending = createPendingDemoOps();
+    pending.claims.set("locro", "claim");
+    expect(deriveVisiblePendingClaims(base(), pending, "g1")).toEqual({
+      locro: "claim",
+    });
   });
 });
 
@@ -78,5 +115,14 @@ describe("mergeClaimsPreserveLocal", () => {
     const local = { locro: { g1: 1 } };
     const merged = mergeClaimsPreserveLocal(server, local, "g1");
     expect(merged.locro?.g1).toBe(1);
+  });
+
+  it("drops stale local claims when trustLocal is false (post-reset)", () => {
+    const server = {};
+    const local = { locro: { g1: 1 } };
+    const merged = mergeClaimsPreserveLocal(server, local, "g1", {
+      trustLocal: false,
+    });
+    expect(merged.locro).toBeUndefined();
   });
 });

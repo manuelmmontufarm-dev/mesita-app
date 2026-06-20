@@ -227,6 +227,82 @@ async function saveState(token: string, state: DemoTableState): Promise<DemoTabl
   return state;
 }
 
+const MUTATE_MAX_RETRIES = 10;
+
+/** Serialize mutations per table token within this process (avoids interleaved RMW). */
+const tokenMutationTail = new Map<string, Promise<unknown>>();
+
+function runSerializedMutation<T>(token: string, work: () => Promise<T>): Promise<T> {
+  const prev = tokenMutationTail.get(token) ?? Promise.resolve();
+  const run = prev.catch(() => undefined).then(work);
+  tokenMutationTail.set(
+    token,
+    run.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return run;
+}
+
+/** Atomic commit: version must still match or the write is rejected (caller retries). */
+async function tryCommitDemoState(
+  token: string,
+  draft: DemoTableState,
+  expectedVersion: number,
+): Promise<boolean> {
+  const redis = getRedis();
+  if (redis) {
+    const key = REDIS_KEY(token);
+    const remote = await redis.get<DemoTableState>(key);
+    if (!remote || remote.version !== expectedVersion) return false;
+    await redis.set(key, draft);
+    getMemoryStore().set(token, draft);
+    return true;
+  }
+  const mem = getMemoryStore();
+  const current = mem.get(token);
+  if (!current || current.version !== expectedVersion) return false;
+  mem.set(token, draft);
+  return true;
+}
+
+/** Read-modify-write with version CAS — prevents lost claim updates across lambdas. */
+async function mutateDemoState(
+  token: string,
+  mutator: (state: DemoTableState) => void,
+): Promise<DemoTableState> {
+  return runSerializedMutation(token, async () => {
+    for (let attempt = 0; attempt < MUTATE_MAX_RETRIES; attempt++) {
+      let state = await loadState(token);
+      if (!state) {
+        state = createState(token);
+        if (!(await tryCommitDemoState(token, state, 0))) {
+          continue;
+        }
+      }
+      if ((state.stateVersion ?? 1) < DEMO_STATE_VERSION) {
+        state = migrateState(state);
+      }
+      const expectedVersion = state.version;
+      const draft: DemoTableState = {
+        ...state,
+        claims: { ...state.claims },
+        guests: state.guests.map((g) => ({ ...g })),
+        items: [...state.items],
+        paidItemIds: [...state.paidItemIds],
+        payments: [...state.payments],
+      };
+      mutator(draft);
+      touch(draft);
+      if (await tryCommitDemoState(token, draft, expectedVersion)) {
+        return draft;
+      }
+    }
+    throw new Error(`Demo table ${token}: concurrent update conflict`);
+  });
+}
+
 export async function getDemoTableState(token: string): Promise<DemoTableState> {
   const existing = await loadState(token);
   if (existing) {
@@ -248,7 +324,17 @@ export async function resetDemoTableState(token: string): Promise<DemoTableState
   const state = createState(token);
   state.resetSeq = (prev?.resetSeq ?? 0) + 1;
   state.version = (prev?.version ?? 0) + 1;
-  return saveState(token, state);
+  state.claims = {};
+  state.guests = [];
+  state.payments = [];
+  state.paidItemIds = [];
+  state.nextGuestNumber = 1;
+  getMemoryStore().set(token, state);
+  const redis = getRedis();
+  if (redis) {
+    await redis.set(REDIS_KEY(token), state);
+  }
+  return state;
 }
 
 /** Derive next Persona N from existing labels — recycles gaps, immune to ghost increments. */
@@ -265,51 +351,53 @@ export async function joinDemoTable(
   token: string,
   opts?: JoinDemoTableOpts | string,
 ): Promise<{ state: DemoTableState; guest: DemoGuest }> {
-  // Back-compat: accept a plain guestId string from legacy callers.
   const { guestId, deviceId } =
     typeof opts === "string" ? { guestId: opts, deviceId: undefined } : opts ?? {};
 
-  const state = await getDemoTableState(token);
-  const ts = nowIso();
+  let resolvedGuest: DemoGuest | null = null;
+  const state = await mutateDemoState(token, (draft) => {
+    const ts = nowIso();
 
-  // 1) Primary idempotency: deviceId — survives lost-update + 409 cycles.
-  if (deviceId) {
-    const byDevice = state.guests.find((g) => g.deviceId === deviceId);
-    if (byDevice) {
-      byDevice.status = byDevice.status === "paid" ? "paid" : "selecting";
-      byDevice.updatedAt = ts;
-      return { state: await saveState(token, touch(state)), guest: byDevice };
+    if (deviceId) {
+      const byDevice = draft.guests.find((g) => g.deviceId === deviceId);
+      if (byDevice) {
+        byDevice.status = byDevice.status === "paid" ? "paid" : "selecting";
+        byDevice.updatedAt = ts;
+        resolvedGuest = byDevice;
+        return;
+      }
     }
-  }
 
-  // 2) Fallback: guestId — heal storage by binding deviceId for next time.
-  if (guestId) {
-    const byId = state.guests.find((g) => g.id === guestId);
-    if (byId) {
-      if (deviceId && !byId.deviceId) byId.deviceId = deviceId;
-      byId.status = byId.status === "paid" ? "paid" : "selecting";
-      byId.updatedAt = ts;
-      return { state: await saveState(token, touch(state)), guest: byId };
+    if (guestId) {
+      const byId = draft.guests.find((g) => g.id === guestId);
+      if (byId) {
+        if (deviceId && !byId.deviceId) byId.deviceId = deviceId;
+        byId.status = byId.status === "paid" ? "paid" : "selecting";
+        byId.updatedAt = ts;
+        resolvedGuest = byId;
+        return;
+      }
+      if (!deviceId) throw new DemoGuestNotFoundError(guestId);
     }
-    // guestId provided but not found — only throw if NO deviceId fallback to create with.
-    if (!deviceId) throw new DemoGuestNotFoundError(guestId);
-  }
 
-  // 3) Create — derive number from existing labels (no monotonic counter).
-  const number = nextPersonaNumber(state);
-  state.nextGuestNumber = number + 1;
-  const guest: DemoGuest = {
-    id: crypto.randomUUID(),
-    label: guestLabel(number),
-    name: guestLabel(number),
-    hue: guestAvatarHue(number - 1),
-    status: "selecting",
-    joinedAt: ts,
-    updatedAt: ts,
-    deviceId,
-  };
-  state.guests.unshift(guest);
-  return { state: await saveState(token, touch(state)), guest };
+    const number = nextPersonaNumber(draft);
+    draft.nextGuestNumber = number + 1;
+    const guest: DemoGuest = {
+      id: crypto.randomUUID(),
+      label: guestLabel(number),
+      name: guestLabel(number),
+      hue: guestAvatarHue(number - 1),
+      status: "selecting",
+      joinedAt: ts,
+      updatedAt: ts,
+      deviceId,
+    };
+    draft.guests.unshift(guest);
+    resolvedGuest = guest;
+  });
+
+  if (!resolvedGuest) throw new Error("joinDemoTable: guest not resolved");
+  return { state, guest: resolvedGuest };
 }
 
 export async function renameDemoGuest(
@@ -317,13 +405,13 @@ export async function renameDemoGuest(
   guestId: string,
   name: string,
 ): Promise<DemoTableState> {
-  const state = await getDemoTableState(token);
-  const guest = requireGuest(state, guestId);
-  const cleaned = name.trim().slice(0, 10);
-  const next = cleaned && cleaned.toLowerCase() !== "invitado" ? cleaned : guest.label;
-  guest.name = next || guest.label;
-  guest.updatedAt = nowIso();
-  return saveState(token, touch(state));
+  return mutateDemoState(token, (draft) => {
+    const guest = requireGuest(draft, guestId);
+    const cleaned = name.trim().slice(0, 10);
+    const next = cleaned && cleaned.toLowerCase() !== "invitado" ? cleaned : guest.label;
+    guest.name = next || guest.label;
+    guest.updatedAt = nowIso();
+  });
 }
 
 export async function setDemoGuestStatus(
@@ -331,11 +419,11 @@ export async function setDemoGuestStatus(
   guestId: string,
   status: DemoGuestStatus,
 ): Promise<DemoTableState> {
-  const state = await getDemoTableState(token);
-  const guest = requireGuest(state, guestId);
-  guest.status = status;
-  guest.updatedAt = nowIso();
-  return saveState(token, touch(state));
+  return mutateDemoState(token, (draft) => {
+    const guest = requireGuest(draft, guestId);
+    guest.status = status;
+    guest.updatedAt = nowIso();
+  });
 }
 
 export async function claimDemoItem(
@@ -343,15 +431,15 @@ export async function claimDemoItem(
   guestId: string,
   itemId: string,
 ): Promise<DemoTableState> {
-  const state = await getDemoTableState(token);
-  const guest = requireGuest(state, guestId);
-  if (state.paidItemIds.includes(itemId)) return state;
-  const current = state.claims[itemId];
-  if (current === guestId) delete state.claims[itemId];
-  else state.claims[itemId] = guestId;
-  guest.status = "reviewing";
-  guest.updatedAt = nowIso();
-  return saveState(token, touch(state));
+  return mutateDemoState(token, (draft) => {
+    const guest = requireGuest(draft, guestId);
+    if (draft.paidItemIds.includes(itemId)) return;
+    const current = draft.claims[itemId];
+    if (current === guestId) delete draft.claims[itemId];
+    else draft.claims[itemId] = guestId;
+    guest.status = "reviewing";
+    guest.updatedAt = nowIso();
+  });
 }
 
 export async function releaseDemoItem(
@@ -359,57 +447,54 @@ export async function releaseDemoItem(
   guestId: string,
   itemId: string,
 ): Promise<DemoTableState> {
-  const state = await getDemoTableState(token);
-  requireGuest(state, guestId);
-  if (state.claims[itemId] === guestId) {
-    delete state.claims[itemId];
-  }
-  return saveState(token, touch(state));
+  return mutateDemoState(token, (draft) => {
+    requireGuest(draft, guestId);
+    if (draft.claims[itemId] === guestId) {
+      delete draft.claims[itemId];
+    }
+  });
 }
 
 export async function recordDemoPayment(
   token: string,
   input: Omit<DemoPayment, "id" | "createdAt" | "ref">,
 ): Promise<DemoTableState> {
-  const state = await getDemoTableState(token);
-  const ts = nowIso();
-  const payment: DemoPayment = {
-    ...input,
-    id: crypto.randomUUID(),
-    ref: `MQR-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}`,
-    createdAt: ts,
-  };
-  state.payments.unshift(payment);
+  return mutateDemoState(token, (draft) => {
+    const ts = nowIso();
+    const payment: DemoPayment = {
+      ...input,
+      id: crypto.randomUUID(),
+      ref: `MQR-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}`,
+      createdAt: ts,
+    };
+    draft.payments.unshift(payment);
 
-  if (input.mode === "todo") {
-    state.paidItemIds = state.items.map((item) => item.id);
-  } else if (input.mode === "item") {
-    state.paidItemIds = Array.from(new Set([...state.paidItemIds, ...input.itemIds]));
-  }
-
-  const guest = requireGuest(state, input.guestId);
-  const incoming = input.guestName?.trim();
-  if (incoming && incoming.toLowerCase() !== "invitado") {
-    // Guardrail: don't clobber a real typed name with an auto "Persona N" label.
-    // (Belt-and-suspenders for the legacy code path; clients now send typedName.)
-    const incomingIsAutoLabel = personNumberFromLabel(incoming) != null;
-    const existingIsAutoLabel = personNumberFromLabel(guest.name) != null;
-    if (!incomingIsAutoLabel || existingIsAutoLabel) {
-      guest.name = incoming;
+    if (input.mode === "todo") {
+      draft.paidItemIds = draft.items.map((item) => item.id);
+    } else if (input.mode === "item") {
+      draft.paidItemIds = Array.from(new Set([...draft.paidItemIds, ...input.itemIds]));
     }
-  }
-  guest.status = "paid";
-  guest.updatedAt = ts;
 
-  if (
-    input.mode === "equal" &&
-    state.guests.length > 0 &&
-    state.guests.every((g) => g.status === "paid")
-  ) {
-    state.paidItemIds = state.items.map((item) => item.id);
-  }
+    const guest = requireGuest(draft, input.guestId);
+    const incoming = input.guestName?.trim();
+    if (incoming && incoming.toLowerCase() !== "invitado") {
+      const incomingIsAutoLabel = personNumberFromLabel(incoming) != null;
+      const existingIsAutoLabel = personNumberFromLabel(guest.name) != null;
+      if (!incomingIsAutoLabel || existingIsAutoLabel) {
+        guest.name = incoming;
+      }
+    }
+    guest.status = "paid";
+    guest.updatedAt = ts;
 
-  return saveState(token, touch(state));
+    if (
+      input.mode === "equal" &&
+      draft.guests.length > 0 &&
+      draft.guests.every((g) => g.status === "paid")
+    ) {
+      draft.paidItemIds = draft.items.map((item) => item.id);
+    }
+  });
 }
 
 /** Pure helper — only apply snapshots with strictly newer version counters. */

@@ -70,6 +70,12 @@ export class SimulatedDevice {
     return claimDemoItem(this.token, this.guestId!, itemId);
   }
 
+  /** Fire claim without jitter — exposes lost-update races. */
+  async claimFast(itemId: string): Promise<DemoTableState> {
+    if (!this.guestId) await this.join();
+    return claimDemoItem(this.token, this.guestId!, itemId);
+  }
+
   async release(itemId: string): Promise<DemoTableState> {
     if (!this.guestId) await this.join();
     await jitter();
@@ -392,15 +398,19 @@ export const SCENARIOS: Scenario[] = [
   {
     id: "16",
     category: "reset",
-    name: "Reset → resetSeq bumps, guests cleared",
+    name: "Reset → resetSeq bumps, guests and claims cleared",
     run: async (token) => {
       const a = new SimulatedDevice(token);
       const b = new SimulatedDevice(token);
       await Promise.all([a.join(), b.join()]);
+      await a.claim("locro");
+      await b.claim("seco");
       const before = await getDemoTableState(token);
+      expectEq(Object.keys(before.claims).length, 2, "claims set before reset");
       const reset = await resetDemoTableState(token);
       expectEq(reset.resetSeq, before.resetSeq + 1, "resetSeq +1");
       expectEq(reset.guests.length, 0, "guests cleared");
+      expectEq(Object.keys(reset.claims).length, 0, "claims cleared");
       expectEq(reset.nextGuestNumber, 1, "counter reset to 1");
     },
   },
@@ -472,6 +482,32 @@ export const SCENARIOS: Scenario[] = [
         me?.name !== "Invitado" && me?.name?.toLowerCase() !== "invitado",
         `name should NOT be Invitado (got "${me?.name}")`,
       );
+    },
+  },
+  {
+    id: "21",
+    category: "claim",
+    name: "4-device parallel claim burst → every claim persisted",
+    run: async (token) => {
+      const devices = [
+        new SimulatedDevice(token),
+        new SimulatedDevice(token),
+        new SimulatedDevice(token),
+        new SimulatedDevice(token),
+      ];
+      await Promise.all(devices.map((d) => d.join()));
+      const itemIds = ["locro", "seco", "encebollado", "ceviche"];
+      await Promise.all(
+        devices.map((d, i) => d.claimFast(itemIds[i]!)),
+      );
+      const state = await getDemoTableState(token);
+      for (let i = 0; i < itemIds.length; i++) {
+        expectEq(
+          state.claims[itemIds[i]!],
+          devices[i]!.guestId,
+          `${itemIds[i]} owned by device ${i}`,
+        );
+      }
     },
   },
 ];

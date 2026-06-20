@@ -32,6 +32,7 @@ import {
 import type { LiveSessionActions } from "@/hooks/useLiveTableSession";
 import { fmt } from "@/lib/guest-billing";
 import { mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
+import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
 import { freeUnits, isTableFullyPaid, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
 import type {
   BillItem,
@@ -52,6 +53,7 @@ interface StageProps {
   members: readonly TableMember[];
   config: RestaurantConfig;
   sessionClaims?: Claims;
+  pendingClaims?: Readonly<Record<string, PendingClaimOp>>;
   paidSummaries?: readonly TablePaymentSummary[];
   demoTableProgress?: DemoTableProgress;
   onResetDemo?: () => Promise<void>;
@@ -87,6 +89,8 @@ export interface GuestBillFlowProps {
   onResetDemo?: () => Promise<void>;
   /** Server-authoritative claims for pill display (avoids one-frame stale local state). */
   sessionClaims?: Claims;
+  /** In-flight claims on this device — loading spinner until server confirms. */
+  pendingClaims?: Readonly<Record<string, PendingClaimOp>>;
   /** Payments recorded on the shared session (for waiting summaries). */
   paidSummaries?: readonly TablePaymentSummary[];
   /** Demo-only: merged live progress for waiting/success ring. */
@@ -108,6 +112,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     serverSync,
     onResetDemo,
     sessionClaims,
+    pendingClaims,
     paidSummaries,
     demoTableProgress,
   } = props;
@@ -177,6 +182,11 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
 
   const activeFlow = liveSession ? liveFlow : flow;
 
+  const youMember = members.find((m) => m.isYou);
+  const seededName = useRef(false);
+  const lastResetSeq = useRef<number | null>(null);
+  const trustLocalClaims = useRef(true);
+
   useLayoutEffect(() => {
     if (!serverSync) return;
     flow.syncFromServer({
@@ -184,18 +194,16 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
         serverSync.claims,
         flow.state.claims,
         resolvedYouId,
+        { trustLocal: trustLocalClaims.current },
       ),
       paidItemIds: serverSync.paidItemIds,
       paidIds: serverSync.paidIds,
       people: serverSync.people,
     });
+    trustLocalClaims.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverSync?.version, serverSync?.syncRevision]);
 
-  const youMember = members.find((m) => m.isYou);
-  const seededName = useRef(false);
-
-  const lastResetSeq = useRef<number | null>(null);
   useEffect(() => {
     if (serverSync?.resetSeq == null) return;
     if (lastResetSeq.current === null) {
@@ -205,6 +213,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     if (serverSync.resetSeq === lastResetSeq.current) return;
     lastResetSeq.current = serverSync.resetSeq;
     seededName.current = false;
+    trustLocalClaims.current = false;
     flow.reset({
       ...init,
       initialStage: "bill",
@@ -273,6 +282,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     members,
     config,
     sessionClaims,
+    pendingClaims,
     paidSummaries,
     demoTableProgress,
     onResetDemo,
@@ -331,6 +341,7 @@ function BillShellStage({
   members,
   config,
   sessionClaims,
+  pendingClaims,
   onResetDemo,
 }: StageProps) {
   const { state, derived } = flow;
@@ -418,6 +429,7 @@ function BillShellStage({
           members={members}
           config={config}
           sessionClaims={sessionClaims}
+          pendingClaims={pendingClaims}
         />
       </div>
 

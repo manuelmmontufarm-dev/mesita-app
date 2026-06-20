@@ -23,15 +23,75 @@ export function createPendingDemoOps(): PendingDemoOps {
   return { claims: new Map(), pendingNames: new Map() };
 }
 
+export function clearPendingDemoOps(pending: PendingDemoOps): void {
+  pending.claims.clear();
+  pending.pendingNames.clear();
+}
+
+/** Drop pending ops the server snapshot already reflects. Returns true if anything was pruned. */
+export function pruneResolvedPendingClaims(
+  demo: DemoTableState,
+  pending: PendingDemoOps,
+  guestId: string | null,
+): boolean {
+  if (!guestId) return false;
+  let changed = false;
+  for (const [itemId, op] of [...pending.claims.entries()]) {
+    const owner = demo.claims[itemId];
+    if (op === "claim" && owner === guestId) {
+      pending.claims.delete(itemId);
+      changed = true;
+    } else if (op === "release" && owner !== guestId) {
+      pending.claims.delete(itemId);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+/** Pending claim/release ops still waiting for the server to match (drives loading UI). */
+export function deriveVisiblePendingClaims(
+  raw: DemoTableState | null,
+  pending: PendingDemoOps,
+  guestId: string | null,
+): Record<string, PendingClaimOp> {
+  const out: Record<string, PendingClaimOp> = {};
+  if (!guestId) return out;
+  for (const [itemId, op] of pending.claims) {
+    if (!raw) {
+      out[itemId] = op;
+      continue;
+    }
+    const owner = raw.claims[itemId];
+    const resolved =
+      (op === "claim" && owner === guestId) ||
+      (op === "release" && owner !== guestId);
+    if (!resolved) out[itemId] = op;
+  }
+  return out;
+}
+
+/** True when the server wiped the table — never replay stale optimistic ops. */
+export function isDemoTableReset(
+  incomingResetSeq: number,
+  lastResetSeq: number | undefined,
+): boolean {
+  if (lastResetSeq === undefined) return false;
+  return incomingResetSeq > lastResetSeq;
+}
+
 /**
  * Merge an incoming server snapshot with in-flight optimistic ops so poll/SSE
  * cannot roll back a claim or rename that hasn't round-tripped yet.
+ * Skipped entirely after a table reset (resetSeq bump).
  */
 export function mergeDemoStateWithPending(
   incoming: DemoTableState,
   pending: PendingDemoOps,
   guestId: string | null,
+  opts?: { afterReset?: boolean },
 ): DemoTableState {
+  if (opts?.afterReset) return incoming;
   if (pending.claims.size === 0 && pending.pendingNames.size === 0) {
     return incoming;
   }
@@ -76,7 +136,9 @@ export function mergeClaimsPreserveLocal(
   server: Claims,
   local: Claims,
   youId: MemberId,
+  opts?: { trustLocal?: boolean },
 ): Claims {
+  if (opts?.trustLocal === false) return { ...serverMapClone(server) };
   const merged: Claims = {};
   const itemIds = new Set([...Object.keys(server), ...Object.keys(local)]);
 
@@ -94,4 +156,12 @@ export function mergeClaimsPreserveLocal(
   }
 
   return merged;
+}
+
+function serverMapClone(server: Claims): Claims {
+  const out: Claims = {};
+  for (const [itemId, map] of Object.entries(server)) {
+    out[itemId] = { ...map };
+  }
+  return out;
 }

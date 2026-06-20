@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Fix: reset demo borra claims; claims paralelos atómicos (CAS)
+- **Qué:** `demo-optimistic-merge.ts`, `demo-table-store.ts` (`mutateDemoState` CAS), `useDemoTableSession.ts`, `GuestBillFlow.tsx`, `demo-scenarios.ts` (esc. 16 + 21), tests merge + multi-user.
+- **Por qué:** Tras "Reiniciar demo" reaparecían platos seleccionados (pending ops + merge local); taps rápidos perdían claims (lost-update entre lambdas); 409 en claim hacía re-join con `clearStored` y rompía identidad.
+- **Qué hace:** Al subir `resetSeq` se limpian pending ops y el flow usa solo claims del server una vez (`trustLocal: false`); writes al store usan CAS atómico + cola por token en el server y cola serial en el cliente; escenario 21 fuzz de 4 claims en paralelo; reset verifica `claims === {}`. 250 tests verdes.
+
 ### 2026-06-19 — Fix: claims/nombres optimistas sobreviven al sync live
 - **Qué:** `demo-optimistic-merge.ts`, `useDemoTableSession`, `GuestBillFlow`, `BillStage`, `payer-badges`.
 - **Por qué:** Al tipear nombre o seleccionar ítems, poll/SSE aplicaba snapshot viejo y borraba claims/renames en vuelo — selects desaparecían y el otro device no veía tu nombre.

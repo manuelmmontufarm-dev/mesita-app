@@ -22,7 +22,7 @@ beforeAll(() => {
   delete process.env.UPSTASH_REDIS_REST_TOKEN;
 });
 
-describe("multi-user scenarios — 20 scenarios × 20 reps with jitter", () => {
+describe("multi-user scenarios — 21 scenarios × 20 reps with jitter", () => {
   for (const scenario of SCENARIOS) {
     it(
       `[${scenario.id}] ${scenario.name}`,
