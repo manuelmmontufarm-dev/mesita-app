@@ -663,8 +663,8 @@ export function WaitingSuccessStage({
         tableOpen={!demoTableProgress?.tableClosed}
       />
 
-      {pendingMembers.length > 0 && (
-        <div className="ws-pending-list surfx">
+        {pendingMembers.length > 0 && (
+          <div className="ws-pending-list surfx">
 
           <div className="ws-pending-title">Pendientes de pago</div>
           {pendingMembers.map((m) => {
@@ -685,6 +685,15 @@ export function WaitingSuccessStage({
           })}
         </div>
       )}
+
+      <button
+        type="button"
+        className="ws-back-mesa-btn ws-back-mesa-inline"
+        onClick={() => flow.goToBill()}
+        data-testid="waiting-back-btn"
+      >
+        <Ic.users s={16} /> Ver mesa
+      </button>
     </div>
   );
 
@@ -738,7 +747,7 @@ export function WaitingSuccessStage({
       <div className="completed-actions">
         <button
           type="button"
-          className="completed-btn ws-back-mesa-btn"
+          className="ws-back-mesa-btn ws-back-mesa-inline"
           onClick={() => flow.goToBill()}
           data-testid="success-back-mesa-btn"
         >
@@ -782,21 +791,9 @@ export function WaitingSuccessStage({
       aria-live="polite"
     >
       {displayedPhase === "waiting" ? (
-        <>
-          <div className={"ws-waiting-wrap" + (fading ? " ws-fading" : "")}>
-            {waitingScroll}
-          </div>
-          <div className="flow-foot ws-wait-foot">
-            <button
-              type="button"
-              className="flow-secondary ws-back-mesa-btn"
-              onClick={() => flow.goToBill()}
-              data-testid="waiting-back-btn"
-            >
-              <Ic.users s={16} /> Ver mesa
-            </button>
-          </div>
-        </>
+        <div className={"ws-waiting-wrap" + (fading ? " ws-fading" : "")}>
+          {waitingScroll}
+        </div>
       ) : (
         <div className={"ws-content ws-success-wrap" + (fading ? " ws-fading" : "")}>
           <div className="wait-scroll ws-success-scroll">{successContent}</div>

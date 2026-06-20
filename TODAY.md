@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-20 — Fix recibo z-index, Ver mesa, PDF legible
+- **Qué:** `customer.css`, `WaitingSuccessStage.tsx`, `ReceiptDrawer.tsx`, `receipt-pdf.ts`.
+- **Por qué:** Ver mesa y Pagar tu parte quedaban encima del recibo; botón con fondo gris incorrecto; PDF A5 ilegible.
+- **Qué hace:** Recibo z-index 92+ tapa dock/botones; Ver mesa inline en scroll con fondo blanco; PDF A4 con jerarquía clara; backdrop al abrir recibo.
+
 ### 2026-06-20 — Fix build: type error en GuestPayPage demo progress
 - **Qué:** `GuestPayPage.tsx`, `demo-table-progress.ts`.
 - **Por qué:** Vercel build falló — ternario `"paymentCount" in live` narrowing a `never`; import `paidSubtotal` sin usar.

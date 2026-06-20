@@ -90,6 +90,11 @@ export function ReceiptDrawer({ receipts, config, peekLabel = "Tu recibo" }: Rec
     return () => clearTimeout(id);
   }, [introId]);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle("has-receipt-open", pos === "open");
+    return () => document.documentElement.classList.remove("has-receipt-open");
+  }, [pos]);
+
   useLayoutEffect(() => {
     const el = containerRef.current;
     const hd = perfRef.current;
