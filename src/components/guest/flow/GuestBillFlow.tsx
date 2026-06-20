@@ -31,7 +31,7 @@ import {
 } from "@/hooks/useGuestPaymentFlow";
 import type { LiveSessionActions } from "@/hooks/useLiveTableSession";
 import { fmt } from "@/lib/guest-billing";
-import { freeUnits, unitsOf } from "@/lib/guest-billing/split-math";
+import { freeUnits, isTableFullyPaid, unitsOf } from "@/lib/guest-billing/split-math";
 import type {
   BillItem,
   Claims,
@@ -68,11 +68,14 @@ export interface GuestBillFlowProps {
   /** Server-authoritative sync payload (SSE / poll version bump). */
   serverSync?: {
     version: number;
+    resetSeq?: number;
     claims: Claims;
     paidItemIds: ItemId[];
     paidIds: MemberId[];
     people: number;
   };
+  /** Demo-only: reset shared table state for all devices. */
+  onResetDemo?: () => Promise<void>;
 }
 
 export function GuestBillFlow(props: GuestBillFlowProps) {
@@ -88,6 +91,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     now,
     liveSession,
     serverSync,
+    onResetDemo,
   } = props;
 
   const resolvedYouId = youId ?? liveSession?.guestSessionId ?? "you";
@@ -166,6 +170,44 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverSync?.version]);
 
+  const lastResetSeq = useRef<number | null>(null);
+  useEffect(() => {
+    if (serverSync?.resetSeq == null) return;
+    if (lastResetSeq.current === null) {
+      lastResetSeq.current = serverSync.resetSeq;
+      return;
+    }
+    if (serverSync.resetSeq === lastResetSeq.current) return;
+    lastResetSeq.current = serverSync.resetSeq;
+    flow.reset({
+      ...init,
+      initialStage: "bill",
+      initialClaims: serverSync.claims,
+      initialPaidItemIds: serverSync.paidItemIds,
+      initialPaidIds: serverSync.paidIds,
+      initialPeople: serverSync.people,
+      initialReceipts: [],
+    });
+    seededName.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverSync?.resetSeq]);
+
+  useEffect(() => {
+    if (!serverSync || items.length === 0) return;
+    const tableClosed = isTableFullyPaid(
+      items,
+      serverSync.paidItemIds,
+      serverSync.paidIds,
+      serverSync.people,
+    );
+    if (!tableClosed) return;
+    const { stage } = flow.state;
+    if (stage === "bill" || stage === "confirm" || stage === "payment") {
+      flow.finishWaiting();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverSync?.version, items.length, flow.state.stage]);
+
   const youMember = members.find((m) => m.isYou);
   const seededName = useRef(false);
   useEffect(() => {
@@ -226,7 +268,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     case "error":
       return (<><ErrorStage {...stageProps} externalError={externalError ?? null} />{receiptDrawer}</>);
     case "bill":
-      return (<><BillShellStage {...stageProps} />{receiptDrawer}</>);
+      return (<><BillShellStage {...stageProps} onResetDemo={onResetDemo} />{receiptDrawer}</>);
     case "confirm":
       return (<><ConfirmStage {...stageProps} />{receiptDrawer}</>);
     case "payment":
@@ -240,8 +282,15 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
  * (sticky header + sticky bottom pay dock).
  * ────────────────────────────────────────────────────────────────────────── */
 
-function BillShellStage({ flow, items, members, config }: StageProps) {
+function BillShellStage({
+  flow,
+  items,
+  members,
+  config,
+  onResetDemo,
+}: StageProps & { onResetDemo?: () => Promise<void> }) {
   const { state, derived } = flow;
+  const [resetting, setResetting] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [atBottom, setAtBottom] = useState(false);
@@ -296,6 +345,20 @@ function BillShellStage({ flow, items, members, config }: StageProps) {
             En vivo
           </span>
         </div>
+        {config.demoMode && onResetDemo ? (
+          <button
+            type="button"
+            className="demo-reset-btn"
+            disabled={resetting}
+            onClick={() => {
+              setResetting(true);
+              void onResetDemo().finally(() => setResetting(false));
+            }}
+            data-testid="demo-reset-btn"
+          >
+            {resetting ? "Reiniciando…" : "Reiniciar demo"}
+          </button>
+        ) : null}
         <div className="head-title">Total por pagar</div>
       </div>
 

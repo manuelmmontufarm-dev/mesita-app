@@ -125,6 +125,7 @@ function GuestPayShell({
         live.state
           ? {
               version: live.version,
+              resetSeq: "resetSeq" in live ? live.resetSeq : undefined,
               claims: live.claims,
               paidItemIds: live.paidItemIds,
               paidIds,
@@ -132,6 +133,7 @@ function GuestPayShell({
             }
           : undefined
       }
+      onResetDemo={isDemo && "resetDemo" in live ? live.resetDemo : undefined}
     />
   );
 }

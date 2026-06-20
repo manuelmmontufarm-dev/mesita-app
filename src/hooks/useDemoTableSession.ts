@@ -12,7 +12,6 @@ import type {
   TableMember,
 } from "@/lib/guest-billing";
 import {
-  AVATAR_HUE_YOU,
   guestAvatarHue,
   guestLabel,
   initialsFor,
@@ -43,7 +42,9 @@ export interface UseDemoTableSessionResult {
   version: number;
   billId: string | null;
   liveSession: LiveSessionActions | null;
+  resetDemo: () => Promise<void>;
   retry: () => void;
+  resetSeq: number;
   isDemo: true;
 }
 
@@ -73,7 +74,7 @@ function mapDemoMembers(guests: TableSessionState["guests"], youId: string | nul
     id: g.id,
     name: g.displayName || guestLabel(idx + 1),
     initials: initialsFor(g.displayName || guestLabel(idx + 1)),
-    hue: g.id === youId ? AVATAR_HUE_YOU : g.colorHue ?? guestAvatarHue(idx),
+    hue: g.colorHue ?? guestAvatarHue(idx),
     isYou: g.id === youId,
   }));
 }
@@ -259,6 +260,10 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     [guestSessionId, onRename, onClaim, onRelease, onStatus],
   );
 
+  const resetDemo = useCallback(async () => {
+    await postAction({ action: "reset" });
+  }, [postAction]);
+
   const claims = useMemo(() => (state ? mapClaimsFromDemo(state) : {}), [state]);
   const paidItemIds = useMemo(
     () => (state ? state.items.filter((i) => i.isPaid).map((i) => i.id) : []),
@@ -301,7 +306,9 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     version: state?.version ?? 0,
     billId: "demo-bill",
     liveSession,
+    resetDemo,
     retry: () => setJoinAttempt((n) => n + 1),
+    resetSeq: raw?.resetSeq ?? 0,
     isDemo: true,
   };
 }

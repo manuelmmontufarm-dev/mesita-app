@@ -10,7 +10,6 @@ import type {
   TableMember,
 } from "@/lib/guest-billing";
 import {
-  AVATAR_HUE_YOU,
   guestAvatarHue,
   guestLabel,
   initialsFor,
@@ -130,7 +129,7 @@ function mapMembers(
     id: g.id,
     name: g.displayName || guestLabel(idx + 1),
     initials: initialsFor(g.displayName || guestLabel(idx + 1)),
-    hue: g.id === youId ? AVATAR_HUE_YOU : g.colorHue ?? guestAvatarHue(idx),
+    hue: g.colorHue ?? guestAvatarHue(idx),
     isYou: g.id === youId,
   }));
 }

@@ -121,7 +121,7 @@ export function memberPillLabel(
 
 export const avatarColor = (hue: number): string => `hsl(${hue} 62% 47%)`;
 
-/** Apply typed name + green hue to the current payer's roster entry. */
+/** Apply typed name to the current payer's roster entry (hue stays server-assigned). */
 export function resolveMemberDisplay(
   member: TableMember,
   typedName: string,
@@ -135,8 +135,20 @@ export function resolveMemberDisplay(
     isYou: true,
     name,
     initials: initialsFor(name),
-    hue: AVATAR_HUE_YOU,
   };
+}
+
+/** True when every item is paid or every guest at the table has paid. */
+export function isTableFullyPaid(
+  items: readonly BillItem[],
+  paidItemIds: readonly ItemId[],
+  paidIds: readonly MemberId[],
+  people: number,
+): boolean {
+  const allItems =
+    items.length > 0 && items.every((it) => paidItemIds.includes(it.id));
+  const allGuests = people > 0 && paidIds.length >= people;
+  return allItems || allGuests;
 }
 
 export function resolveRoster(

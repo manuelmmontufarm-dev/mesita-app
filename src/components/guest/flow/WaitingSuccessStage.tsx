@@ -27,6 +27,7 @@ import {
   billSubtotal,
   computeTotals,
   fmt,
+  isTableFullyPaid,
   memberSubtotal,
   resolveMemberDisplay,
   resolveRoster,
@@ -199,7 +200,10 @@ export function WaitingSuccessStage({
   /* ── phase derivation ─────────────────────────────────────────────────── */
 
   const phase: "waiting" | "success" =
-    derived.remainingSub <= 0.01 ? "success" : "waiting";
+    derived.remainingSub <= 0.01 ||
+    isTableFullyPaid(items, state.paidItemIds, paidIds, people)
+      ? "success"
+      : "waiting";
 
   // Lag the displayed phase by 300 ms for a CSS cross-fade.
   const [displayedPhase, setDisplayedPhase] = useState<"waiting" | "success">(

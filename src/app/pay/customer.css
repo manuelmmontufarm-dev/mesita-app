@@ -83,6 +83,30 @@
   100% { box-shadow:0 0 0 0 rgba(30,158,99,0) }
 }
 
+.demo-reset-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--c-border, #E7DDD2);
+  background: rgba(255,255,255,.72);
+  color: var(--c-muted, #6B7280);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, opacity .15s ease;
+}
+.demo-reset-btn:hover:not(:disabled) {
+  background: #fff;
+  color: var(--c-ink, #1B1714);
+}
+.demo-reset-btn:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+
 /* glass segmented tab (Cuenta / Mesa) */
 .tabseg { display:flex; gap:5px; padding:5px; border-radius:100px; margin-top:18px; }
 .tabseg button {

@@ -26,12 +26,12 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
 import {
-  AVATAR_HUE_YOU,
   billSubtotal,
   claimantsOf,
   computeTotals,
   fmt,
   freeUnits,
+  guestAvatarHue,
   initialsFor,
   isItemPaid,
   itemOwed,
@@ -82,10 +82,12 @@ function NameField({
   value,
   invalid,
   onChange,
+  youHue,
 }: {
   value: string;
   invalid: boolean;
   onChange: (next: string) => void;
+  youHue: number;
 }) {
   const [ph, setPh] = useState(NAME_PLACEHOLDERS[0]);
   const [focused, setFocused] = useState(false);
@@ -126,7 +128,7 @@ function NameField({
             name={value}
             member={{
               initials: initialsFor(value),
-              hue: AVATAR_HUE_YOU,
+              hue: youHue,
               isYou: true,
             }}
             size={40}
@@ -499,11 +501,17 @@ export function BillStage({
     () =>
       displayMembers.find((m) => m.id === flow.youId) ??
       resolveMemberDisplay(
-        { id: flow.youId, name: "Tú", initials: "Tú", hue: AVATAR_HUE_YOU, isYou: true },
+        {
+          id: flow.youId,
+          name: "Tú",
+          initials: "Tú",
+          hue: members.find((m) => m.id === flow.youId)?.hue ?? guestAvatarHue(0),
+          isYou: true,
+        },
         state.name,
         flow.youId,
       ),
-    [displayMembers, flow.youId, state.name],
+    [displayMembers, flow.youId, state.name, members],
   );
 
   return (
@@ -539,6 +547,7 @@ export function BillStage({
           value={state.name}
           invalid={state.nameErr}
           onChange={(v) => flow.setName(v)}
+          youHue={youMember.hue}
         />
       </div>
 

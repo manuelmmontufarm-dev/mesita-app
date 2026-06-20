@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Demo: colores compartidos, mesa cerrada sync, reiniciar demo
+- **Qué:** `split-math`, `useDemoTableSession`, `demo-table-store`, `GuestBillFlow`, `BillStage`, `WaitingSuccessStage`, `GuestPayPage`, `customer.css`.
+- **Por qué:** En multi-device el color de cada persona debía verse igual para todos; al pagar la mesa completa todos debían llegar a “Mesa cerrada”; hacía falta resetear la demo sin recargar.
+- **Qué hace:** El hue asignado en servidor es el mismo en todos los dispositivos; cuando todos pagan (ítems o invitados) todos pasan a la pantalla final; botón “Reiniciar demo” resetea la mesa vía Redis/SSE para todos.
+
 ### 2026-06-19 — /pay/demo usa API demo + Redis (sin Postgres)
 - **Qué:** `useDemoTableSession`, `demo-table-store` async + Upstash, `GuestPayPage` bifurcado demo/live.
 - **Por qué:** Postgres en Vercel devuelve 500; `/api/demo/table/demo` sí funciona pero no tenía el nuevo UI cableado.

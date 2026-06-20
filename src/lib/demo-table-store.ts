@@ -63,6 +63,7 @@ export interface DemoTableState {
   paidItemIds: string[];
   payments: DemoPayment[];
   nextGuestNumber: number;
+  resetSeq: number;
   version: number;
   updatedAt: string;
 }
@@ -138,6 +139,7 @@ function createState(token: string): DemoTableState {
       },
     ],
     nextGuestNumber: 1,
+    resetSeq: 0,
     version: 1,
     updatedAt: ts,
   };
@@ -178,7 +180,10 @@ export async function getDemoTableState(token: string): Promise<DemoTableState> 
 }
 
 export async function resetDemoTableState(token: string): Promise<DemoTableState> {
+  const prev = await loadState(token);
   const state = createState(token);
+  state.resetSeq = (prev?.resetSeq ?? 0) + 1;
+  state.version = (prev?.version ?? 0) + 1;
   return saveState(token, state);
 }
 
@@ -295,5 +300,10 @@ export async function recordDemoPayment(
     guest.status = "paid";
     guest.updatedAt = ts;
   }
+
+  if (input.mode === "equal" && state.guests.length > 0 && state.guests.every((g) => g.status === "paid")) {
+    state.paidItemIds = state.items.map((item) => item.id);
+  }
+
   return saveState(token, touch(state));
 }
