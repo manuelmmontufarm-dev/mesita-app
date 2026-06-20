@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — /pay/demo usa API demo + Redis (sin Postgres)
+- **Qué:** `useDemoTableSession`, `demo-table-store` async + Upstash, `GuestPayPage` bifurcado demo/live.
+- **Por qué:** Postgres en Vercel devuelve 500; `/api/demo/table/demo` sí funciona pero no tenía el nuevo UI cableado.
+- **Qué hace:** `/pay/demo` carga menú Mesita Demo precargado, sync multi-device vía Redis/SSE, pagos demo sin DB.
+
 ### 2026-06-19 — Demo auto-bootstrap en `/pay/demo` (sin seed manual)
 - **Qué:** `ensure-demo-table.ts`, `findActiveBillByToken` solo cuentas abiertas, IDs de ítems demo sin UUID en API.
 - **Por qué:** `/pay/demo` fallaba si no corrías seed; el usuario quiere menú demo precargado + sync multi-device.

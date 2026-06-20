@@ -1,6 +1,7 @@
 import { getDemoTableState } from "@/lib/demo-table-store";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET(
   request: Request,
@@ -11,9 +12,9 @@ export async function GET(
   let lastVersion = 0;
 
   const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      const send = () => {
-        const state = getDemoTableState(token);
+    async start(controller) {
+      const send = async () => {
+        const state = await getDemoTableState(token);
         if (state.version === lastVersion) return;
         lastVersion = state.version;
         controller.enqueue(
@@ -21,8 +22,10 @@ export async function GET(
         );
       };
 
-      send();
-      const interval = setInterval(send, 700);
+      await send();
+      const interval = setInterval(() => {
+        void send();
+      }, 700);
       const heartbeat = setInterval(() => {
         controller.enqueue(encoder.encode(`event: ping\ndata: {}\n\n`));
       }, 15_000);

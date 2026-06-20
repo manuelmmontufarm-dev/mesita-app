@@ -3,6 +3,7 @@ import {
   getDemoTableState,
   joinDemoTable,
   recordDemoPayment,
+  releaseDemoItem,
   renameDemoGuest,
   resetDemoTableState,
   setDemoGuestStatus,
@@ -33,6 +34,11 @@ const actionSchema = z.discriminatedUnion("action", [
     itemId: z.string(),
   }),
   z.object({
+    action: z.literal("release"),
+    guestId: z.string(),
+    itemId: z.string(),
+  }),
+  z.object({
     action: z.literal("pay"),
     guestId: z.string(),
     guestName: z.string(),
@@ -56,7 +62,7 @@ export async function GET(
   context: { params: Promise<{ token: string }> }
 ): Promise<Response> {
   const { token } = await context.params;
-  return successResponse(getDemoTableState(token), 200);
+  return successResponse(await getDemoTableState(token), 200);
 }
 
 export async function POST(
@@ -71,24 +77,27 @@ export async function POST(
 
     const body = parsed.data;
     if (body.action === "join") {
-      const joined = joinDemoTable(token, body.guestId);
+      const joined = await joinDemoTable(token, body.guestId);
       return successResponse(joined, 200);
     }
     if (body.action === "rename") {
-      return successResponse(renameDemoGuest(token, body.guestId, body.name), 200);
+      return successResponse(await renameDemoGuest(token, body.guestId, body.name), 200);
     }
     if (body.action === "status") {
       return successResponse(
-        setDemoGuestStatus(token, body.guestId, body.status as DemoGuestStatus),
+        await setDemoGuestStatus(token, body.guestId, body.status as DemoGuestStatus),
         200
       );
     }
     if (body.action === "claim") {
-      return successResponse(claimDemoItem(token, body.guestId, body.itemId), 200);
+      return successResponse(await claimDemoItem(token, body.guestId, body.itemId), 200);
+    }
+    if (body.action === "release") {
+      return successResponse(await releaseDemoItem(token, body.guestId, body.itemId), 200);
     }
     if (body.action === "pay") {
       return successResponse(
-        recordDemoPayment(token, {
+        await recordDemoPayment(token, {
           guestId: body.guestId,
           guestName: body.guestName,
           mode: body.mode as DemoSplitMode,
@@ -105,7 +114,7 @@ export async function POST(
       );
     }
 
-    return successResponse(resetDemoTableState(token), 200);
+    return successResponse(await resetDemoTableState(token), 200);
   } catch (error) {
     console.error("Demo table action failed:", error);
     return errorResponse("Internal server error", 500);

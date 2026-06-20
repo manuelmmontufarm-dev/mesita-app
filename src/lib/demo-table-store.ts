@@ -1,6 +1,8 @@
+import { Redis } from "@upstash/redis";
+
 import { guestLabel } from "@/lib/guest-billing/split-math";
 
-/** @deprecated Use Postgres-backed `/api/guest/table-session` + `/pay/demo` instead. */
+/** Vercel-safe demo table state — persisted in Upstash when configured. */
 
 export type DemoSplitMode = "item" | "equal" | "todo";
 export type DemoGuestStatus = "selecting" | "reviewing" | "in_payment" | "paid";
@@ -68,25 +70,19 @@ export interface DemoTableState {
 type DemoStore = Map<string, DemoTableState>;
 
 const DEMO_ITEMS: DemoFoodItem[] = [
-  { id: "locro", name: "Locro de papa", note: "con aguacate y queso", emoji: "🥣", qty: 1, unitPrice: 4.5, posExternalId: "POS-001" },
-  { id: "seco", name: "Seco de chivo", note: "con arroz amarillo", emoji: "🍖", qty: 1, unitPrice: 8.9, posExternalId: "POS-002" },
-  { id: "encebollado", name: "Encebollado", note: "porción grande", emoji: "🐟", qty: 1, unitPrice: 6, posExternalId: "POS-003" },
-  { id: "llapingacho", name: "Llapingacho", note: "con chorizo y huevo", emoji: "🥔", qty: 1, unitPrice: 5.5, posExternalId: "POS-004" },
-  { id: "ceviche", name: "Ceviche de camarón", note: "del día", emoji: "🦐", qty: 1, unitPrice: 9.5, posExternalId: "POS-005" },
-  { id: "bolon", name: "Bolón de verde", note: "mixto", emoji: "🟢", qty: 1, unitPrice: 3.5, posExternalId: "POS-006" },
-  { id: "jugo-1", name: "Jugo de naranjilla", note: "natural", emoji: "🧃", qty: 1, unitPrice: 2.5, posExternalId: "POS-007" },
-  { id: "jugo-2", name: "Jugo de naranjilla", note: "natural", emoji: "🧃", qty: 1, unitPrice: 2.5, posExternalId: "POS-008" },
-  { id: "club-1", name: "Club Verde", note: "fría", emoji: "🍺", qty: 1, unitPrice: 2.75, posExternalId: "POS-009" },
-  { id: "club-2", name: "Club Verde", note: "fría", emoji: "🍺", qty: 1, unitPrice: 2.75, posExternalId: "POS-010" },
-  { id: "morocho", name: "Morocho", note: "canela y leche", emoji: "🥛", qty: 1, unitPrice: 2, posExternalId: "POS-011" },
+  { id: "locro", name: "Locro de papa", note: "", emoji: "🥣", qty: 1, unitPrice: 4.5 },
+  { id: "seco", name: "Seco de chivo", note: "", emoji: "🍖", qty: 1, unitPrice: 8.9 },
+  { id: "encebollado", name: "Encebollado", note: "", emoji: "🐟", qty: 1, unitPrice: 6 },
+  { id: "ceviche", name: "Ceviche de camarón", note: "", emoji: "🦐", qty: 1, unitPrice: 9.5 },
+  { id: "jugo-1", name: "Jugo de naranjilla", note: "", emoji: "🧃", qty: 1, unitPrice: 2.5 },
+  { id: "jugo-2", name: "Jugo de naranjilla", note: "", emoji: "🧃", qty: 1, unitPrice: 2.5 },
+  { id: "club-1", name: "Club Verde", note: "", emoji: "🍺", qty: 1, unitPrice: 2.75 },
+  { id: "club-2", name: "Club Verde", note: "", emoji: "🍺", qty: 1, unitPrice: 2.75 },
 ];
 
-const SEEDED_GUESTS: Array<Omit<DemoGuest, "joinedAt" | "updatedAt">> = [
-  { id: "seed-manuel", label: "P0", name: "Manuel", hue: 222, status: "reviewing" },
-  { id: "seed-ana", label: "P0", name: "Ana", hue: 152, status: "paid" },
-];
+const REDIS_KEY = (token: string) => `mesita:demo:table:${token}`;
 
-function getStore(): DemoStore {
+function getMemoryStore(): DemoStore {
   const globalStore = globalThis as typeof globalThis & {
     __mesitaDemoTables?: DemoStore;
   };
@@ -94,6 +90,13 @@ function getStore(): DemoStore {
     globalStore.__mesitaDemoTables = new Map();
   }
   return globalStore.__mesitaDemoTables;
+}
+
+function getRedis(): Redis | null {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    return null;
+  }
+  return Redis.fromEnv();
 }
 
 function nowIso(): string {
@@ -105,28 +108,23 @@ function createState(token: string): DemoTableState {
   return {
     token,
     restaurant: {
-      name: "Doña Pepa",
-      tagline: "Cocina Quiteña",
-      city: "Quito · Ecuador",
+      name: "Mesita Demo",
+      tagline: "Comida ecuatoriana",
+      city: "Quito",
       ivaRate: 0.15,
       serviceRate: 0.1,
       serviceEnabled: true,
     },
-    table: { name: "Mesa 12" },
-    // POS integration will replace this array with bill lines from the open POS document.
+    table: { name: "12" },
     items: DEMO_ITEMS,
-    guests: SEEDED_GUESTS.map((guest) => ({ ...guest, joinedAt: ts, updatedAt: ts })),
-    claims: {
-      locro: "seed-ana",
-      seco: "seed-manuel",
-      ceviche: "seed-manuel",
-    },
+    guests: [],
+    claims: {},
     paidItemIds: ["locro"],
     payments: [
       {
-        id: "pay-seed-ana",
-        guestId: "seed-ana",
-        guestName: "Ana",
+        id: "pay-seed-locro",
+        guestId: "seed-system",
+        guestName: "Persona 1",
         mode: "item",
         amount: 5.63,
         subtotal: 4.5,
@@ -135,7 +133,7 @@ function createState(token: string): DemoTableState {
         tip: 0,
         itemIds: ["locro"],
         method: "Demo",
-        ref: "MQR-DEMO-1024",
+        ref: "MQR-DEMO-LOCRO",
         createdAt: ts,
       },
     ],
@@ -151,32 +149,50 @@ function touch(state: DemoTableState): DemoTableState {
   return state;
 }
 
-export function getDemoTableState(token: string): DemoTableState {
-  const store = getStore();
-  const existing = store.get(token);
-  if (existing) return existing;
-  const created = createState(token);
-  store.set(token, created);
-  return created;
+async function loadState(token: string): Promise<DemoTableState | null> {
+  const redis = getRedis();
+  if (redis) {
+    const remote = await redis.get<DemoTableState>(REDIS_KEY(token));
+    if (remote) {
+      getMemoryStore().set(token, remote);
+      return remote;
+    }
+  }
+  return getMemoryStore().get(token) ?? null;
 }
 
-export function resetDemoTableState(token: string): DemoTableState {
-  const state = createState(token);
-  getStore().set(token, state);
+async function saveState(token: string, state: DemoTableState): Promise<DemoTableState> {
+  getMemoryStore().set(token, state);
+  const redis = getRedis();
+  if (redis) {
+    await redis.set(REDIS_KEY(token), state);
+  }
   return state;
 }
 
-export function joinDemoTable(token: string, guestId?: string): {
-  state: DemoTableState;
-  guest: DemoGuest;
-} {
-  const state = getDemoTableState(token);
+export async function getDemoTableState(token: string): Promise<DemoTableState> {
+  const existing = await loadState(token);
+  if (existing) return existing;
+  const created = createState(token);
+  return saveState(token, created);
+}
+
+export async function resetDemoTableState(token: string): Promise<DemoTableState> {
+  const state = createState(token);
+  return saveState(token, state);
+}
+
+export async function joinDemoTable(
+  token: string,
+  guestId?: string,
+): Promise<{ state: DemoTableState; guest: DemoGuest }> {
+  const state = await getDemoTableState(token);
   if (guestId) {
     const existing = state.guests.find((guest) => guest.id === guestId);
     if (existing) {
       existing.status = existing.status === "paid" ? "paid" : "selecting";
       existing.updatedAt = nowIso();
-      return { state: touch(state), guest: existing };
+      return { state: await saveState(token, touch(state)), guest: existing };
     }
   }
 
@@ -193,47 +209,71 @@ export function joinDemoTable(token: string, guestId?: string): {
     updatedAt: ts,
   };
   state.guests.unshift(guest);
-  return { state: touch(state), guest };
+  return { state: await saveState(token, touch(state)), guest };
 }
 
-export function renameDemoGuest(token: string, guestId: string, name: string): DemoTableState {
-  const state = getDemoTableState(token);
-  const guest = state.guests.find((candidate) => candidate.id === guestId);
-  if (!guest) return state;
-  const cleaned = name.trim().slice(0, 34);
-  guest.name = cleaned || guest.label;
-  guest.updatedAt = nowIso();
-  return touch(state);
-}
-
-export function setDemoGuestStatus(
+export async function renameDemoGuest(
   token: string,
   guestId: string,
-  status: DemoGuestStatus
-): DemoTableState {
-  const state = getDemoTableState(token);
+  name: string,
+): Promise<DemoTableState> {
+  const state = await getDemoTableState(token);
+  const guest = state.guests.find((candidate) => candidate.id === guestId);
+  if (!guest) return state;
+  const cleaned = name.trim().slice(0, 10);
+  guest.name = cleaned || guest.label;
+  guest.updatedAt = nowIso();
+  return saveState(token, touch(state));
+}
+
+export async function setDemoGuestStatus(
+  token: string,
+  guestId: string,
+  status: DemoGuestStatus,
+): Promise<DemoTableState> {
+  const state = await getDemoTableState(token);
   const guest = state.guests.find((candidate) => candidate.id === guestId);
   if (!guest) return state;
   guest.status = status;
   guest.updatedAt = nowIso();
-  return touch(state);
+  return saveState(token, touch(state));
 }
 
-export function claimDemoItem(token: string, guestId: string, itemId: string): DemoTableState {
-  const state = getDemoTableState(token);
+export async function claimDemoItem(
+  token: string,
+  guestId: string,
+  itemId: string,
+): Promise<DemoTableState> {
+  const state = await getDemoTableState(token);
   if (state.paidItemIds.includes(itemId)) return state;
   const current = state.claims[itemId];
   if (current === guestId) delete state.claims[itemId];
   else state.claims[itemId] = guestId;
-  setDemoGuestStatus(token, guestId, "reviewing");
-  return touch(state);
+  const guest = state.guests.find((candidate) => candidate.id === guestId);
+  if (guest) {
+    guest.status = "reviewing";
+    guest.updatedAt = nowIso();
+  }
+  return saveState(token, touch(state));
 }
 
-export function recordDemoPayment(
+export async function releaseDemoItem(
   token: string,
-  input: Omit<DemoPayment, "id" | "createdAt" | "ref">
-): DemoTableState {
-  const state = getDemoTableState(token);
+  guestId: string,
+  itemId: string,
+): Promise<DemoTableState> {
+  const state = await getDemoTableState(token);
+  if (state.claims[itemId] === guestId) {
+    delete state.claims[itemId];
+  }
+  return saveState(token, touch(state));
+}
+
+export async function recordDemoPayment(
+  token: string,
+  input: Omit<DemoPayment, "id" | "createdAt" | "ref">,
+): Promise<DemoTableState> {
+  const state = await getDemoTableState(token);
   const ts = nowIso();
   const payment: DemoPayment = {
     ...input,
@@ -255,5 +295,5 @@ export function recordDemoPayment(
     guest.status = "paid";
     guest.updatedAt = ts;
   }
-  return touch(state);
+  return saveState(token, touch(state));
 }
