@@ -39,6 +39,10 @@ export interface TablePaymentSummary {
   guestName: string;
   amount: number;
   method: string;
+  tip?: number;
+  mode?: "item" | "equal" | "todo";
+  createdAt?: string;
+  itemCount?: number;
 }
 
 /** claims[itemId][memberId] = units (float, fractional allowed, Σ ≤ item.qty) */

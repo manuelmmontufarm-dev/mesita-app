@@ -24,6 +24,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { latestReceipt, type useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
 import { expandRepeatedItems } from "@/lib/guest-billing/bill-display";
 import {
+  assignPayerBadges,
+  badgesForGuest,
+  type PayerBadge,
+  type PaymentForBadges,
+} from "@/lib/guest-billing/payer-badges";
+import {
   billSubtotal,
   computeTotals,
   fmt,
@@ -62,6 +68,90 @@ function unitLabel(units: number): string {
   return "";
 }
 
+function toBadgePayments(
+  paidSummaries: readonly TablePaymentSummary[],
+): PaymentForBadges[] {
+  return paidSummaries.map((p) => ({
+    guestId: p.guestId,
+    guestName: p.guestName,
+    amount: p.amount,
+    tip: p.tip ?? 0,
+    mode: p.mode ?? "equal",
+    createdAt: p.createdAt ?? new Date(0).toISOString(),
+    itemCount: p.itemCount,
+  }));
+}
+
+function PayerBadgeChip({ badge }: { badge: PayerBadge }) {
+  return (
+    <span className="ws-payer-badge" title={badge.subtitle}>
+      <span className="ws-payer-badge-emoji" aria-hidden="true">
+        {badge.emoji}
+      </span>
+      <span className="ws-payer-badge-title">{badge.title}</span>
+    </span>
+  );
+}
+
+function PayerBadgeCard({ badge, featured }: { badge: PayerBadge; featured?: boolean }) {
+  return (
+    <div
+      className={"ws-payer-badge-card" + (featured ? " ws-payer-badge-card-featured" : "")}
+      data-testid={`ws-badge-${badge.id}`}
+    >
+      <span className="ws-payer-badge-card-emoji" aria-hidden="true">
+        {badge.emoji}
+      </span>
+      <div className="ws-payer-badge-card-copy">
+        <span className="ws-payer-badge-card-title">{badge.title}</span>
+        <span className="ws-payer-badge-card-sub">{badge.subtitle}</span>
+      </div>
+    </div>
+  );
+}
+
+function YourBadgesSection({ badges }: { badges: readonly PayerBadge[] }) {
+  if (!badges.length) return null;
+  const primary = badges[0];
+  const rest = badges.slice(1);
+  return (
+    <div className="ws-your-badges surfx" data-testid="ws-your-badges">
+      <div className="ws-paid-sofar-title">Tu medalla</div>
+      {primary ? <PayerBadgeCard badge={primary} featured /> : null}
+      {rest.length > 0 && (
+        <div className="ws-payer-badge-row">
+          {rest.map((b) => (
+            <PayerBadgeChip key={b.id} badge={b} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MesaBadgesSection({
+  awards,
+}: {
+  awards: ReturnType<typeof assignPayerBadges>;
+}) {
+  if (!awards.length) return null;
+  return (
+    <div className="ws-mesa-badges surfx" data-testid="ws-mesa-badges">
+      <div className="ws-paid-sofar-title">Medallas de la mesa 🏆</div>
+      {awards.map((row) => (
+        <div key={row.guestId} className="ws-mesa-badge-row">
+          <span className="ws-mesa-badge-name">{row.guestName}</span>
+          <div className="ws-payer-badge-row">
+            {row.badges.map((b) => (
+              <PayerBadgeChip key={b.id} badge={b} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ── sub-components ─────────────────────────────────────────────────────── */
 
 
@@ -89,7 +179,7 @@ function MesaProgressRing({
   remainingAmt: string;
   paidCount: number;
   totalCount: number;
-  paidRows: Array<{ member: TableMember; amount: string }>;
+  paidRows: Array<{ member: TableMember; amount: string; badges: PayerBadge[] }>;
 }) {
   const r = 52;
   const c = 2 * Math.PI * r;
@@ -135,9 +225,18 @@ function MesaProgressRing({
       {paidRows.length > 0 && (
         <div className="ws-paid-sofar">
           <div className="ws-paid-sofar-title">Ya pagaron</div>
-          {paidRows.map(({ member, amount }) => (
+          {paidRows.map(({ member, amount, badges }) => (
             <div key={member.id} className="ws-paid-sofar-row">
-              <NamePill member={member} size={34} />
+              <div className="ws-paid-sofar-left">
+                <NamePill member={member} size={34} />
+                {badges.length > 0 && (
+                  <div className="ws-payer-badge-row ws-payer-badge-row-inline">
+                    {badges.slice(0, 2).map((b) => (
+                      <PayerBadgeChip key={b.id} badge={b} />
+                    ))}
+                  </div>
+                )}
+              </div>
               <span className="ws-paid-sofar-amt">{amount}</span>
             </div>
           ))}
@@ -401,8 +500,23 @@ export function WaitingSuccessStage({
 
   const expandedItems = useMemo(() => expandRepeatedItems(items), [items]);
 
+  const badgePayments = useMemo(
+    () => toBadgePayments(paidSummaries),
+    [paidSummaries],
+  );
+
+  const badgeAwards = useMemo(
+    () => assignPayerBadges(badgePayments, { final: phase === "success" }),
+    [badgePayments, phase],
+  );
+
+  const yourBadges = useMemo(
+    () => badgesForGuest(badgeAwards, youId),
+    [badgeAwards, youId],
+  );
+
   const paidRows = useMemo(() => {
-    const rows: Array<{ member: TableMember; amount: string }> = [];
+    const rows: Array<{ member: TableMember; amount: string; badges: PayerBadge[] }> = [];
     for (const payment of paidSummaries) {
       const member =
         displayMembers.find((m) => m.id === payment.guestId) ??
@@ -423,6 +537,7 @@ export function WaitingSuccessStage({
           youId,
         ),
         amount: fmt(payment.amount),
+        badges: badgesForGuest(badgeAwards, payment.guestId),
       });
     }
     if (rows.length === 0) {
@@ -432,11 +547,12 @@ export function WaitingSuccessStage({
         rows.push({
           member: resolveMemberDisplay(member, state.name, youId),
           amount: fmt(latestReceipt(state)?.amount ?? 0),
+          badges: badgesForGuest(badgeAwards, id),
         });
       }
     }
     return rows;
-  }, [paidSummaries, paidIds, displayMembers, youId, state.name, state]);
+  }, [paidSummaries, paidIds, displayMembers, youId, state.name, state, badgeAwards]);
 
   /* ── pending members list (for waiting phase) ─────────────────────────── */
 
@@ -505,6 +621,8 @@ export function WaitingSuccessStage({
         paidRows={paidRows}
       />
 
+      <YourBadgesSection badges={yourBadges} />
+
       {pendingMembers.length > 0 && (
         <div className="ws-pending-list surfx">
 
@@ -552,14 +670,25 @@ export function WaitingSuccessStage({
       {paidRows.length > 0 && (
         <div className="ws-paid-sofar ws-paid-sofar-success surfx">
           <div className="ws-paid-sofar-title">Resumen de la mesa</div>
-          {paidRows.map(({ member, amount }) => (
+          {paidRows.map(({ member, amount, badges }) => (
             <div key={member.id} className="ws-paid-sofar-row">
-              <NamePill member={member} size={36} />
+              <div className="ws-paid-sofar-left">
+                <NamePill member={member} size={36} />
+                {badges.length > 0 && (
+                  <div className="ws-payer-badge-row ws-payer-badge-row-inline">
+                    {badges.map((b) => (
+                      <PayerBadgeChip key={b.id} badge={b} />
+                    ))}
+                  </div>
+                )}
+              </div>
               <span className="ws-paid-sofar-amt">{amount}</span>
             </div>
           ))}
         </div>
       )}
+
+      <MesaBadgesSection awards={badgeAwards} />
 
       <div className="completed-brand">
         <LogoMark size={30} />

@@ -174,7 +174,9 @@ function GuestDemoPayPage({ token }: { token: string }) {
     return <div className="cust-root cust-app demo-entry-hydrate" aria-busy="true" />;
   }
 
-  const inTable = live.hasEntered && live.guestSessionId;
+  const inTable =
+    live.hasEntered &&
+    (Boolean(live.guestSessionId) || live.loading || live.entering);
 
   if (!inTable) {
     return (

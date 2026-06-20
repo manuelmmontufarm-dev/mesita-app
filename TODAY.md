@@ -79,6 +79,16 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Medallas playfull al pagar + fix lobby en sync
+- **Qué:** `payer-badges.ts`, `WaitingSuccessStage`, `customer.css`, `useDemoTableSession`, `GuestPayPage`, tests.
+- **Por qué:** Hacer más cool el cierre de mesa con badges chistosos (el más rápido, Mr. Money, el más lento…) y no expulsar al lobby al tocar ítems.
+- **Qué hace:** Cada comensal recibe medallas según orden, monto, propina y modo de pago; se muestran en espera y en éxito; sync solo expulsa tras reset real.
+
+### 2026-06-19 — Fix: sync ya no expulsa al lobby al tocar ítems
+- **Qué:** `useDemoTableSession`, `GuestPayPage`, test `reset-detect.test.ts`.
+- **Por qué:** Cada poll/SSE comparaba solo `resetSeq` y mandaba al lobby; un 409 en claim también expulsaba.
+- **Qué hace:** Solo sale al lobby si hubo reset real (resetSeq sube Y tu guest ya no está); 409 intenta re-join; no flash de lobby mientras carga.
+
 ### 2026-06-19 — Demo: pantalla de entrada + reset expulsa a lobby
 - **Qué:** `DemoTableEntry`, `useDemoTableSession`, `GuestPayPage`, `demo-restaurant`, `demo-table-store`, `customer.css`.
 - **Por qué:** Abrir el link no debe unir a la mesa solo por abrirlo; solo quien toca Entrar participa; reiniciar demo debe sacar a todos a la entrada.

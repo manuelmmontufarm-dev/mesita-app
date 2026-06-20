@@ -3076,9 +3076,17 @@ html.has-receipt-peek .ws-wait-foot {
 }
 .ws-paid-sofar-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+.ws-paid-sofar-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
 }
 .ws-paid-sofar-amt {
   font-size: 14px;
@@ -3130,6 +3138,94 @@ html.has-receipt-peek .ws-wait-foot {
   color: var(--c-ink-2);
   text-align: center;
   max-width: 280px;
+}
+
+/* Playful payer badges */
+.ws-your-badges,
+.ws-mesa-badges {
+  border-radius: 22px;
+  padding: 14px 16px;
+  margin-top: 12px;
+}
+.ws-payer-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ws-payer-badge-row-inline {
+  margin-top: 2px;
+}
+.ws-payer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  background: rgba(26, 158, 98, 0.1);
+  border: 1px solid rgba(26, 158, 98, 0.18);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--c-ink);
+  max-width: 100%;
+}
+.ws-payer-badge-emoji {
+  font-size: 13px;
+  line-height: 1;
+}
+.ws-payer-badge-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-payer-badge-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(26, 158, 98, 0.12), rgba(47, 179, 126, 0.06));
+  border: 1px solid rgba(26, 158, 98, 0.2);
+}
+.ws-payer-badge-card-featured {
+  box-shadow: 0 8px 24px rgba(26, 158, 98, 0.12);
+}
+.ws-payer-badge-card-emoji {
+  font-size: 32px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.ws-payer-badge-card-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ws-payer-badge-card-title {
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--c-ink);
+}
+.ws-payer-badge-card-sub {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--c-ink-2);
+}
+.ws-mesa-badge-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid var(--c-sep);
+}
+.ws-mesa-badge-row:first-of-type {
+  border-top: none;
+  padding-top: 4px;
+}
+.ws-mesa-badge-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c-ink);
 }
 
 .demo-reset-success-btn {

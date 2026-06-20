@@ -33,6 +33,7 @@ import type {
 /** Tab-scoped — each browser tab is a separate demo guest. */
 const SESSION_KEY = (token: string) => `mesita:demo-guest:${token}`;
 const ENTERED_KEY = (token: string) => `mesita:demo-entered:${token}`;
+const RESET_SEQ_KEY = (token: string) => `mesita:demo-reset-seq:${token}`;
 
 /** Live sync every 500ms — version guard prevents stale overwrites. */
 const SYNC_INTERVAL_MS = 500;
@@ -158,6 +159,10 @@ function mapPaidSummaries(raw: DemoTableState | null): TablePaymentSummary[] {
       ),
       amount: p.amount,
       method: p.method,
+      tip: p.tip,
+      mode: p.mode,
+      createdAt: p.createdAt,
+      itemCount: p.itemIds?.length ?? 0,
     };
   });
 }
@@ -186,6 +191,33 @@ function writeStoredEntered(token: string): void {
 
 function clearStoredEntered(token: string): void {
   sessionStorage.removeItem(ENTERED_KEY(token));
+}
+
+function readStoredResetSeq(token: string): number | undefined {
+  if (typeof window === "undefined") return undefined;
+  const raw = sessionStorage.getItem(RESET_SEQ_KEY(token));
+  if (raw == null) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function writeStoredResetSeq(token: string, resetSeq: number): void {
+  sessionStorage.setItem(RESET_SEQ_KEY(token), String(resetSeq));
+}
+
+function clearStoredResetSeq(token: string): void {
+  sessionStorage.removeItem(RESET_SEQ_KEY(token));
+}
+
+/** True when the server wiped the table (reset) — not a normal sync tick. */
+function isRemoteTableReset(
+  demo: DemoTableState,
+  guestId: string | null,
+  lastResetSeq: number | undefined,
+): boolean {
+  if (guestId == null || lastResetSeq === undefined) return false;
+  if (demo.resetSeq <= lastResetSeq) return false;
+  return !demo.guests.some((g) => g.id === guestId);
 }
 
 async function postDemo<T>(token: string, body: Record<string, unknown>): Promise<T> {
@@ -226,11 +258,15 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   const renameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastVersion = useRef<number | undefined>(undefined);
   const lastResetSeq = useRef<number | undefined>(undefined);
+  const guestSessionIdRef = useRef<string | null>(null);
   const rejoining = useRef(false);
+
+  guestSessionIdRef.current = guestSessionId;
 
   const exitToLobby = useCallback(() => {
     clearStoredGuestId(token);
     clearStoredEntered(token);
+    clearStoredResetSeq(token);
     setHasEntered(false);
     setGuestSessionId(null);
     setRaw(null);
@@ -262,6 +298,34 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     setState(mapDemoStateToSession(demo));
   }, []);
 
+  /** Apply server snapshot + detect real table reset (guest gone), never on version-only sync. */
+  const ingestDemoState = useCallback(
+    (demo: DemoTableState, opts?: { force?: boolean; source?: string }) => {
+      const gid = guestSessionIdRef.current;
+      const prevReset = lastResetSeq.current ?? readStoredResetSeq(token);
+
+      if (
+        readStoredEntered(token) &&
+        isRemoteTableReset(demo, gid, prevReset)
+      ) {
+        demoDebug("lobby", "remote reset — guest removed", {
+          resetSeq: demo.resetSeq,
+          prevReset,
+        });
+        exitToLobby();
+        return;
+      }
+
+      applyDemo(demo, opts);
+
+      if (prevReset === undefined || demo.resetSeq >= prevReset) {
+        lastResetSeq.current = demo.resetSeq;
+        writeStoredResetSeq(token, demo.resetSeq);
+      }
+    },
+    [applyDemo, exitToLobby, token],
+  );
+
   const joinTable = useCallback(
     async (opts?: { guestId?: string; clearStored?: boolean }) => {
       if (rejoining.current) return null;
@@ -276,8 +340,9 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
           }>(token, { action: "join", guestId: savedId });
           writeStoredGuestId(token, guest.id);
           setGuestSessionId(guest.id);
-          applyDemo(joined, { force: true, source: "join" });
+          ingestDemoState(joined, { force: true, source: "join" });
           lastResetSeq.current = joined.resetSeq;
+          writeStoredResetSeq(token, joined.resetSeq);
           demoDebug("join", `guest ${guest.id.slice(0, 8)}`, {
             label: joined.guests.find((g) => g.id === guest.id)?.label,
             resetSeq: joined.resetSeq,
@@ -293,8 +358,9 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
             }>(token, { action: "join" });
             writeStoredGuestId(token, guest.id);
             setGuestSessionId(guest.id);
-            applyDemo(joined, { force: true, source: "join-fresh" });
+            ingestDemoState(joined, { force: true, source: "join-fresh" });
             lastResetSeq.current = joined.resetSeq;
+            writeStoredResetSeq(token, joined.resetSeq);
             return guest.id;
           }
           throw err;
@@ -303,10 +369,14 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         rejoining.current = false;
       }
     },
-    [token, applyDemo],
+    [token, ingestDemoState],
   );
 
   useEffect(() => {
+    const storedReset = readStoredResetSeq(token);
+    if (storedReset !== undefined) {
+      lastResetSeq.current = storedReset;
+    }
     setHasEntered(readStoredEntered(token));
     setHydrated(true);
   }, [token]);
@@ -360,22 +430,6 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     setJoinAttempt((n) => n + 1);
   }, [guestSessionId, token]);
 
-  /** Table reset elsewhere — kick everyone back to the entry screen. */
-  useEffect(() => {
-    if (!raw || !hasEntered) return;
-
-    if (lastResetSeq.current === undefined) {
-      lastResetSeq.current = raw.resetSeq;
-      return;
-    }
-
-    if (raw.resetSeq === lastResetSeq.current) return;
-
-    lastResetSeq.current = raw.resetSeq;
-    demoDebug("lobby", "resetSeq changed — exit to entry", { resetSeq: raw.resetSeq });
-    exitToLobby();
-  }, [raw?.resetSeq, raw, hasEntered, exitToLobby]);
-
   useEffect(() => {
     if (!guestSessionId) return;
 
@@ -390,7 +444,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     const onState = (event: MessageEvent) => {
       try {
         const next = JSON.parse(event.data) as DemoTableState;
-        applyDemo(next, { source: "sse" });
+        ingestDemoState(next, { source: "sse" });
         demoDebug("sync:sse", `event v${next.version}`);
       } catch (err) {
         console.error(err);
@@ -412,9 +466,9 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       events.close();
       setSseConnected(false);
     };
-  }, [token, guestSessionId, applyDemo]);
+  }, [token, guestSessionId, ingestDemoState]);
 
-  /** Poll every second for continuous multi-device sync. */
+  /** Poll every 500ms for continuous multi-device sync. */
   useEffect(() => {
     if (!guestSessionId) return;
     let cancelled = false;
@@ -425,7 +479,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         const res = await fetch(`/api/demo/table/${encodeURIComponent(token)}`);
         const payload = await res.json();
         if (!cancelled && res.ok && payload.success) {
-          applyDemo(payload.data as DemoTableState, { source: "poll" });
+          ingestDemoState(payload.data as DemoTableState, { source: "poll" });
           demoDebug("sync:poll", `v${(payload.data as DemoTableState).version}`);
         }
       } catch (err) {
@@ -441,7 +495,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [token, guestSessionId, applyDemo]);
+  }, [token, guestSessionId, ingestDemoState]);
 
   const postAction = useCallback(
     async (body: Record<string, unknown>) => {
@@ -451,16 +505,22 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
           data && typeof data === "object" && "state" in data
             ? (data as { state: DemoTableState }).state
             : (data as DemoTableState);
-        applyDemo(next, { force: true, source: "action" });
+        ingestDemoState(next, { force: true, source: "action" });
         return next;
       } catch (err) {
         if (err instanceof Error && err.message === "SESSION_EXPIRED") {
-          exitToLobby();
+          demoDebug("join", "409 on action — try recover join");
+          try {
+            await joinTable({ clearStored: true });
+            return;
+          } catch {
+            exitToLobby();
+          }
         }
         throw err;
       }
     },
-    [token, applyDemo, exitToLobby],
+    [token, ingestDemoState, joinTable, exitToLobby],
   );
 
   const onRename = useCallback(
