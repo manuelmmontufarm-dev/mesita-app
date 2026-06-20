@@ -10,6 +10,7 @@ import { useLiveTableSession } from "@/hooks/useLiveTableSession";
 import type { FlowInit, PaidPayload } from "@/hooks/useGuestPaymentFlow";
 import { mapSplitModeToDemo } from "@/lib/demo-live-adapter";
 import { isDemoTableToken } from "@/lib/demo-restaurant";
+import { deriveDemoTableProgress } from "@/lib/guest-billing/demo-table-progress";
 import { guestLabel } from "@/lib/guest-billing/split-math";
 
 import "@/app/pay/customer.css";
@@ -27,13 +28,36 @@ function GuestPayShell({
   live: ReturnType<typeof useLiveTableSession> | ReturnType<typeof useDemoTableSession>;
   isDemo: boolean;
 }) {
-  const paidIds = useMemo(
-    () =>
+  const paidIds = useMemo(() => {
+    const fromStatus =
       live.state?.guests
         .filter((g) => g.status === "PAID")
-        .map((g) => g.id) ?? [],
-    [live.state?.guests],
-  );
+        .map((g) => g.id) ?? [];
+    const fromPayments =
+      "paidSummaries" in live && live.paidSummaries
+        ? live.paidSummaries.map((p) => p.guestId)
+        : [];
+    return [...new Set([...fromStatus, ...fromPayments])];
+  }, [
+    live.state?.guests,
+    "paidSummaries" in live ? live.paidSummaries : null,
+  ]);
+
+  const demoProgress = useMemo(() => {
+    if (!isDemo || !("paidSummaries" in live)) return null;
+    const paymentsSubtotal = live.paidSummaries?.reduce(
+      (sum, p) => sum + (p.subtotal ?? p.amount / 1.25),
+      0,
+    );
+    return deriveDemoTableProgress({
+      items: live.items,
+      paidItemIds: live.paidItemIds,
+      paidGuestIds: paidIds,
+      guestCount: Math.max(live.members.length, live.people, paidIds.length),
+      paymentsSubtotal,
+      config: live.config,
+    });
+  }, [isDemo, live, paidIds]);
 
   const init: FlowInit = useMemo(
     () => ({
@@ -149,12 +173,14 @@ function GuestPayShell({
               paidItemIds: live.paidItemIds,
               paidIds,
               people: live.people,
+              tableClosed: demoProgress?.tableClosed ?? false,
             }
           : undefined
       }
       onResetDemo={isDemo && "resetDemo" in live ? live.resetDemo : undefined}
       sessionClaims={live.claims}
       paidSummaries={"paidSummaries" in live ? live.paidSummaries : undefined}
+      demoTableProgress={demoProgress ?? undefined}
     />
     </>
   );
@@ -174,9 +200,7 @@ function GuestDemoPayPage({ token }: { token: string }) {
     return <div className="cust-root cust-app demo-entry-hydrate" aria-busy="true" />;
   }
 
-  const inTable =
-    live.hasEntered &&
-    (Boolean(live.guestSessionId) || live.loading || live.entering);
+  const inTable = Boolean(live.guestSessionId);
 
   if (!inTable) {
     return (

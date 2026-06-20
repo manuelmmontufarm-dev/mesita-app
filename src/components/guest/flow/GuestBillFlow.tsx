@@ -41,6 +41,7 @@ import type {
   TableMember,
   TablePaymentSummary,
 } from "@/lib/guest-billing";
+import type { DemoTableProgress } from "@/lib/guest-billing/demo-table-progress";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
 
@@ -51,6 +52,7 @@ interface StageProps {
   config: RestaurantConfig;
   sessionClaims?: Claims;
   paidSummaries?: readonly TablePaymentSummary[];
+  demoTableProgress?: DemoTableProgress;
   onResetDemo?: () => Promise<void>;
 }
 
@@ -77,6 +79,7 @@ export interface GuestBillFlowProps {
     paidItemIds: ItemId[];
     paidIds: MemberId[];
     people: number;
+    tableClosed?: boolean;
   };
   /** Demo-only: reset shared table state for all devices. */
   onResetDemo?: () => Promise<void>;
@@ -84,6 +87,8 @@ export interface GuestBillFlowProps {
   sessionClaims?: Claims;
   /** Payments recorded on the shared session (for waiting summaries). */
   paidSummaries?: readonly TablePaymentSummary[];
+  /** Demo-only: merged live progress for waiting/success ring. */
+  demoTableProgress?: DemoTableProgress;
 }
 
 export function GuestBillFlow(props: GuestBillFlowProps) {
@@ -102,6 +107,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     onResetDemo,
     sessionClaims,
     paidSummaries,
+    demoTableProgress,
   } = props;
 
   const resolvedYouId = youId ?? liveSession?.guestSessionId ?? "you";
@@ -208,14 +214,16 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
 
   useEffect(() => {
     if (!serverSync || items.length === 0) return;
-    const tableClosed = isTableFullyPaid(items, serverSync.paidItemIds);
+    const tableClosed =
+      serverSync.tableClosed === true ||
+      isTableFullyPaid(items, serverSync.paidItemIds);
     if (!tableClosed) return;
     const { stage } = flow.state;
-    if (stage === "bill" || stage === "confirm") {
+    if (stage === "bill" || stage === "confirm" || stage === "waiting") {
       flow.finishWaiting();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverSync?.version, items.length, flow.state.stage]);
+  }, [serverSync?.version, serverSync?.tableClosed, items.length, flow.state.stage]);
 
   useEffect(() => {
     if (seededName.current || !youMember?.name.trim()) return;
@@ -247,6 +255,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     config,
     sessionClaims,
     paidSummaries,
+    demoTableProgress,
     onResetDemo,
   };
   const stage = flow.state.stage;

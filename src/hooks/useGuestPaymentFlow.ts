@@ -277,8 +277,10 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
       return {
         ...state,
         claims: action.claims,
-        paidItemIds: action.paidItemIds,
-        paidIds: action.paidIds,
+        paidItemIds: Array.from(
+          new Set([...state.paidItemIds, ...action.paidItemIds]),
+        ),
+        paidIds: Array.from(new Set([...state.paidIds, ...action.paidIds])),
         people: Math.max(1, action.people),
       };
 

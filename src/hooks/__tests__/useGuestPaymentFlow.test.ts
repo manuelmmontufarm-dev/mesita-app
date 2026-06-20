@@ -372,3 +372,24 @@ describe("buildReceipt", () => {
     expect(r.methodLabel).toBe("Diners Club");
   });
 });
+
+describe("flowReducer — sync/fromServer", () => {
+  it("merges paid ids and paid items instead of replacing with stale server", () => {
+    const s = flowReducer(
+      withState({
+        stage: "waiting",
+        paidIds: ["you"],
+        paidItemIds: ["loc", "sec", "cev", "enc"],
+      }),
+      {
+        type: "sync/fromServer",
+        claims: {},
+        paidIds: [],
+        paidItemIds: [],
+        people: 2,
+      },
+    );
+    expect(s.paidIds).toEqual(["you"]);
+    expect(s.paidItemIds).toEqual(["loc", "sec", "cev", "enc"]);
+  });
+});

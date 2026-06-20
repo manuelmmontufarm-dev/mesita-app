@@ -46,6 +46,7 @@ import type {
   TableMember,
   TablePaymentSummary,
 } from "@/lib/guest-billing/types";
+import type { DemoTableProgress } from "@/lib/guest-billing/demo-table-progress";
 
 import { Ic, LogoMark, NamePill } from "./_shared";
 
@@ -57,6 +58,7 @@ export interface WaitingSuccessStageProps {
   members: readonly TableMember[];
   config: RestaurantConfig;
   paidSummaries?: readonly TablePaymentSummary[];
+  demoTableProgress?: DemoTableProgress;
   onResetDemo?: () => Promise<void>;
 }
 
@@ -300,6 +302,7 @@ export function WaitingSuccessStage({
   members,
   config,
   paidSummaries = [],
+  demoTableProgress,
   onResetDemo,
 }: WaitingSuccessStageProps) {
   const { state, derived, youId } = flow;
@@ -309,7 +312,9 @@ export function WaitingSuccessStage({
   /* ── phase derivation ─────────────────────────────────────────────────── */
 
   const phase: "waiting" | "success" =
-    derived.remainingSub <= 0.01 ? "success" : "waiting";
+    demoTableProgress?.tableClosed || derived.remainingSub <= 0.01
+      ? "success"
+      : "waiting";
 
   // Lag the displayed phase by 300 ms for a CSS cross-fade.
   const [displayedPhase, setDisplayedPhase] = useState<"waiting" | "success">(
@@ -457,11 +462,29 @@ export function WaitingSuccessStage({
   /* ── shared math ──────────────────────────────────────────────────────── */
 
   const fullSub = billSubtotal(items);
-  const mesaTotal = computeTotals(fullSub, config, 0).total;
+  const mesaTotal =
+    demoTableProgress?.mesaTotal ?? computeTotals(fullSub, config, 0).total;
+  const remainingSub =
+    demoTableProgress?.remainingSub ?? derived.remainingSub;
   const paidPct =
-    mesaTotal > 0.01
+    demoTableProgress?.paidPct ??
+    (mesaTotal > 0.01
       ? Math.round(((mesaTotal - derived.remainingSub) / mesaTotal) * 100)
-      : 100;
+      : 100);
+  const remainingTotal = computeTotals(
+    Math.max(0, remainingSub),
+    config,
+    0,
+  ).total;
+  const paidGuestCount =
+    demoTableProgress?.paidCount ??
+    Math.max(paidSummaries.length, state.paidIds.length);
+  const totalGuestCount = Math.max(
+    members.length,
+    people,
+    paidGuestCount,
+    paidSummaries.length,
+  );
 
   const displayMembers = resolveRoster(members, state.name, youId);
   const youDisplay = resolveMemberDisplay(
@@ -612,12 +635,12 @@ export function WaitingSuccessStage({
       <MesaProgressRing
         paidPct={paidPct}
         remainingAmt={
-          derived.remainingSub > 0.01
-            ? `Faltan ${fmt(derived.remainingSub)}`
+          remainingTotal > 0.01
+            ? `Faltan ${fmt(remainingTotal)}`
             : "¡Mesa completa!"
         }
-        paidCount={paidRows.length || state.paidIds.length}
-        totalCount={Math.max(members.length, people, paidRows.length)}
+        paidCount={paidGuestCount}
+        totalCount={totalGuestCount}
         paidRows={paidRows}
       />
 

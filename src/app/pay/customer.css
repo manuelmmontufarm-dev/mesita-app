@@ -3584,3 +3584,133 @@ html.has-receipt-peek .ws-wait-foot {
   font-weight: 600;
   text-align: center;
 }
+
+/* Demo QR poster — /pay/demo/qr */
+.demo-qr-page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px 40px;
+  background: var(--c-bg);
+}
+.demo-qr-card {
+  width: min(420px, 100%);
+  padding: 24px 20px 22px;
+  border-radius: 28px;
+  background: var(--c-card);
+  box-shadow:
+    0 24px 60px -28px rgba(27, 23, 20, 0.28),
+    0 0 0 1px rgba(27, 23, 20, 0.06);
+}
+.demo-qr-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.demo-qr-eyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+.demo-qr-title {
+  margin: 2px 0 0;
+  font-size: 22px;
+  font-weight: 760;
+  letter-spacing: -0.03em;
+  color: var(--c-ink);
+}
+.demo-qr-lede {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--c-ink-2);
+}
+.demo-qr-frame {
+  position: relative;
+  border-radius: 24px;
+  padding: 14px;
+  background: linear-gradient(145deg, rgba(47, 179, 126, 0.08), rgba(255, 253, 249, 0.9));
+  box-shadow: inset 0 0 0 1px rgba(26, 158, 98, 0.12);
+}
+.demo-qr-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 16px;
+}
+.demo-qr-loading,
+.demo-qr-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-ink-2);
+  background: rgba(255, 253, 249, 0.85);
+  border-radius: 24px;
+}
+.demo-qr-error {
+  color: #b91c1c;
+}
+.demo-qr-url {
+  margin: 12px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--c-ink-3);
+  word-break: break-all;
+}
+.demo-qr-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+.demo-qr-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid var(--c-sep);
+  background: var(--c-card);
+  color: var(--c-ink);
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.demo-qr-btn-primary {
+  border: none;
+  background: var(--pay);
+  color: #fff;
+  box-shadow: 0 10px 24px -10px rgba(26, 158, 98, 0.55);
+}
+.demo-qr-btn-primary:disabled {
+  opacity: 0.55;
+}
+.demo-qr-foot {
+  margin: 14px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--c-ink-3);
+}
+
+@media print {
+  .demo-qr-page {
+    padding: 0;
+    background: #fff;
+  }
+  .demo-qr-actions,
+  .demo-qr-foot {
+    display: none;
+  }
+}

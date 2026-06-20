@@ -79,6 +79,16 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Fix: progreso live + éxito al cerrar mesa + QR → lobby
+- **Qué:** `demo-table-progress`, `WaitingSuccessStage`, `GuestBillFlow`, `GuestPayPage`, `useGuestPaymentFlow`, `useDemoTableSession`, `navigation-kind`.
+- **Por qué:** Al pagar (todo/igual) el % no subía, decía "0 de 2 pagaron" y no pasaba a mesa cerrada; el QR saltaba el lobby.
+- **Qué hace:** Progreso fusiona ítems + pagadores + pagos; sync no borra estado local; auto-éxito desde waiting; escaneo QR = visita nueva → pantalla Entrar.
+
+### 2026-06-19 — QR de marca para demo `/pay/demo`
+- **Qué:** `DemoQRPoster`, `/pay/demo/qr`, `qr-utils`, `scripts/generate-demo-qr.mjs`, `public/demo-pay-qr.png`, `customer.css`.
+- **Por qué:** Necesitaban un QR listo para imprimir/compartir del link de demo sin ir a otra herramienta.
+- **Qué hace:** Página en `/pay/demo/qr` con QR verde Mesita + logo al centro, botón descargar PNG; también `npm run qr:demo` genera `public/demo-pay-qr.png`.
+
 ### 2026-06-19 — Medallas playfull al pagar + fix lobby en sync
 - **Qué:** `payer-badges.ts`, `WaitingSuccessStage`, `customer.css`, `useDemoTableSession`, `GuestPayPage`, tests.
 - **Por qué:** Hacer más cool el cierre de mesa con badges chistosos (el más rápido, Mr. Money, el más lento…) y no expulsar al lobby al tocar ítems.

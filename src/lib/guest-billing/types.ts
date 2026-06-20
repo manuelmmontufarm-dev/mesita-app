@@ -43,6 +43,7 @@ export interface TablePaymentSummary {
   mode?: "item" | "equal" | "todo";
   createdAt?: string;
   itemCount?: number;
+  subtotal?: number;
 }
 
 /** claims[itemId][memberId] = units (float, fractional allowed, Σ ≤ item.qty) */

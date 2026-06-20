@@ -7,6 +7,7 @@ import { demoDebug } from "@/lib/demo-debug";
 import { DEMO_LOBBY, emojiForItemName } from "@/lib/demo-restaurant";
 import type { DemoTableState } from "@/lib/demo-table-store";
 import { shouldApplyDemoVersion } from "@/lib/demo-table-store";
+import { isFreshDocumentNavigation } from "@/lib/navigation-kind";
 import type {
   BillItem,
   Claims,
@@ -163,6 +164,7 @@ function mapPaidSummaries(raw: DemoTableState | null): TablePaymentSummary[] {
       mode: p.mode,
       createdAt: p.createdAt,
       itemCount: p.itemIds?.length ?? 0,
+      subtotal: p.subtotal,
     };
   });
 }
@@ -373,6 +375,12 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   );
 
   useEffect(() => {
+    if (isFreshDocumentNavigation()) {
+      clearStoredGuestId(token);
+      clearStoredEntered(token);
+      clearStoredResetSeq(token);
+      demoDebug("lobby", "fresh visit — require entry screen");
+    }
     const storedReset = readStoredResetSeq(token);
     if (storedReset !== undefined) {
       lastResetSeq.current = storedReset;
