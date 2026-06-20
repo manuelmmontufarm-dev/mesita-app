@@ -734,6 +734,10 @@
   width:6px; height:6px; border-radius:50%; background:var(--accent);
   box-shadow:0 0 0 3px var(--accent-soft);
 }
+.taken-tag {
+  font-size:12px; font-weight:650; color:var(--c-ink-3);
+  background:rgba(27,23,20,.06); padding:3px 9px; border-radius:100px;
+}
 
 .bl-main { flex:1; min-width:0; }
 .bl-claim {

@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Fix demo: locro fantasma, pills invisibles, crash al pagar
+- **Qué:** `demo-table-store`, `split-math`, `GuestBillFlow`, `WaitingSuccessStage`, `_shared`, `BillStage`, `customer.css`.
+- **Por qué:** Locro precargado como “Persona 1” confundía numeración; ítems bloqueados sin pill; pagar solo crashaba la app (cierre de mesa prematuro + member undefined).
+- **Qué hace:** Demo arranca limpia (v2 resetea Redis viejo); pills siempre visibles bajo platos; mesa cerrada solo cuando todos los ítems están pagados; sin crash en pago.
+
 ### 2026-06-19 — Demo: colores compartidos, mesa cerrada sync, reiniciar demo
 - **Qué:** `split-math`, `useDemoTableSession`, `demo-table-store`, `GuestBillFlow`, `BillStage`, `WaitingSuccessStage`, `GuestPayPage`, `customer.css`.
 - **Por qué:** En multi-device el color de cada persona debía verse igual para todos; al pagar la mesa completa todos debían llegar a “Mesa cerrada”; hacía falta resetear la demo sin recargar.

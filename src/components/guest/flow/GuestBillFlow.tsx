@@ -194,15 +194,10 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
 
   useEffect(() => {
     if (!serverSync || items.length === 0) return;
-    const tableClosed = isTableFullyPaid(
-      items,
-      serverSync.paidItemIds,
-      serverSync.paidIds,
-      serverSync.people,
-    );
+    const tableClosed = isTableFullyPaid(items, serverSync.paidItemIds);
     if (!tableClosed) return;
     const { stage } = flow.state;
-    if (stage === "bill" || stage === "confirm" || stage === "payment") {
+    if (stage === "bill" || stage === "confirm") {
       flow.finishWaiting();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

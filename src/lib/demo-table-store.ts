@@ -44,8 +44,12 @@ export interface DemoPayment {
   createdAt: string;
 }
 
+/** Bump when default demo seed shape changes — stale Redis is reset on read. */
+const DEMO_STATE_VERSION = 2;
+
 export interface DemoTableState {
   token: string;
+  stateVersion: number;
   restaurant: {
     name: string;
     tagline: string;
@@ -120,25 +124,10 @@ function createState(token: string): DemoTableState {
     items: DEMO_ITEMS,
     guests: [],
     claims: {},
-    paidItemIds: ["locro"],
-    payments: [
-      {
-        id: "pay-seed-locro",
-        guestId: "seed-system",
-        guestName: "Persona 1",
-        mode: "item",
-        amount: 5.63,
-        subtotal: 4.5,
-        iva: 0.68,
-        service: 0.45,
-        tip: 0,
-        itemIds: ["locro"],
-        method: "Demo",
-        ref: "MQR-DEMO-LOCRO",
-        createdAt: ts,
-      },
-    ],
+    paidItemIds: [],
+    payments: [],
     nextGuestNumber: 1,
+    stateVersion: DEMO_STATE_VERSION,
     resetSeq: 0,
     version: 1,
     updatedAt: ts,
@@ -174,7 +163,12 @@ async function saveState(token: string, state: DemoTableState): Promise<DemoTabl
 
 export async function getDemoTableState(token: string): Promise<DemoTableState> {
   const existing = await loadState(token);
-  if (existing) return existing;
+  if (existing && (existing.stateVersion ?? 1) >= DEMO_STATE_VERSION) {
+    return existing;
+  }
+  if (existing) {
+    return resetDemoTableState(token);
+  }
   const created = createState(token);
   return saveState(token, created);
 }

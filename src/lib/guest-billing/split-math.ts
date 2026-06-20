@@ -123,10 +123,20 @@ export const avatarColor = (hue: number): string => `hsl(${hue} 62% 47%)`;
 
 /** Apply typed name to the current payer's roster entry (hue stays server-assigned). */
 export function resolveMemberDisplay(
-  member: TableMember,
+  member: TableMember | null | undefined,
   typedName: string,
   youId: MemberId,
 ): TableMember {
+  if (!member) {
+    const name = typedName.trim() || "Tú";
+    return {
+      id: youId,
+      name,
+      initials: initialsFor(name),
+      hue: guestAvatarHue(0),
+      isYou: true,
+    };
+  }
   const isYou = member.id === youId || member.isYou === true;
   if (!isYou) return member;
   const name = typedName.trim() || member.name;
@@ -138,17 +148,37 @@ export function resolveMemberDisplay(
   };
 }
 
-/** True when every item is paid or every guest at the table has paid. */
+/** True when every bill item has been marked paid. */
 export function isTableFullyPaid(
   items: readonly BillItem[],
   paidItemIds: readonly ItemId[],
-  paidIds: readonly MemberId[],
-  people: number,
 ): boolean {
-  const allItems =
-    items.length > 0 && items.every((it) => paidItemIds.includes(it.id));
-  const allGuests = people > 0 && paidIds.length >= people;
-  return allItems || allGuests;
+  return items.length > 0 && items.every((it) => paidItemIds.includes(it.id));
+}
+
+/** Resolve a roster entry for a claimant id (fallback when roster is stale). */
+export function resolveClaimantMember(
+  id: MemberId,
+  roster: readonly TableMember[],
+  youId?: MemberId,
+  youName?: string,
+): TableMember {
+  const found = roster.find((m) => m.id === id);
+  if (found) {
+    if (id === youId && youName?.trim()) {
+      return { ...found, name: youName.trim(), isYou: true };
+    }
+    return found;
+  }
+  const isYou = id === youId;
+  const label = isYou ? youName?.trim() || "Tú" : "Invitado";
+  return {
+    id,
+    name: label,
+    initials: initialsFor(label),
+    hue: guestAvatarHue(Math.abs(id.charCodeAt(0)) % 3),
+    isYou,
+  };
 }
 
 export function resolveRoster(
@@ -174,10 +204,17 @@ export const claimantsOf = (
   claims: Claims,
   itemId: ItemId,
   roster: readonly TableMember[],
-): MemberId[] =>
-  roster
-    .filter((m) => unitsOf(claims, itemId, m.id) > 0)
-    .map((m) => m.id);
+): MemberId[] => {
+  const itemMap = claims[itemId];
+  if (!itemMap) return [];
+  const ids = Object.entries(itemMap)
+    .filter(([, units]) => units > 0.001)
+    .map(([id]) => id);
+  const order = new Map(roster.map((m, i) => [m.id, i]));
+  return [...ids].sort(
+    (a, b) => (order.get(a) ?? 999) - (order.get(b) ?? 999),
+  );
+};
 
 export const freeUnits = (item: BillItem, claims: Claims): number =>
   round2(item.qty - claimedUnits(claims, item.id));

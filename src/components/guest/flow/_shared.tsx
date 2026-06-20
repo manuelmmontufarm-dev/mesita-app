@@ -13,6 +13,7 @@ import {
   AVATAR_HUE_YOU,
   memberPillLabel,
   NAME_PILL_MAX,
+  resolveClaimantMember,
 } from "@/lib/guest-billing/split-math";
 
 /* ── icons ─────────────────────────────────────────────────── */
@@ -377,7 +378,7 @@ export function AvatarStack({
   return (
     <div className="av-stack">
       {shown.map((id) => {
-        const member = roster.find((m) => m.id === id) ?? null;
+        const member = resolveClaimantMember(id, roster, youId, youName);
         return (
           <NamePill
             key={id}

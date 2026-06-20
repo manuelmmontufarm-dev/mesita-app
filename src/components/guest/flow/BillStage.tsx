@@ -260,6 +260,9 @@ export function BillItemRow({
                   <span className="dot" /> Toca para escogerlo
                 </span>
               )}
+              {mode === "item" && free <= 0.001 && !mine && !paid && claimants.length === 0 && (
+                <span className="taken-tag">Escogido</span>
+              )}
             </>
           )}
         </div>
