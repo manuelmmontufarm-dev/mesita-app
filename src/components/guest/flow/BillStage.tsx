@@ -50,6 +50,7 @@ import type {
   TableMember,
 } from "@/lib/guest-billing/types";
 import { expandRepeatedItems } from "@/lib/guest-billing/bill-display";
+import { mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
 
 import { AvatarStack, EqualShareVisual, Ic, LogoMark, NamePill } from "./_shared";
 
@@ -456,7 +457,13 @@ export function BillStage({
 }: BillStageProps) {
   const { state, derived } = flow;
   const { mode, tip, people, paidItemIds, claims: localClaims } = state;
-  const displayClaims = sessionClaims ?? localClaims;
+  const displayClaims = useMemo(
+    () =>
+      sessionClaims
+        ? mergeClaimsPreserveLocal(sessionClaims, localClaims, flow.youId)
+        : localClaims,
+    [sessionClaims, localClaims, flow.youId],
+  );
 
   const [otherTip, setOtherTip] = useState(false);
   // Monto en USD que el usuario teclea en "Otro" — persiste aunque el parent

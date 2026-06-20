@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Fix: claims/nombres optimistas sobreviven al sync live
+- **Qué:** `demo-optimistic-merge.ts`, `useDemoTableSession`, `GuestBillFlow`, `BillStage`, `payer-badges`.
+- **Por qué:** Al tipear nombre o seleccionar ítems, poll/SSE aplicaba snapshot viejo y borraba claims/renames en vuelo — selects desaparecían y el otro device no veía tu nombre.
+- **Qué hace:** Claims/rename optimistas en raw + merge en ingest; `syncRevision` mantiene flow al día; un solo badge chistoso por persona; 5 tests nuevos de merge.
+
 ### 2026-06-19 — Docs: regla obligatoria "bug → escenario primero" en CLAUDE.md
 - **Qué:** Bloque nuevo en `CLAUDE.md` titulado "🧪 REGLA OBLIGATORIA — Red de regresión multi-usuario", justo después de la regla del TODAY.md. Documenta el flujo: ante un bug en `/pay/demo` o multi-device, primero se agrega el escenario en `src/lib/demo-scenarios.ts`, se confirma que falla con `npm test`, luego se arregla, y ambas capas (vitest + Playwright) deben quedar verdes antes del commit. Incluye una sección "Para asistentes AI" con la secuencia exacta a seguir.
 - **Por qué:** La suite multi-usuario (20 escenarios × 5 dispositivos, vitest + Playwright) es solo útil si crece con cada bug real. Sin disciplina explícita en la doc, futuras sesiones (humanas o AI) iban a saltarse el repro-primero y la red se quedaría estancada en los 20 iniciales.

@@ -189,6 +189,7 @@ function GuestPayShell({
               paidIds,
               people: live.people,
               tableClosed: demoProgress?.tableClosed ?? false,
+              syncRevision: "syncRevision" in live ? live.syncRevision : undefined,
             }
           : undefined
       }

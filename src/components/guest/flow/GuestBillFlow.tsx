@@ -31,6 +31,7 @@ import {
 } from "@/hooks/useGuestPaymentFlow";
 import type { LiveSessionActions } from "@/hooks/useLiveTableSession";
 import { fmt } from "@/lib/guest-billing";
+import { mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
 import { freeUnits, isTableFullyPaid, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
 import type {
   BillItem,
@@ -80,6 +81,7 @@ export interface GuestBillFlowProps {
     paidIds: MemberId[];
     people: number;
     tableClosed?: boolean;
+    syncRevision?: number;
   };
   /** Demo-only: reset shared table state for all devices. */
   onResetDemo?: () => Promise<void>;
@@ -178,13 +180,17 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
   useLayoutEffect(() => {
     if (!serverSync) return;
     flow.syncFromServer({
-      claims: serverSync.claims,
+      claims: mergeClaimsPreserveLocal(
+        serverSync.claims,
+        flow.state.claims,
+        resolvedYouId,
+      ),
       paidItemIds: serverSync.paidItemIds,
       paidIds: serverSync.paidIds,
       people: serverSync.people,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverSync?.version]);
+  }, [serverSync?.version, serverSync?.syncRevision]);
 
   const youMember = members.find((m) => m.isYou);
   const seededName = useRef(false);

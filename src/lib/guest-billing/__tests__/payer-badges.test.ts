@@ -7,7 +7,7 @@ const t1 = "2026-06-19T20:01:00.000Z";
 const t2 = "2026-06-19T20:08:00.000Z";
 
 describe("assignPayerBadges", () => {
-  it("gives fastest and mr money to solo payer", () => {
+  it("gives exactly one badge to solo payer", () => {
     const awards = assignPayerBadges(
       [
         {
@@ -21,13 +21,12 @@ describe("assignPayerBadges", () => {
       ],
       { final: true },
     );
-    const ana = badgesForGuest(awards, "a").map((b) => b.id);
-    expect(ana).toContain("fastest");
-    expect(ana).toContain("mr-money");
-    expect(ana).toContain("picky");
+    const ana = badgesForGuest(awards, "a");
+    expect(ana).toHaveLength(1);
+    expect(ana[0]?.id).toBe("fastest");
   });
 
-  it("assigns fastest, slowest, mr money, and saver when table closes", () => {
+  it("picks one primary badge per guest when table closes", () => {
     const awards = assignPayerBadges(
       [
         {
@@ -49,11 +48,12 @@ describe("assignPayerBadges", () => {
       ],
       { final: true },
     );
-    expect(badgesForGuest(awards, "a").some((b) => b.id === "fastest")).toBe(true);
-    expect(badgesForGuest(awards, "a").some((b) => b.id === "saver")).toBe(true);
-    expect(badgesForGuest(awards, "b").some((b) => b.id === "slowest")).toBe(true);
-    expect(badgesForGuest(awards, "b").some((b) => b.id === "mr-money")).toBe(true);
-    expect(badgesForGuest(awards, "b").some((b) => b.id === "todo-king")).toBe(true);
+    expect(badgesForGuest(awards, "a")).toEqual([
+      expect.objectContaining({ id: "fastest" }),
+    ]);
+    expect(badgesForGuest(awards, "b")).toEqual([
+      expect.objectContaining({ id: "slowest" }),
+    ]);
   });
 
   it("holds slowest badge until final", () => {
@@ -73,6 +73,8 @@ describe("assignPayerBadges", () => {
       ],
       { final: true },
     );
-    expect(badgesForGuest(fin, "b").some((b) => b.id === "slowest")).toBe(true);
+    expect(badgesForGuest(fin, "b")).toEqual([
+      expect.objectContaining({ id: "slowest" }),
+    ]);
   });
 });

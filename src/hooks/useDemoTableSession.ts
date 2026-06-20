@@ -4,6 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { mapDemoStateToSession } from "@/lib/demo-live-adapter";
 import { demoDebug } from "@/lib/demo-debug";
+import {
+  createPendingDemoOps,
+  mapClaimsFromDemoRaw,
+  mergeDemoStateWithPending,
+  type PendingDemoOps,
+} from "@/lib/demo-optimistic-merge";
 import { DEMO_LOBBY, emojiForItemName } from "@/lib/demo-restaurant";
 import type { DemoTableState } from "@/lib/demo-table-store";
 import { shouldApplyDemoVersion } from "@/lib/demo-table-store";
@@ -74,6 +80,8 @@ export interface UseDemoTableSessionResult {
   retry: () => void;
   resetSeq: number;
   paidSummaries: TablePaymentSummary[];
+  /** Bumps on optimistic local patches — keeps flow claims in sync before server version. */
+  syncRevision: number;
   isDemo: true;
   sseConnected: boolean;
   /** User tapped "Entrar a la mesa" (or returning with that consent saved). */
@@ -88,17 +96,6 @@ export interface UseDemoTableSessionResult {
     table: string;
     city: string;
   };
-}
-
-function mapClaimsFromDemo(state: TableSessionState): Claims {
-  const claims: Claims = {};
-  for (const claim of state.claims) {
-    if (claim.status !== "ACTIVE") continue;
-    const itemMap = { ...(claims[claim.billItemId] ?? {}) };
-    itemMap[claim.guestSessionId] = claim.units;
-    claims[claim.billItemId] = itemMap;
-  }
-  return claims;
 }
 
 function mapDemoItems(raw: DemoTableState): BillItem[] {
@@ -276,6 +273,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   const [entering, setEntering] = useState(false);
   const [joinAttempt, setJoinAttempt] = useState(0);
   const [sseConnected, setSseConnected] = useState(false);
+  const [syncRevision, setSyncRevision] = useState(0);
   const renameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Last typed name not yet POSTed (paired with renameTimer). */
   const pendingRename = useRef<string | null>(null);
@@ -285,12 +283,23 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   const rejoining = useRef(false);
   /** True while a pay POST is in flight — blocks the silent heal re-join. */
   const paying = useRef(false);
+  const pendingOps = useRef<PendingDemoOps>(createPendingDemoOps());
   const joinTableRef = useRef<
     | ((opts?: { guestId?: string; clearStored?: boolean }) => Promise<string | null>)
     | null
   >(null);
 
   guestSessionIdRef.current = guestSessionId;
+
+  const patchLocalDemo = useCallback((patch: (demo: DemoTableState) => DemoTableState) => {
+    setRaw((prev) => {
+      if (!prev) return prev;
+      const next = patch(prev);
+      setState(mapDemoStateToSession(next));
+      setSyncRevision((n) => n + 1);
+      return next;
+    });
+  }, []);
 
   const exitToLobby = useCallback(() => {
     clearStoredGuestId(token);
@@ -305,6 +314,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     setEntering(false);
     lastVersion.current = undefined;
     lastResetSeq.current = undefined;
+    pendingOps.current = createPendingDemoOps();
     demoDebug("lobby", "back to entry screen");
   }, [token]);
 
@@ -345,24 +355,30 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         return;
       }
 
-      applyDemo(demo, opts);
+      const pending = pendingOps.current;
+      const hasPending =
+        pending.claims.size > 0 || pending.pendingNames.size > 0;
+      const merged =
+        opts?.force || !hasPending
+          ? demo
+          : mergeDemoStateWithPending(demo, pending, gid);
+
+      applyDemo(merged, opts);
 
       if (prevReset === undefined || demo.resetSeq >= prevReset) {
         lastResetSeq.current = demo.resetSeq;
         writeStoredResetSeq(token, demo.resetSeq);
       }
 
-      // Lost-update heal: entered + has guestId + no reset + guest NOT in roster → silent re-join.
-      // deviceId on server makes this idempotent (same Persona N reused).
-      // Blocked while paying/joining to prevent a transient snapshot mid-pay
-      // from triggering a spurious "ghost" re-join that surfaces as a new Persona.
+      // Lost-update heal — skip while claims/rename/pay in flight.
       if (
         readStoredEntered(token) &&
         gid &&
         demo.resetSeq === (prevReset ?? demo.resetSeq) &&
         !demo.guests.some((g) => g.id === gid) &&
         !rejoining.current &&
-        !paying.current
+        !paying.current &&
+        !hasPending
       ) {
         demoDebug("rejoin", "ghost detected — silent re-join via deviceId");
         void joinTableRef.current?.().catch(() => {
@@ -583,36 +599,39 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     (name: string) => {
       if (!guestSessionId) return;
       const trimmed = name.trim().slice(0, NAME_PILL_MAX);
+      const display =
+        trimmed && trimmed.toLowerCase() !== "invitado" ? trimmed : null;
       pendingRename.current = trimmed;
-      setRaw((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          guests: prev.guests.map((g) =>
-            g.id === guestSessionId
-              ? {
-                  ...g,
-                  name:
-                    trimmed && trimmed.toLowerCase() !== "invitado"
-                      ? trimmed
-                      : g.label,
-                  updatedAt: new Date().toISOString(),
-                }
-              : g,
-          ),
-        };
-      });
+      if (display) {
+        pendingOps.current.pendingNames.set(guestSessionId, display);
+      } else {
+        pendingOps.current.pendingNames.delete(guestSessionId);
+      }
+      patchLocalDemo((prev) => ({
+        ...prev,
+        guests: prev.guests.map((g) =>
+          g.id === guestSessionId
+            ? {
+                ...g,
+                name: display ?? g.label,
+                updatedAt: new Date().toISOString(),
+              }
+            : g,
+        ),
+      }));
       if (renameTimer.current) clearTimeout(renameTimer.current);
       renameTimer.current = setTimeout(() => {
         const toSend = pendingRename.current;
         if (toSend == null) return;
         pendingRename.current = null;
-        void postAction({ action: "rename", guestId: guestSessionId, name: toSend }).catch(
-          console.error,
-        );
-      }, 150);
+        void postAction({ action: "rename", guestId: guestSessionId, name: toSend })
+          .then(() => {
+            pendingOps.current.pendingNames.delete(guestSessionId);
+          })
+          .catch(console.error);
+      }, 80);
     },
-    [guestSessionId, postAction],
+    [guestSessionId, postAction, patchLocalDemo],
   );
 
   /** Force-send any pending rename synchronously before a critical action (pay). */
@@ -626,6 +645,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     pendingRename.current = null;
     try {
       await postAction({ action: "rename", guestId: guestSessionId, name: toSend });
+      pendingOps.current.pendingNames.delete(guestSessionId);
     } catch (err) {
       console.error(err);
     }
@@ -634,23 +654,50 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   const onClaim = useCallback(
     (billItemId: string, _units: number) => {
       if (!guestSessionId) return;
-      void postAction({ action: "claim", guestId: guestSessionId, itemId: billItemId }).catch(
-        console.error,
-      );
+      patchLocalDemo((prev) => {
+        const claims = { ...prev.claims };
+        const op: "claim" | "release" =
+          claims[billItemId] === guestSessionId ? "release" : "claim";
+        if (op === "release") delete claims[billItemId];
+        else claims[billItemId] = guestSessionId;
+        pendingOps.current.claims.set(billItemId, op);
+        return { ...prev, claims };
+      });
+      void postAction({ action: "claim", guestId: guestSessionId, itemId: billItemId })
+        .then(() => {
+          pendingOps.current.claims.delete(billItemId);
+        })
+        .catch((err) => {
+          pendingOps.current.claims.delete(billItemId);
+          console.error(err);
+        });
     },
-    [guestSessionId, postAction],
+    [guestSessionId, postAction, patchLocalDemo],
   );
 
   const onRelease = useCallback(
     (billItemId: string) => {
       if (!guestSessionId) return;
+      patchLocalDemo((prev) => {
+        const claims = { ...prev.claims };
+        delete claims[billItemId];
+        pendingOps.current.claims.set(billItemId, "release");
+        return { ...prev, claims };
+      });
       void postAction({
         action: "release",
         guestId: guestSessionId,
         itemId: billItemId,
-      }).catch(console.error);
+      })
+        .then(() => {
+          pendingOps.current.claims.delete(billItemId);
+        })
+        .catch((err) => {
+          pendingOps.current.claims.delete(billItemId);
+          console.error(err);
+        });
     },
-    [guestSessionId, postAction],
+    [guestSessionId, postAction, patchLocalDemo],
   );
 
   const onStatus = useCallback(
@@ -717,7 +764,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     [guestSessionId, postAction, flushRename],
   );
 
-  const claims = useMemo(() => (state ? mapClaimsFromDemo(state) : {}), [state]);
+  const claims = useMemo(() => (raw ? mapClaimsFromDemoRaw(raw) : {}), [raw]);
   const paidItemIds = useMemo(
     () => (state ? state.items.filter((i) => i.isPaid).map((i) => i.id) : []),
     [state],
@@ -785,6 +832,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     retry: () => setJoinAttempt((n) => n + 1),
     resetSeq: raw?.resetSeq ?? 0,
     paidSummaries,
+    syncRevision,
     isDemo: true,
     sseConnected,
     hasEntered,

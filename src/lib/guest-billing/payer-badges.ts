@@ -1,6 +1,6 @@
 /**
  * Playful post-pay badges for shared-table checkout.
- * Computed from server payment records (demo Redis / live session).
+ * One badge per guest — the most fun relevant title wins.
  */
 
 export interface PaymentForBadges {
@@ -75,12 +75,6 @@ const BADGE = {
     title: "Pickypicker",
     subtitle: "Plato por plato. Sabes lo que quieres.",
   },
-  flash: {
-    id: "flash",
-    emoji: "⚡",
-    title: "Flash",
-    subtitle: "Pagaste en menos de 2 min desde el primero.",
-  },
   snailMail: {
     id: "snail-mail",
     emoji: "📮",
@@ -88,6 +82,19 @@ const BADGE = {
     subtitle: "Tu pago llegó cuando ya casi no quedaba mesa.",
   },
 } as const satisfies Record<string, PayerBadge>;
+
+/** Highest-priority badge id wins when multiple apply. */
+const BADGE_PRIORITY = [
+  "slowest",
+  "fastest",
+  "mr-money",
+  "todo-king",
+  "generous",
+  "picky",
+  "splitter",
+  "saver",
+  "snail-mail",
+] as const;
 
 function byTime(a: PaymentForBadges, b: PaymentForBadges): number {
   return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -99,7 +106,16 @@ function pushBadge(map: Map<string, PayerBadge[]>, guestId: string, badge: Payer
   map.set(guestId, [...list, badge]);
 }
 
-/** Assign fun badges per guest. `final` = table closed — unlocks "el más lento". */
+function pickPrimaryBadge(candidates: readonly PayerBadge[]): PayerBadge[] {
+  if (!candidates.length) return [];
+  for (const id of BADGE_PRIORITY) {
+    const hit = candidates.find((b) => b.id === id);
+    if (hit) return [hit];
+  }
+  return [candidates[0]!];
+}
+
+/** Assign one fun badge per guest. `final` = table closed — unlocks "el más lento". */
 export function assignPayerBadges(
   payments: readonly PaymentForBadges[],
   opts?: { final?: boolean },
@@ -116,6 +132,11 @@ export function assignPayerBadges(
 
   if (opts?.final && sorted.length >= 2 && last.guestId !== first.guestId) {
     pushBadge(byGuest, last.guestId, BADGE.slowest);
+    const t0 = new Date(first.createdAt).getTime();
+    const delta = new Date(last.createdAt).getTime() - t0;
+    if (delta >= 5 * 60 * 1000) {
+      pushBadge(byGuest, last.guestId, BADGE.snailMail);
+    }
   }
 
   if (sorted.length >= 2) {
@@ -145,24 +166,13 @@ export function assignPayerBadges(
     if (p.mode === "item") pushBadge(byGuest, p.guestId, BADGE.picky);
   }
 
-  if (sorted.length >= 2) {
-    const t0 = new Date(first.createdAt).getTime();
-    for (const p of sorted) {
-      const delta = new Date(p.createdAt).getTime() - t0;
-      if (delta <= 2 * 60 * 1000) pushBadge(byGuest, p.guestId, BADGE.flash);
-      if (opts?.final && p.guestId === last.guestId && delta >= 5 * 60 * 1000) {
-        pushBadge(byGuest, p.guestId, BADGE.snailMail);
-      }
-    }
-  }
-
   return sorted
     .map((p) => p.guestId)
     .filter((id, i, arr) => arr.indexOf(id) === i)
     .map((guestId) => ({
       guestId,
       guestName: nameByGuest.get(guestId) ?? "Persona",
-      badges: byGuest.get(guestId) ?? [],
+      badges: pickPrimaryBadge(byGuest.get(guestId) ?? []),
     }))
     .filter((row) => row.badges.length > 0);
 }
