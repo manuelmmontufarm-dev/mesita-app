@@ -199,7 +199,11 @@ export function useLiveTableSession(token: string): UseLiveTableSessionResult {
         if (cancelled) return;
         console.error(err);
         setError(
-          err instanceof Error ? err.message : "No pudimos conectar con la mesa.",
+          err instanceof Error
+            ? err.message.includes("Internal server")
+              ? "No pudimos conectar con la mesa. Revisa que la base de datos esté configurada."
+              : err.message
+            : "No pudimos conectar con la mesa.",
         );
         setLoading(false);
       });

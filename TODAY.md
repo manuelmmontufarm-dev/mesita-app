@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Demo auto-bootstrap en `/pay/demo` (sin seed manual)
+- **Qué:** `ensure-demo-table.ts`, `findActiveBillByToken` solo cuentas abiertas, IDs de ítems demo sin UUID en API.
+- **Por qué:** `/pay/demo` fallaba si no corrías seed; el usuario quiere menú demo precargado + sync multi-device.
+- **Qué hace:** Al primer request a token `demo`, se crea Mesita Demo + Mesa 12 + cuenta ecuatoriana (locro pagado); otros teléfonos ven join/claims en vivo.
+
 ### 2026-06-19 — Revert migrate en build (Vercel P1001 localhost)
 - **Qué:** `package.json` — quitado `migrate deploy` del build; scripts `db:deploy`, `db:seed`, `db:setup`.
 - **Por qué:** Build en Vercel falló: `DATABASE_URL` apunta a `localhost:5432` (noop) durante build.

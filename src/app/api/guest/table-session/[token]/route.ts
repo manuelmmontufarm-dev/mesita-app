@@ -30,13 +30,13 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("claim-item"),
     guestSessionId: z.string().uuid(),
-    billItemId: z.string().uuid(),
+    billItemId: z.string().min(1),
     units: z.number().positive().max(100).default(1),
   }),
   z.object({
     action: z.literal("release-item"),
     guestSessionId: z.string().uuid(),
-    billItemId: z.string().uuid(),
+    billItemId: z.string().min(1),
   }),
 ]);
 

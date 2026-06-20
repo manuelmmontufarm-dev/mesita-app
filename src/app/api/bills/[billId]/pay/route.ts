@@ -27,7 +27,7 @@ const paymentSchema = z.object({
   tableToken: z.string().min(1),
   idempotencyKey: z.string().uuid().optional(),
   splitMode: z.enum(["FULL", "EQUAL", "BY_ITEM"]).optional(),
-  selectedItemIds: z.array(z.string().uuid()).optional(),
+  selectedItemIds: z.array(z.string().min(1)).optional(),
   equalSplitPeople: z.number().int().min(2).optional(),
   guestSessionId: z.string().uuid().optional(),
   voluntaryTipAmount: z.number().min(0).optional(),

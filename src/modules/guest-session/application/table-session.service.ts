@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { ensureDemoTableReady } from "./ensure-demo-table";
 import { calculateBillBreakdown } from "@/modules/bills";
 import { money, toNumberSafe } from "@/lib/money";
 import { guestLabel } from "@/lib/guest-billing/split-math";
@@ -34,12 +35,14 @@ function labelFor(ordinal: number): string {
 }
 
 async function findActiveBillByToken(token: string) {
+  await ensureDemoTableReady(token);
+
   const table = await prisma.table.findUnique({
     where: { token },
     include: {
       restaurant: true,
       bills: {
-        where: { status: { not: "REFUNDED" } },
+        where: { status: { in: ["UNPAID", "PARTIALLY_PAID"] } },
         orderBy: { createdAt: "desc" },
         take: 1,
         include: {
