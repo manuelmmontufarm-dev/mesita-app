@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Revert migrate en build (Vercel P1001 localhost)
+- **Qué:** `package.json` — quitado `migrate deploy` del build; scripts `db:deploy`, `db:seed`, `db:setup`.
+- **Por qué:** Build en Vercel falló: `DATABASE_URL` apunta a `localhost:5432` (noop) durante build.
+- **Qué hace:** Deploy vuelve a compilar; migraciones/seed se corren manualmente con la URL real de Supabase.
+
 ### 2026-06-19 — /pay/demo 500 en Vercel: DB sin migrar/conectar
 - **Qué:** diagnóstico prod + `package.json` build con `prisma migrate deploy`.
 - **Por qué:** API `/api/guest/table-session/demo` responde 500; frontend muestra "Internal server error".
