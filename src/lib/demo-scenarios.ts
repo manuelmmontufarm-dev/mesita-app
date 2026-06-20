@@ -54,6 +54,16 @@ export class SimulatedDevice {
     return guest;
   }
 
+  /** Join without jitter — for cold-start race tests. */
+  async joinFast(): Promise<DemoGuest> {
+    const { guest } = await joinDemoTable(this.token, {
+      guestId: this.guestId ?? undefined,
+      deviceId: this.deviceId,
+    });
+    this.guestId = guest.id;
+    return guest;
+  }
+
   /** Simulate a refresh: forget guestId but keep deviceId. */
   forgetGuestId(): void {
     this.guestId = null;
@@ -91,13 +101,15 @@ export class SimulatedDevice {
   async pay(opts: {
     mode: DemoSplitMode;
     amount?: number;
+    subtotal?: number;
     itemIds?: string[];
+    itemUnits?: Record<string, number>;
     guestName?: string;
     equalPeople?: number;
   }): Promise<DemoTableState> {
     if (!this.guestId) await this.join();
     await jitter();
-    const subtotal = (opts.amount ?? 10) / 1.25;
+    const subtotal = opts.subtotal ?? (opts.amount ?? 10) / 1.25;
     return recordDemoPayment(this.token, {
       guestId: this.guestId!,
       guestName: opts.guestName ?? "Tester",
@@ -108,6 +120,7 @@ export class SimulatedDevice {
       service: subtotal * 0.1,
       tip: 0,
       itemIds: opts.itemIds ?? [],
+      itemUnits: opts.itemUnits,
       equalPeople: opts.equalPeople,
       method: "demo",
     });

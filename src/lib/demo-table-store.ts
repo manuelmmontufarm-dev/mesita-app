@@ -209,7 +209,12 @@ function scrubOrphanClaims(state: DemoTableState): boolean {
 }
 
 function normalizeLoadedState(state: DemoTableState): DemoTableState | null {
-  if (!scrubOrphanClaims(state)) return null;
+  let changed = scrubOrphanClaims(state);
+  if (!state.itemPaidUnits || typeof state.itemPaidUnits !== "object") {
+    state.itemPaidUnits = {};
+    changed = true;
+  }
+  if (!changed) return null;
   return touch(state);
 }
 
@@ -234,7 +239,7 @@ async function saveState(token: string, state: DemoTableState): Promise<DemoTabl
   return state;
 }
 
-const MUTATE_MAX_RETRIES = 10;
+const MUTATE_MAX_RETRIES = 25;
 
 /** Serialize mutations per table token within this process (avoids interleaved RMW). */
 const tokenMutationTail = new Map<string, Promise<unknown>>();
@@ -283,12 +288,15 @@ async function mutateDemoState(
     for (let attempt = 0; attempt < MUTATE_MAX_RETRIES; attempt++) {
       let state = await loadState(token);
       if (!state) {
-        // Seed via getDemoTableState (direct save) — tryCommit(…, 0) cannot insert.
         await getDemoTableState(token);
-        continue;
+        state = await loadState(token);
+        if (!state) continue;
       }
       if ((state.stateVersion ?? 1) < DEMO_STATE_VERSION) {
         state = migrateState(state);
+      }
+      if (!state.itemPaidUnits || typeof state.itemPaidUnits !== "object") {
+        state.itemPaidUnits = {};
       }
       const expectedVersion = state.version;
       const draft: DemoTableState = {
@@ -297,7 +305,7 @@ async function mutateDemoState(
         guests: state.guests.map((g) => ({ ...g })),
         items: [...state.items],
         paidItemIds: [...state.paidItemIds],
-        itemPaidUnits: { ...state.itemPaidUnits },
+        itemPaidUnits: { ...(state.itemPaidUnits ?? {}) },
         payments: [...state.payments],
       };
       mutator(draft);
@@ -335,6 +343,7 @@ export async function resetDemoTableState(token: string): Promise<DemoTableState
   state.guests = [];
   state.payments = [];
   state.paidItemIds = [];
+  state.itemPaidUnits = {};
   state.nextGuestNumber = 1;
   getMemoryStore().set(token, state);
   const redis = getRedis();
@@ -360,6 +369,8 @@ export async function joinDemoTable(
 ): Promise<{ state: DemoTableState; guest: DemoGuest }> {
   const { guestId, deviceId } =
     typeof opts === "string" ? { guestId: opts, deviceId: undefined } : opts ?? {};
+
+  await getDemoTableState(token);
 
   let resolvedGuest: DemoGuest | null = null;
   const state = await mutateDemoState(token, (draft) => {

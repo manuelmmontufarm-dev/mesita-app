@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-20 — Fix join 500 + swarm 20×10 + personas Grandpa/Child
+- **Qué:** `demo-table-store.ts`, `demo-rigorous-swarm.ts`, `demo-persona-simulation.ts`, `demo-scenarios.ts`, tests (`rigorous-swarm`, `persona-simulation`, `cold-join`), `docs/PERSONA_RECOMMENDATIONS.md`.
+- **Por qué:** "Internal server error" al pulsar Entrar en Vercel demo; necesidad de stress-test 20 escenarios × 10 comensales y simular usuarios reales (abuelo / niño).
+- **Qué hace:** Join precarga estado + normaliza `itemPaidUnits` en Redis stale; 25 reintentos CAS; 290 tests pasan (20 rigurosos + 40 personas); recomendaciones UX en `docs/PERSONA_RECOMMENDATIONS.md`.
+
 ### 2026-06-20 — Fix: pagos parciales (½ plato, ¼ mesa) no cierran la mesa
 - **Qué:** `useGuestPaymentFlow.ts`, `demo-table-store.ts`, `GuestPayPage.tsx`, `WaitingSuccessStage.tsx`, `GuestBillFlow.tsx`, `customer.css`, tests/scenarios.
 - **Por qué:** Pagar ½ plato marcaba el ítem entero como pagado y saltaba a éxito; modo equal solo cerraba por headcount; subtotal demo mal calculado (`amount/1.25`).

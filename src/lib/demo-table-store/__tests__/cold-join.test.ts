@@ -24,4 +24,28 @@ describe("cold join (empty store, no prior GET)", () => {
     const loaded = await getDemoTableState(token);
     expect(loaded.guests).toHaveLength(1);
   });
+
+  it("10 concurrent cold joins all succeed", async () => {
+    const token = `cold-concurrent-${Math.random().toString(36).slice(2, 10)}`;
+    const joins = await Promise.all(
+      Array.from({ length: 10 }, (_, i) =>
+        joinDemoTable(token, { deviceId: `device-${i}` }),
+      ),
+    );
+    expect(joins).toHaveLength(10);
+    const loaded = await getDemoTableState(token);
+    expect(loaded.guests).toHaveLength(10);
+  });
+
+  it("double join same device is idempotent", async () => {
+    const token = `cold-idem-${Math.random().toString(36).slice(2, 10)}`;
+    const first = await joinDemoTable(token, { deviceId: "idem-device" });
+    const second = await joinDemoTable(token, {
+      guestId: first.guest.id,
+      deviceId: "idem-device",
+    });
+    expect(second.guest.id).toBe(first.guest.id);
+    const loaded = await getDemoTableState(token);
+    expect(loaded.guests).toHaveLength(1);
+  });
 });
