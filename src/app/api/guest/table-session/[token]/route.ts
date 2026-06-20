@@ -50,6 +50,22 @@ function mapGuestSessionError(error: unknown): Response {
   if (error instanceof GuestSessionConflictError) {
     return errorResponse(error.message, 409);
   }
+  const prismaCode =
+    error && typeof error === "object" && "code" in error
+      ? String((error as { code: string }).code)
+      : null;
+  if (prismaCode === "P1001" || prismaCode === "P1017") {
+    return errorResponse(
+      "No pudimos conectar con la base de datos. Revisa DATABASE_URL en Vercel.",
+      503
+    );
+  }
+  if (prismaCode === "P2021") {
+    return errorResponse(
+      "La base de datos necesita migraciones. Ejecuta prisma migrate deploy.",
+      503
+    );
+  }
   console.error("Guest table session error:", error);
   return errorResponse("Internal server error", 500);
 }

@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — /pay/demo 500 en Vercel: DB sin migrar/conectar
+- **Qué:** diagnóstico prod + `package.json` build con `prisma migrate deploy`.
+- **Por qué:** API `/api/guest/table-session/demo` responde 500; frontend muestra "Internal server error".
+- **Qué hace:** Cada deploy aplica migraciones; falta confirmar `DATABASE_URL` en Vercel y correr seed una vez.
+
 ### 2026-06-19 — Backend live sync + demo Postgres en Vercel
 - **Qué:** `useLiveTableSession`, `GuestPayPage`, seed Mesita Demo (`/pay/demo`), `DemoPaymentAdapter`, `GuestBillFlow` live callbacks, SSE `maxDuration`, rutas `/pay/[token]` y `/pay/demo` unificadas.
 - **Por qué:** El flujo nuevo era solo local; multi-dispositivo y deploy en Vercel necesitan Postgres + SSE, no `localStorage` ni Map en memoria.

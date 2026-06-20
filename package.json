@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
@@ -64,6 +64,10 @@
     "@types/uuid": "^10.0.0",
     "@vitest/coverage-v8": "^4.1.7",
     "prisma": "^5.7.0",
+    "tsx": "^4.19.0",
     "vitest": "^4.1.7"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
   }
 }
