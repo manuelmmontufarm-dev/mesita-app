@@ -1,6 +1,6 @@
 import { Redis } from "@upstash/redis";
 
-import { guestLabel } from "@/lib/guest-billing/split-math";
+import { guestLabel, guestAvatarHue } from "@/lib/guest-billing/split-math";
 
 /** Vercel-safe demo table state — persisted in Upstash when configured. */
 
@@ -45,7 +45,7 @@ export interface DemoPayment {
 }
 
 /** Bump when default demo seed shape changes — migrated in-place, never wipes guests. */
-const DEMO_STATE_VERSION = 2;
+const DEMO_STATE_VERSION = 3;
 
 export class DemoGuestNotFoundError extends Error {
   constructor(public readonly guestId: string) {
@@ -156,8 +156,20 @@ function requireGuest(state: DemoTableState, guestId: string): DemoGuest {
 /** In-place schema upgrade — preserves guests/claims (no surprise table wipe). */
 function migrateState(state: DemoTableState): DemoTableState {
   if ((state.stateVersion ?? 1) >= DEMO_STATE_VERSION) return state;
-  state.stateVersion = DEMO_STATE_VERSION;
+
   if (state.resetSeq == null) state.resetSeq = 0;
+
+  for (const guest of state.guests) {
+    const numMatch = /^Persona (\d+)$/i.exec(guest.label?.trim() ?? "");
+    const ordinal = numMatch ? Number(numMatch[1]) : state.guests.indexOf(guest) + 1;
+    guest.hue = guestAvatarHue(ordinal - 1);
+    const cleaned = guest.name?.trim();
+    if (!cleaned || cleaned.toLowerCase() === "invitado") {
+      guest.name = guest.label || guestLabel(ordinal);
+    }
+  }
+
+  state.stateVersion = DEMO_STATE_VERSION;
   return touch(state);
 }
 
@@ -223,7 +235,7 @@ export async function joinDemoTable(
     id: crypto.randomUUID(),
     label: guestLabel(number),
     name: guestLabel(number),
-    hue: (number * 53 + 24) % 360,
+    hue: guestAvatarHue(number - 1),
     status: "selecting",
     joinedAt: ts,
     updatedAt: ts,
@@ -240,7 +252,8 @@ export async function renameDemoGuest(
   const state = await getDemoTableState(token);
   const guest = requireGuest(state, guestId);
   const cleaned = name.trim().slice(0, 10);
-  guest.name = cleaned || guest.label;
+  const next = cleaned && cleaned.toLowerCase() !== "invitado" ? cleaned : guest.label;
+  guest.name = next || guest.label;
   guest.updatedAt = nowIso();
   return saveState(token, touch(state));
 }

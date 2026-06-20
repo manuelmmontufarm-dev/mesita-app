@@ -152,7 +152,7 @@ export async function getTableSessionState(token: string) {
         payment.guestSession?.displayName ??
         payment.guestNombre ??
         payment.guestEmail ??
-        "Invitado",
+        guestLabel(1),
       amount: Number(payment.amount),
       voluntaryTip: payment.voluntaryTip != null ? Number(payment.voluntaryTip) : null,
       splitMode: payment.splitMode,

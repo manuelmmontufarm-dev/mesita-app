@@ -13,6 +13,8 @@ import {
   displayPillLabel,
   memberPillLabel,
   initialsFor,
+  guestAvatarHue,
+  normalizeMemberName,
   isItemPaid,
   itemOwed,
   lineTotal,
@@ -133,6 +135,18 @@ describe("guestLabel & displayPillLabel", () => {
     expect(memberPillLabel({ isYou: true, name: "Tú" }, "Manuel")).toBe("Manuel");
     expect(memberPillLabel({ isYou: true, name: "Tú" }, "")).toBe("Tú");
     expect(memberPillLabel({ name: "Persona 2" }, undefined)).toBe("Persona 2");
+  });
+
+  it("normalizeMemberName strips Invitado", () => {
+    expect(normalizeMemberName("Invitado", "Persona 2")).toBe("Persona 2");
+    expect(normalizeMemberName("", "Persona 3")).toBe("Persona 3");
+    expect(normalizeMemberName("Manuel", "Persona 1")).toBe("Manuel");
+  });
+
+  it("guestAvatarHue uses fixed cheerful palette", () => {
+    expect(guestAvatarHue(0)).toBe(152);
+    expect(guestAvatarHue(1)).toBe(210);
+    expect(guestAvatarHue(2)).toBe(275);
   });
 });
 

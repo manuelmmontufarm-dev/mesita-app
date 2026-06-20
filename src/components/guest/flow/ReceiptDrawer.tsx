@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Receipt, receiptsTotal } from "@/hooks/useGuestPaymentFlow";
 import { downloadReceiptPdf } from "@/lib/guest-billing/receipt-pdf";
-import { fmt } from "@/lib/guest-billing/split-math";
+import { fmt, guestLabel } from "@/lib/guest-billing/split-math";
 import type { RestaurantConfig } from "@/lib/guest-billing/types";
 import { Ic, LogoMark } from "./_shared";
 
@@ -34,7 +34,7 @@ function ReceiptSection({ receipt, config, index, total }: {
         </div>
       )}
       <div className="rcpt-amount">{fmt(receipt.amount || 0)}</div>
-      <div className="rcpt-amount-l">Pagado por {receipt.name || "Invitado"}</div>
+      <div className="rcpt-amount-l">Pagado por {receipt.name?.trim() || guestLabel(1)}</div>
       {receipt.how && <div className="rcpt-how"><Ic.split s={14} /> {receipt.how}</div>}
       {items.length > 0 && (
         <>

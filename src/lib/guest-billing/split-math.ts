@@ -56,14 +56,41 @@ export function guestLabel(ordinal: number): string {
   return `Persona ${ordinal}`;
 }
 
-/** Avatar hue for the current payer — brand green. */
-export const AVATAR_HUE_YOU = 160;
+/** Avatar hue for the current payer — light green (Persona 1). */
+export const AVATAR_HUE_YOU = 152;
 
-/** Cheerful hues for tablemates (blue, yellow, purple). No tomato/brown. */
-export const AVATAR_HUE_GUESTS = [210, 48, 280] as const;
+/**
+ * Cheerful fixed palette — Persona 1 green, 2 blue, 3 purple, then distinct hues.
+ * `avatarColor(hue)` maps these to tuned HSL strings.
+ */
+export const GUEST_HUE_PALETTE = [152, 210, 275, 38, 330, 185, 25] as const;
+
+/** @deprecated use GUEST_HUE_PALETTE */
+export const AVATAR_HUE_GUESTS = GUEST_HUE_PALETTE;
+
+const AVATAR_COLOR_BY_HUE: Record<number, string> = {
+  152: "hsl(152 48% 52%)",
+  210: "hsl(210 65% 52%)",
+  275: "hsl(275 58% 55%)",
+  38: "hsl(38 92% 55%)",
+  330: "hsl(330 75% 58%)",
+  185: "hsl(185 62% 48%)",
+  25: "hsl(25 88% 56%)",
+};
 
 export function guestAvatarHue(guestIndex: number): number {
-  return AVATAR_HUE_GUESTS[guestIndex % AVATAR_HUE_GUESTS.length];
+  const idx = Math.max(0, guestIndex) % GUEST_HUE_PALETTE.length;
+  return GUEST_HUE_PALETTE[idx];
+}
+
+/** Never show "Invitado" — fall back to Persona N label. */
+export function normalizeMemberName(
+  name: string | null | undefined,
+  fallbackLabel: string,
+): string {
+  const n = (name ?? "").trim();
+  if (!n || n.toLowerCase() === "invitado") return fallbackLabel.trim() || guestLabel(1);
+  return n;
 }
 
 /**
@@ -119,7 +146,8 @@ export function memberPillLabel(
   return displayPillLabel(m.name, maxLen);
 }
 
-export const avatarColor = (hue: number): string => `hsl(${hue} 62% 47%)`;
+export const avatarColor = (hue: number): string =>
+  AVATAR_COLOR_BY_HUE[hue] ?? `hsl(${hue} 58% 50%)`;
 
 /** Apply typed name to the current payer's roster entry (hue stays server-assigned). */
 export function resolveMemberDisplay(
@@ -165,10 +193,14 @@ export function resolveClaimantMember(
 ): TableMember {
   const found = roster.find((m) => m.id === id);
   if (found) {
+    const normalized = normalizeMemberName(
+      found.name,
+      found.seatLabel ?? guestLabel(roster.indexOf(found) + 1),
+    );
     if (id === youId && youName?.trim()) {
       return { ...found, name: youName.trim(), isYou: true };
     }
-    return found;
+    return { ...found, name: normalized };
   }
   const isYou = id === youId;
   const ordinal = roster.length + 1;

@@ -3,11 +3,13 @@
 import { useMemo } from "react";
 
 import { GuestBillFlow } from "@/components/guest/flow/GuestBillFlow";
+import { DemoDebugPanel } from "@/components/guest/DemoDebugPanel";
 import { useDemoTableSession } from "@/hooks/useDemoTableSession";
 import { useLiveTableSession } from "@/hooks/useLiveTableSession";
 import type { FlowInit, PaidPayload } from "@/hooks/useGuestPaymentFlow";
 import { mapSplitModeToDemo } from "@/lib/demo-live-adapter";
 import { isDemoTableToken } from "@/lib/demo-restaurant";
+import { guestLabel } from "@/lib/guest-billing/split-math";
 
 import "@/app/pay/customer.css";
 
@@ -56,12 +58,13 @@ function GuestPayShell({
     if (isDemo && "payDemo" in live) {
       if (!live.guestSessionId) return;
       const subtotal = payload.amount / 1.25;
+      const you = live.members.find((m) => m.isYou);
       const displayName =
         live.yourDisplayName.trim() ||
-        live.members.find((m) => m.isYou)?.name?.trim() ||
+        you?.name?.trim() ||
         payload.eInvoice?.legalName?.trim() ||
-        live.members.find((m) => m.isYou)?.seatLabel ||
-        "Persona";
+        you?.seatLabel ||
+        guestLabel(live.members.length || 1);
       await live.payDemo({
         guestName: displayName,
         mode: mapSplitModeToDemo(payload.splitMode),
@@ -115,7 +118,18 @@ function GuestPayShell({
   };
 
   return (
-    <GuestBillFlow
+    <>
+      {isDemo && "sseConnected" in live ? (
+        <DemoDebugPanel
+          version={live.version}
+          resetSeq={live.resetSeq}
+          guestSessionId={live.guestSessionId}
+          yourDisplayName={live.yourDisplayName}
+          memberCount={live.members.length}
+          sseConnected={live.sseConnected}
+        />
+      ) : null}
+      <GuestBillFlow
       items={live.items}
       members={live.members}
       config={live.config}
@@ -141,6 +155,7 @@ function GuestPayShell({
       sessionClaims={live.claims}
       paidSummaries={"paidSummaries" in live ? live.paidSummaries : undefined}
     />
+    </>
   );
 }
 

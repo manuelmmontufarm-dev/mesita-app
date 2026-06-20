@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { mapDemoStateToSession } from "@/lib/demo-live-adapter";
+import { demoDebug } from "@/lib/demo-debug";
 import { emojiForItemName } from "@/lib/demo-restaurant";
 import type { DemoTableState } from "@/lib/demo-table-store";
 import { shouldApplyDemoVersion } from "@/lib/demo-table-store";
@@ -18,6 +19,7 @@ import {
   guestLabel,
   initialsFor,
   NAME_PILL_MAX,
+  normalizeMemberName,
 } from "@/lib/guest-billing/split-math";
 import { IVA_RATE, PROPINA_RATE } from "@/lib/constants/ecuador-tax";
 
@@ -30,8 +32,8 @@ import type {
 /** Tab-scoped — each browser tab is a separate demo guest. */
 const SESSION_KEY = (token: string) => `mesita:demo-guest:${token}`;
 
-/** Slow fallback when SSE drops (SSE is primary). */
-const POLL_FALLBACK_MS = 8_000;
+/** Live sync every second (SSE + poll; version guard prevents stale overwrites). */
+const SYNC_INTERVAL_MS = 1_000;
 
 export interface UseDemoTableSessionResult {
   state: TableSessionState | null;
@@ -65,6 +67,7 @@ export interface UseDemoTableSessionResult {
   resetSeq: number;
   paidSummaries: TablePaymentSummary[];
   isDemo: true;
+  sseConnected: boolean;
 }
 
 function mapClaimsFromDemo(state: TableSessionState): Claims {
@@ -96,7 +99,7 @@ function buildDemoRoster(
   const byId = new Map<string, TableMember>();
 
   for (const g of raw.guests) {
-    const name = g.name?.trim() || g.label;
+    const name = normalizeMemberName(g.name, g.label);
     byId.set(g.id, {
       id: g.id,
       name,
@@ -110,8 +113,10 @@ function buildDemoRoster(
   for (const guestId of Object.values(raw.claims)) {
     if (!guestId || byId.has(guestId)) continue;
     const guest = raw.guests.find((g) => g.id === guestId);
-    const name =
-      guest?.name?.trim() || guest?.label || guestLabel(byId.size + 1);
+    const name = normalizeMemberName(
+      guest?.name,
+      guest?.label || guestLabel(byId.size + 1),
+    );
     byId.set(guestId, {
       id: guestId,
       name,
@@ -131,11 +136,10 @@ function mapPaidSummaries(raw: DemoTableState | null): TablePaymentSummary[] {
     const guest = raw.guests.find((g) => g.id === p.guestId);
     return {
       guestId: p.guestId,
-      guestName:
-        p.guestName?.trim() ||
-        guest?.name?.trim() ||
-        guest?.label ||
-        "Persona",
+      guestName: normalizeMemberName(
+        p.guestName,
+        guest?.label || guest?.name || "Persona",
+      ),
       amount: p.amount,
       method: p.method,
     };
@@ -192,11 +196,21 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   const lastResetSeq = useRef<number | undefined>(undefined);
   const rejoining = useRef(false);
 
-  const applyDemo = useCallback((demo: DemoTableState, opts?: { force?: boolean }) => {
-    if (!opts?.force && !shouldApplyDemoVersion(demo.version, lastVersion.current)) {
+  const applyDemo = useCallback((demo: DemoTableState, opts?: { force?: boolean; source?: string }) => {
+    const incoming = demo.version;
+    const last = lastVersion.current;
+    if (!opts?.force && !shouldApplyDemoVersion(incoming, last)) {
+      demoDebug("sync:skip", `ignored stale snapshot from ${opts?.source ?? "?"}`, {
+        incoming,
+        last,
+      });
       return;
     }
-    lastVersion.current = Math.max(lastVersion.current ?? 0, demo.version);
+    lastVersion.current = Math.max(last ?? 0, incoming);
+    demoDebug("sync:apply", `v${incoming} from ${opts?.source ?? "?"}`, {
+      guests: demo.guests.map((g) => ({ id: g.id.slice(0, 8), name: g.name, label: g.label })),
+      resetSeq: demo.resetSeq,
+    });
     setRaw(demo);
     setState(mapDemoStateToSession(demo));
   }, []);
@@ -214,8 +228,12 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         }>(token, { action: "join", guestId: savedId });
         writeStoredGuestId(token, guest.id);
         setGuestSessionId(guest.id);
-        applyDemo(joined, { force: true });
+        applyDemo(joined, { force: true, source: "join" });
         lastResetSeq.current = joined.resetSeq;
+        demoDebug("join", `guest ${guest.id.slice(0, 8)}`, {
+          label: joined.guests.find((g) => g.id === guest.id)?.label,
+          resetSeq: joined.resetSeq,
+        });
         return guest.id;
       } finally {
         rejoining.current = false;
@@ -267,6 +285,10 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
 
     clearStoredGuestId(token);
     void joinTable({ clearStored: true });
+    demoDebug("rejoin", resetChanged ? "resetSeq changed" : "guest missing", {
+      resetSeq: raw.resetSeq,
+      guestSessionId: guestSessionId?.slice(0, 8),
+    });
   }, [raw, raw?.resetSeq, raw?.guests, guestSessionId, joinTable, token]);
 
   useEffect(() => {
@@ -283,7 +305,8 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     const onState = (event: MessageEvent) => {
       try {
         const next = JSON.parse(event.data) as DemoTableState;
-        applyDemo(next);
+        applyDemo(next, { source: "sse" });
+        demoDebug("sync:sse", `event v${next.version}`);
       } catch (err) {
         console.error(err);
       }
@@ -306,9 +329,9 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     };
   }, [token, guestSessionId, applyDemo]);
 
-  /** Fallback poll only when SSE is disconnected — avoids double-sync lag. */
+  /** Poll every second for continuous multi-device sync. */
   useEffect(() => {
-    if (!guestSessionId || sseConnected) return;
+    if (!guestSessionId) return;
     let cancelled = false;
 
     const poll = async () => {
@@ -317,20 +340,23 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         const res = await fetch(`/api/demo/table/${encodeURIComponent(token)}`);
         const payload = await res.json();
         if (!cancelled && res.ok && payload.success) {
-          applyDemo(payload.data as DemoTableState);
+          applyDemo(payload.data as DemoTableState, { source: "poll" });
+          demoDebug("sync:poll", `v${(payload.data as DemoTableState).version}`);
         }
-      } catch {
-        /* soft fail */
+      } catch (err) {
+        demoDebug("error", "poll failed", {
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
     };
 
     void poll();
-    const interval = setInterval(() => void poll(), POLL_FALLBACK_MS);
+    const interval = setInterval(() => void poll(), SYNC_INTERVAL_MS);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [token, guestSessionId, sseConnected, applyDemo]);
+  }, [token, guestSessionId, applyDemo]);
 
   const postAction = useCallback(
     async (body: Record<string, unknown>) => {
@@ -340,7 +366,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
           data && typeof data === "object" && "state" in data
             ? (data as { state: DemoTableState }).state
             : (data as DemoTableState);
-        applyDemo(next, { force: true });
+        applyDemo(next, { force: true, source: "action" });
         return next;
       } catch (err) {
         if (err instanceof Error && err.message === "SESSION_EXPIRED") {
@@ -446,7 +472,9 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   const yourDisplayName = useMemo(() => {
     if (!raw || !guestSessionId) return "";
     const g = raw.guests.find((guest) => guest.id === guestSessionId);
-    return g?.name?.trim() || g?.label || "";
+    return g?.name?.trim() && g.name.toLowerCase() !== "invitado"
+      ? g.name.trim()
+      : g?.label || "";
   }, [raw, guestSessionId]);
 
   const config: RestaurantConfig = useMemo(
@@ -488,5 +516,6 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     resetSeq: raw?.resetSeq ?? 0,
     paidSummaries,
     isDemo: true,
+    sseConnected,
   };
 }

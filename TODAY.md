@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Demo: sync 1s, colores Persona 1/2/3, sin Invitado, debug
+- **Qué:** `useDemoTableSession`, `demo-table-store`, `split-math`, `DemoDebugPanel`, `demo-debug.ts`, `GuestPayPage`, `ReceiptDrawer`, `customer.css`.
+- **Por qué:** El usuario quería actualización continua cada segundo, colores verde/azul/morado por persona, nombres Persona N (no "Invitado"), y debug robusto.
+- **Qué hace:** Poll + SSE cada 1s; paleta fija (verde claro, azul, morado…); migración v3 limpia "Invitado" en Redis; panel debug con `?debug=1` o `__mesitaDemoDebug.enable()`.
+
 ### 2026-06-19 — Demo estabilidad: sin lag/restart, nombres estables
 - **Qué:** `useDemoTableSession`, `demo-table-store`, `GuestBillFlow`, `GuestPayPage`, `useGuestPaymentFlow`, rutas demo API/SSE, tests `version.test.ts`.
 - **Por qué:** La demo iba bien y de repente laggeaba, “reiniciaba”, recordaba estado viejo y cambiaba nombres (Invitado / Persona N).
