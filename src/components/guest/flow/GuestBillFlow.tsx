@@ -180,6 +180,9 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverSync?.version]);
 
+  const youMember = members.find((m) => m.isYou);
+  const seededName = useRef(false);
+
   const lastResetSeq = useRef<number | null>(null);
   useEffect(() => {
     if (serverSync?.resetSeq == null) return;
@@ -189,16 +192,17 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     }
     if (serverSync.resetSeq === lastResetSeq.current) return;
     lastResetSeq.current = serverSync.resetSeq;
+    seededName.current = false;
     flow.reset({
       ...init,
       initialStage: "bill",
+      initialName: youMember?.name?.trim() || flow.state.name.trim() || undefined,
       initialClaims: serverSync.claims,
       initialPaidItemIds: serverSync.paidItemIds,
       initialPaidIds: serverSync.paidIds,
       initialPeople: serverSync.people,
       initialReceipts: [],
     });
-    seededName.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverSync?.resetSeq]);
 
@@ -213,15 +217,13 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverSync?.version, items.length, flow.state.stage]);
 
-  const youMember = members.find((m) => m.isYou);
-  const seededName = useRef(false);
   useEffect(() => {
     if (seededName.current || !youMember?.name.trim()) return;
     if (!flow.state.name.trim()) {
-      activeFlow.setName(youMember.name);
+      flow.setName(youMember.name);
       seededName.current = true;
     }
-  }, [youMember?.name, flow.state.name, activeFlow]);
+  }, [youMember?.name, flow.state.name, flow]);
 
   // Mirror external data-layer signals onto the flow state machine.
   useEffect(() => {

@@ -123,13 +123,14 @@ export interface FlowInit {
   initialPaidIds?: MemberId[];
   initialPaidItemIds?: ItemId[];
   initialReceipts?: Receipt[];
+  initialName?: string;
 }
 
 export function createInitialState(init: FlowInit): FlowState {
   return {
     stage: init.initialStage ?? "loading",
     tab: init.initialTab ?? "cuenta",
-    name: "",
+    name: init.initialName?.trim() ?? "",
     nameErr: false,
     mode: init.initialMode ?? "item",
     tip: init.initialTip,

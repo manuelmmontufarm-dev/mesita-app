@@ -1,5 +1,6 @@
 import {
   claimDemoItem,
+  DemoGuestNotFoundError,
   getDemoTableState,
   joinDemoTable,
   recordDemoPayment,
@@ -116,6 +117,9 @@ export async function POST(
 
     return successResponse(await resetDemoTableState(token), 200);
   } catch (error) {
+    if (error instanceof DemoGuestNotFoundError) {
+      return errorResponse("Guest session expired — rejoin the table", 409);
+    }
     console.error("Demo table action failed:", error);
     return errorResponse("Internal server error", 500);
   }

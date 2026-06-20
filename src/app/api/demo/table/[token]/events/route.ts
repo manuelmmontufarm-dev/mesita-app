@@ -25,7 +25,7 @@ export async function GET(
       await send();
       const interval = setInterval(() => {
         void send();
-      }, 700);
+      }, 2000);
       const heartbeat = setInterval(() => {
         controller.enqueue(encoder.encode(`event: ping\ndata: {}\n\n`));
       }, 15_000);

@@ -40,36 +40,40 @@ function GuestPayShell({
       initialClaims: live.claims,
       initialPaidItemIds: live.paidItemIds,
       initialPaidIds: paidIds,
+      initialName:
+        "yourDisplayName" in live ? live.yourDisplayName : undefined,
     }),
-    [live.claims, live.paidItemIds, live.people, paidIds],
+    [
+      live.claims,
+      live.paidItemIds,
+      live.people,
+      paidIds,
+      "yourDisplayName" in live ? live.yourDisplayName : "",
+    ],
   );
 
   const onPaid = async (payload: PaidPayload) => {
-    if (isDemo) {
+    if (isDemo && "payDemo" in live) {
       if (!live.guestSessionId) return;
       const subtotal = payload.amount / 1.25;
-      const res = await fetch(`/api/demo/table/${encodeURIComponent(token)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "pay",
-          guestId: live.guestSessionId,
-          guestName: payload.eInvoice?.legalName ?? "Invitado",
-          mode: mapSplitModeToDemo(payload.splitMode),
-          amount: payload.amount,
-          subtotal,
-          iva: subtotal * 0.15,
-          service: subtotal * 0.1,
-          tip: payload.voluntaryTipAmount ?? 0,
-          itemIds: payload.selectedItemIds ?? [],
-          equalPeople: payload.equalSplitPeople,
-          method: "Tarjeta demo",
-        }),
+      const displayName =
+        live.yourDisplayName.trim() ||
+        live.members.find((m) => m.isYou)?.name?.trim() ||
+        payload.eInvoice?.legalName?.trim() ||
+        live.members.find((m) => m.isYou)?.seatLabel ||
+        "Persona";
+      await live.payDemo({
+        guestName: displayName,
+        mode: mapSplitModeToDemo(payload.splitMode),
+        amount: payload.amount,
+        subtotal,
+        iva: subtotal * 0.15,
+        service: subtotal * 0.1,
+        tip: payload.voluntaryTipAmount ?? 0,
+        itemIds: payload.selectedItemIds ?? [],
+        equalPeople: payload.equalSplitPeople,
+        method: "Tarjeta demo",
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `Payment failed: ${res.status}`);
-      }
       return;
     }
 

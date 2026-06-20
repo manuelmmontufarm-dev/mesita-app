@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Demo estabilidad: sin lag/restart, nombres estables
+- **Qué:** `useDemoTableSession`, `demo-table-store`, `GuestBillFlow`, `GuestPayPage`, `useGuestPaymentFlow`, rutas demo API/SSE, tests `version.test.ts`.
+- **Por qué:** La demo iba bien y de repente laggeaba, “reiniciaba”, recordaba estado viejo y cambiaba nombres (Invitado / Persona N).
+- **Qué hace:** Snapshots viejos se ignoran (versión monótona); cada pestaña tiene su guest en `sessionStorage`; re-join único tras reset (sin doble Persona); pay no manda "Invitado"; SSE cada 2s + poll solo si cae SSE; 409 re-join automático; nombre inicial en flow sin loop de rename.
+
 ### 2026-06-19 — Demo UX: nombres en pills, resumen pagos, éxito con emoji + reset
 - **Qué:** `useDemoTableSession`, `split-math`, `BillStage`, `WaitingSuccessStage`, `GuestBillFlow`, `GuestPayPage`, `customer.css`, `types.ts`.
 - **Por qué:** Pills mostraban "Invitado" en otro dispositivo; pantalla de espera sin resumen de pagos; check roto en éxito parcial; faltaba reiniciar demo al cerrar mesa.

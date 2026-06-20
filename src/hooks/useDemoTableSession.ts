@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { mapDemoStateToSession } from "@/lib/demo-live-adapter";
 import { emojiForItemName } from "@/lib/demo-restaurant";
 import type { DemoTableState } from "@/lib/demo-table-store";
+import { shouldApplyDemoVersion } from "@/lib/demo-table-store";
 import type {
   BillItem,
   Claims,
@@ -26,12 +27,16 @@ import type {
   TableSessionState,
 } from "./useLiveTableSession";
 
+/** Tab-scoped — each browser tab is a separate demo guest. */
 const SESSION_KEY = (token: string) => `mesita:demo-guest:${token}`;
-const POLL_MS = 2_000;
+
+/** Slow fallback when SSE drops (SSE is primary). */
+const POLL_FALLBACK_MS = 8_000;
 
 export interface UseDemoTableSessionResult {
   state: TableSessionState | null;
   guestSessionId: string | null;
+  yourDisplayName: string;
   loading: boolean;
   error: string | null;
   items: BillItem[];
@@ -44,6 +49,18 @@ export interface UseDemoTableSessionResult {
   billId: string | null;
   liveSession: LiveSessionActions | null;
   resetDemo: () => Promise<void>;
+  payDemo: (body: {
+    guestName: string;
+    mode: "item" | "equal" | "todo";
+    amount: number;
+    subtotal: number;
+    iva: number;
+    service: number;
+    tip: number;
+    itemIds: string[];
+    equalPeople?: number;
+    method: string;
+  }) => Promise<void>;
   retry: () => void;
   resetSeq: number;
   paidSummaries: TablePaymentSummary[];
@@ -71,7 +88,6 @@ function mapDemoItems(raw: DemoTableState): BillItem[] {
   }));
 }
 
-/** Full roster from Redis — every guest + anyone referenced in claims. */
 function buildDemoRoster(
   raw: DemoTableState | null,
   youId: string | null,
@@ -126,6 +142,19 @@ function mapPaidSummaries(raw: DemoTableState | null): TablePaymentSummary[] {
   });
 }
 
+function readStoredGuestId(token: string): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return sessionStorage.getItem(SESSION_KEY(token)) ?? undefined;
+}
+
+function writeStoredGuestId(token: string, guestId: string): void {
+  sessionStorage.setItem(SESSION_KEY(token), guestId);
+}
+
+function clearStoredGuestId(token: string): void {
+  sessionStorage.removeItem(SESSION_KEY(token));
+}
+
 async function postDemo<T>(token: string, body: Record<string, unknown>): Promise<T> {
   const res = await fetch(`/api/demo/table/${encodeURIComponent(token)}`, {
     method: "POST",
@@ -133,6 +162,9 @@ async function postDemo<T>(token: string, body: Record<string, unknown>): Promis
     body: JSON.stringify(body),
   });
   const payload = await res.json();
+  if (res.status === 409) {
+    throw new Error("SESSION_EXPIRED");
+  }
   if (!res.ok || !payload.success) {
     throw new Error(payload.error ?? "Demo session action failed");
   }
@@ -154,36 +186,52 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [joinAttempt, setJoinAttempt] = useState(0);
+  const [sseConnected, setSseConnected] = useState(false);
   const renameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastVersion = useRef<number | undefined>(undefined);
+  const lastResetSeq = useRef<number | undefined>(undefined);
+  const rejoining = useRef(false);
 
-  const applyDemo = useCallback((demo: DemoTableState) => {
-    if (demo.version === lastVersion.current) return;
-    lastVersion.current = demo.version;
+  const applyDemo = useCallback((demo: DemoTableState, opts?: { force?: boolean }) => {
+    if (!opts?.force && !shouldApplyDemoVersion(demo.version, lastVersion.current)) {
+      return;
+    }
+    lastVersion.current = Math.max(lastVersion.current ?? 0, demo.version);
     setRaw(demo);
     setState(mapDemoStateToSession(demo));
   }, []);
+
+  const joinTable = useCallback(
+    async (opts?: { guestId?: string; clearStored?: boolean }) => {
+      if (rejoining.current) return null;
+      rejoining.current = true;
+      try {
+        if (opts?.clearStored) clearStoredGuestId(token);
+        const savedId = opts?.guestId ?? readStoredGuestId(token);
+        const { state: joined, guest } = await postDemo<{
+          state: DemoTableState;
+          guest: { id: string };
+        }>(token, { action: "join", guestId: savedId });
+        writeStoredGuestId(token, guest.id);
+        setGuestSessionId(guest.id);
+        applyDemo(joined, { force: true });
+        lastResetSeq.current = joined.resetSeq;
+        return guest.id;
+      } finally {
+        rejoining.current = false;
+      }
+    },
+    [token, applyDemo],
+  );
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
 
-    const savedId =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(SESSION_KEY(token)) ?? undefined
-        : undefined;
-
-    postDemo<{ state: DemoTableState; guest: { id: string } }>(token, {
-      action: "join",
-      guestId: savedId,
-    })
-      .then(({ state: joined, guest }) => {
-        if (cancelled) return;
-        window.localStorage.setItem(SESSION_KEY(token), guest.id);
-        setGuestSessionId(guest.id);
-        applyDemo(joined);
-        setLoading(false);
+    joinTable()
+      .then(() => {
+        if (!cancelled) setLoading(false);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -195,13 +243,43 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     return () => {
       cancelled = true;
     };
-  }, [token, joinAttempt, applyDemo]);
+  }, [token, joinAttempt, joinTable]);
+
+  /** After table reset or expired guest — single re-join (avoids double-join on reset). */
+  useEffect(() => {
+    if (!raw) return;
+
+    if (lastResetSeq.current === undefined) {
+      lastResetSeq.current = raw.resetSeq;
+    }
+
+    const resetChanged = raw.resetSeq !== lastResetSeq.current;
+    const guestMissing =
+      guestSessionId != null && !raw.guests.some((g) => g.id === guestSessionId);
+
+    if (!resetChanged && !guestMissing) return;
+    if (rejoining.current) return;
+
+    if (resetChanged) {
+      lastResetSeq.current = raw.resetSeq;
+      lastVersion.current = undefined;
+    }
+
+    clearStoredGuestId(token);
+    void joinTable({ clearStored: true });
+  }, [raw, raw?.resetSeq, raw?.guests, guestSessionId, joinTable, token]);
 
   useEffect(() => {
     if (!guestSessionId) return;
+
+    let closed = false;
     const events = new EventSource(
       `/api/demo/table/${encodeURIComponent(token)}/events`,
     );
+
+    const onOpen = () => {
+      if (!closed) setSseConnected(true);
+    };
     const onState = (event: MessageEvent) => {
       try {
         const next = JSON.parse(event.data) as DemoTableState;
@@ -210,18 +288,31 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         console.error(err);
       }
     };
+    const onError = () => {
+      setSseConnected(false);
+    };
+
+    events.addEventListener("open", onOpen);
     events.addEventListener("state", onState);
+    events.addEventListener("error", onError);
+
     return () => {
+      closed = true;
+      events.removeEventListener("open", onOpen);
       events.removeEventListener("state", onState);
+      events.removeEventListener("error", onError);
       events.close();
+      setSseConnected(false);
     };
   }, [token, guestSessionId, applyDemo]);
 
+  /** Fallback poll only when SSE is disconnected — avoids double-sync lag. */
   useEffect(() => {
-    if (!guestSessionId) return;
+    if (!guestSessionId || sseConnected) return;
     let cancelled = false;
+
     const poll = async () => {
-      if (document.visibilityState !== "visible") return;
+      if (document.visibilityState !== "visible" || cancelled) return;
       try {
         const res = await fetch(`/api/demo/table/${encodeURIComponent(token)}`);
         const payload = await res.json();
@@ -232,23 +323,33 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         /* soft fail */
       }
     };
-    const interval = setInterval(() => void poll(), POLL_MS);
+
+    void poll();
+    const interval = setInterval(() => void poll(), POLL_FALLBACK_MS);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [token, guestSessionId, applyDemo]);
+  }, [token, guestSessionId, sseConnected, applyDemo]);
 
   const postAction = useCallback(
     async (body: Record<string, unknown>) => {
-      const data = await postDemo<DemoTableState | { state: DemoTableState }>(token, body);
-      const next =
-        data && typeof data === "object" && "state" in data
-          ? (data as { state: DemoTableState }).state
-          : (data as DemoTableState);
-      applyDemo(next);
+      try {
+        const data = await postDemo<DemoTableState | { state: DemoTableState }>(token, body);
+        const next =
+          data && typeof data === "object" && "state" in data
+            ? (data as { state: DemoTableState }).state
+            : (data as DemoTableState);
+        applyDemo(next, { force: true });
+        return next;
+      } catch (err) {
+        if (err instanceof Error && err.message === "SESSION_EXPIRED") {
+          await joinTable({ clearStored: true });
+        }
+        throw err;
+      }
     },
-    [token, applyDemo],
+    [token, applyDemo, joinTable],
   );
 
   const onRename = useCallback(
@@ -260,7 +361,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         void postAction({ action: "rename", guestId: guestSessionId, name: trimmed }).catch(
           console.error,
         );
-      }, 300);
+      }, 400);
     },
     [guestSessionId, postAction],
   );
@@ -311,6 +412,25 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     await postAction({ action: "reset" });
   }, [postAction]);
 
+  const payDemo = useCallback(
+    async (body: {
+      guestName: string;
+      mode: "item" | "equal" | "todo";
+      amount: number;
+      subtotal: number;
+      iva: number;
+      service: number;
+      tip: number;
+      itemIds: string[];
+      equalPeople?: number;
+      method: string;
+    }) => {
+      if (!guestSessionId) return;
+      await postAction({ action: "pay", guestId: guestSessionId, ...body });
+    },
+    [guestSessionId, postAction],
+  );
+
   const claims = useMemo(() => (state ? mapClaimsFromDemo(state) : {}), [state]);
   const paidItemIds = useMemo(
     () => (state ? state.items.filter((i) => i.isPaid).map((i) => i.id) : []),
@@ -322,6 +442,13 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     [raw, guestSessionId],
   );
   const paidSummaries = useMemo(() => mapPaidSummaries(raw), [raw]);
+
+  const yourDisplayName = useMemo(() => {
+    if (!raw || !guestSessionId) return "";
+    const g = raw.guests.find((guest) => guest.id === guestSessionId);
+    return g?.name?.trim() || g?.label || "";
+  }, [raw, guestSessionId]);
+
   const config: RestaurantConfig = useMemo(
     () => ({
       name: "Mesita Demo",
@@ -343,6 +470,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   return {
     state,
     guestSessionId,
+    yourDisplayName,
     loading,
     error,
     items,
@@ -355,6 +483,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     billId: "demo-bill",
     liveSession,
     resetDemo,
+    payDemo,
     retry: () => setJoinAttempt((n) => n + 1),
     resetSeq: raw?.resetSeq ?? 0,
     paidSummaries,

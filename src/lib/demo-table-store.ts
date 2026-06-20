@@ -44,8 +44,15 @@ export interface DemoPayment {
   createdAt: string;
 }
 
-/** Bump when default demo seed shape changes — stale Redis is reset on read. */
+/** Bump when default demo seed shape changes — migrated in-place, never wipes guests. */
 const DEMO_STATE_VERSION = 2;
+
+export class DemoGuestNotFoundError extends Error {
+  constructor(public readonly guestId: string) {
+    super(`Demo guest not found: ${guestId}`);
+    this.name = "DemoGuestNotFoundError";
+  }
+}
 
 export interface DemoTableState {
   token: string;
@@ -140,6 +147,20 @@ function touch(state: DemoTableState): DemoTableState {
   return state;
 }
 
+function requireGuest(state: DemoTableState, guestId: string): DemoGuest {
+  const guest = state.guests.find((candidate) => candidate.id === guestId);
+  if (!guest) throw new DemoGuestNotFoundError(guestId);
+  return guest;
+}
+
+/** In-place schema upgrade — preserves guests/claims (no surprise table wipe). */
+function migrateState(state: DemoTableState): DemoTableState {
+  if ((state.stateVersion ?? 1) >= DEMO_STATE_VERSION) return state;
+  state.stateVersion = DEMO_STATE_VERSION;
+  if (state.resetSeq == null) state.resetSeq = 0;
+  return touch(state);
+}
+
 async function loadState(token: string): Promise<DemoTableState | null> {
   const redis = getRedis();
   if (redis) {
@@ -163,11 +184,11 @@ async function saveState(token: string, state: DemoTableState): Promise<DemoTabl
 
 export async function getDemoTableState(token: string): Promise<DemoTableState> {
   const existing = await loadState(token);
-  if (existing && (existing.stateVersion ?? 1) >= DEMO_STATE_VERSION) {
-    return existing;
-  }
   if (existing) {
-    return resetDemoTableState(token);
+    if ((existing.stateVersion ?? 1) < DEMO_STATE_VERSION) {
+      return saveState(token, migrateState(existing));
+    }
+    return existing;
   }
   const created = createState(token);
   return saveState(token, created);
@@ -217,8 +238,7 @@ export async function renameDemoGuest(
   name: string,
 ): Promise<DemoTableState> {
   const state = await getDemoTableState(token);
-  const guest = state.guests.find((candidate) => candidate.id === guestId);
-  if (!guest) return state;
+  const guest = requireGuest(state, guestId);
   const cleaned = name.trim().slice(0, 10);
   guest.name = cleaned || guest.label;
   guest.updatedAt = nowIso();
@@ -231,8 +251,7 @@ export async function setDemoGuestStatus(
   status: DemoGuestStatus,
 ): Promise<DemoTableState> {
   const state = await getDemoTableState(token);
-  const guest = state.guests.find((candidate) => candidate.id === guestId);
-  if (!guest) return state;
+  const guest = requireGuest(state, guestId);
   guest.status = status;
   guest.updatedAt = nowIso();
   return saveState(token, touch(state));
@@ -244,15 +263,13 @@ export async function claimDemoItem(
   itemId: string,
 ): Promise<DemoTableState> {
   const state = await getDemoTableState(token);
+  const guest = requireGuest(state, guestId);
   if (state.paidItemIds.includes(itemId)) return state;
   const current = state.claims[itemId];
   if (current === guestId) delete state.claims[itemId];
   else state.claims[itemId] = guestId;
-  const guest = state.guests.find((candidate) => candidate.id === guestId);
-  if (guest) {
-    guest.status = "reviewing";
-    guest.updatedAt = nowIso();
-  }
+  guest.status = "reviewing";
+  guest.updatedAt = nowIso();
   return saveState(token, touch(state));
 }
 
@@ -262,6 +279,7 @@ export async function releaseDemoItem(
   itemId: string,
 ): Promise<DemoTableState> {
   const state = await getDemoTableState(token);
+  requireGuest(state, guestId);
   if (state.claims[itemId] === guestId) {
     delete state.claims[itemId];
   }
@@ -288,16 +306,26 @@ export async function recordDemoPayment(
     state.paidItemIds = Array.from(new Set([...state.paidItemIds, ...input.itemIds]));
   }
 
-  const guest = state.guests.find((candidate) => candidate.id === input.guestId);
-  if (guest) {
-    guest.name = input.guestName || guest.name;
-    guest.status = "paid";
-    guest.updatedAt = ts;
+  const guest = requireGuest(state, input.guestId);
+  const incoming = input.guestName?.trim();
+  if (incoming && incoming.toLowerCase() !== "invitado") {
+    guest.name = incoming;
   }
+  guest.status = "paid";
+  guest.updatedAt = ts;
 
-  if (input.mode === "equal" && state.guests.length > 0 && state.guests.every((g) => g.status === "paid")) {
+  if (
+    input.mode === "equal" &&
+    state.guests.length > 0 &&
+    state.guests.every((g) => g.status === "paid")
+  ) {
     state.paidItemIds = state.items.map((item) => item.id);
   }
 
   return saveState(token, touch(state));
+}
+
+/** Pure helper — only apply snapshots with strictly newer version counters. */
+export function shouldApplyDemoVersion(incoming: number, lastApplied: number | undefined): boolean {
+  return incoming > (lastApplied ?? 0);
 }
