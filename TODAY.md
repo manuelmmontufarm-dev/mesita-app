@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — UX: spinner en plato hasta sync confirmado + pendingClaims
+- **Qué:** `BillStage.tsx`, `BillItemRow`, `useDemoTableSession`, `demo-optimistic-merge.ts`, `customer.css`, `GuestBillFlow`, `GuestPayPage`.
+- **Por qué:** Al tocar un plato el check parpadeaba o desaparecía; el usuario quiere feedback claro (loading) hasta que el server confirme y los otros devices vean la selección.
+- **Qué hace:** Check/avatar solo con claims del server; mientras el POST está en vuelo → círculo spinner + "Guardando…"; si el server responde al instante no hay spinner; `pendingClaims` expuesto desde el hook.
+
 ### 2026-06-19 — Fix: reset demo borra claims; claims paralelos atómicos (CAS)
 - **Qué:** `demo-optimistic-merge.ts`, `demo-table-store.ts` (`mutateDemoState` CAS), `useDemoTableSession.ts`, `GuestBillFlow.tsx`, `demo-scenarios.ts` (esc. 16 + 21), tests merge + multi-user.
 - **Por qué:** Tras "Reiniciar demo" reaparecían platos seleccionados (pending ops + merge local); taps rápidos perdían claims (lost-update entre lambdas); 409 en claim hacía re-join con `clearStored` y rompía identidad.

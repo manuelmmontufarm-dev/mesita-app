@@ -195,6 +195,7 @@ function GuestPayShell({
       }
       onResetDemo={isDemo && "resetDemo" in live ? live.resetDemo : undefined}
       sessionClaims={live.claims}
+      pendingClaims={"pendingClaims" in live ? live.pendingClaims : undefined}
       paidSummaries={"paidSummaries" in live ? live.paidSummaries : undefined}
       demoTableProgress={demoProgress ?? undefined}
     />

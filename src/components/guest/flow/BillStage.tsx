@@ -50,7 +50,7 @@ import type {
   TableMember,
 } from "@/lib/guest-billing/types";
 import { expandRepeatedItems } from "@/lib/guest-billing/bill-display";
-import { mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
+import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
 
 import { AvatarStack, EqualShareVisual, Ic, LogoMark, NamePill } from "./_shared";
 
@@ -173,6 +173,7 @@ export function BillItemRow({
   mode,
   paid,
   displayClaims,
+  pendingClaims = {},
 }: {
   item: BillItem;
   flow: Flow;
@@ -180,15 +181,21 @@ export function BillItemRow({
   mode: "item" | "equal" | "todo";
   paid: boolean;
   displayClaims: Claims;
+  pendingClaims?: Readonly<Record<string, PendingClaimOp>>;
 }) {
   const { state, youId } = flow;
+  const pendingOp = pendingClaims[item.id];
   const yours = unitsOf(displayClaims, item.id, youId);
   const free = freeUnits(item, displayClaims);
   const claimants = claimantsOf(displayClaims, item.id, members);
-  const mine = yours > 0;
+  const serverMine = yours > 0;
+  const isLoading =
+    (pendingOp === "claim" && !serverMine) ||
+    (pendingOp === "release" && serverMine);
+  const mine = serverMine && !isLoading;
   const shared = claimants.length > 1;
-  const interactive = mode === "item" && !paid;
-  const myAmt = itemOwed(item, displayClaims, youId);
+  const interactive = mode === "item" && !paid && !isLoading;
+  const myAmt = itemOwed(displayClaims, item.id, youId);
 
   const displayIndex = item.displayIndex ?? null;
   const displayLabel = item.displayLabel ?? item.name;
@@ -196,7 +203,8 @@ export function BillItemRow({
   const cls =
     "c-item" +
     (interactive ? " tappable" : " passive") +
-    (mine && interactive ? " mine" : "") +
+    (mine && mode === "item" && !paid ? " mine" : "") +
+    (isLoading ? " syncing" : "") +
     (paid ? " paid" : "");
 
   return (
@@ -205,24 +213,32 @@ export function BillItemRow({
       onClick={interactive ? () => flow.toggleMine(item) : undefined}
       role={interactive ? "button" : undefined}
       aria-pressed={interactive ? mine : undefined}
+      aria-busy={isLoading || undefined}
       data-testid={`bill-item-${item.id}`}
+      data-syncing={isLoading ? "true" : undefined}
     >
       {/* Número siempre visible en círculo */}
       {displayIndex !== null ? (
         <span
           className={
             "c-tick" +
-            (paid ? " paid-tick on" : mine && interactive ? " on" : "")
+            (paid ? " paid-tick on" : isLoading ? " loading" : mine && mode === "item" ? " on" : "")
           }
           aria-label={
-            paid
-              ? `Ítem ${displayIndex} pagado`
-              : mine
-                ? `Ítem ${displayIndex} escogido`
-                : `Ítem ${displayIndex}`
+            isLoading
+              ? `Sincronizando ítem ${displayIndex}`
+              : paid
+                ? `Ítem ${displayIndex} pagado`
+                : mine
+                  ? `Ítem ${displayIndex} escogido`
+                  : `Ítem ${displayIndex}`
           }
         >
-          <span className="c-tick-num">{displayIndex}</span>
+          {isLoading ? (
+            <span className="c-tick-spinner" aria-hidden="true" />
+          ) : (
+            <span className="c-tick-num">{displayIndex}</span>
+          )}
         </span>
       ) : (
         paid ? (
@@ -230,8 +246,18 @@ export function BillItemRow({
             <span className="c-tick-num">✓</span>
           </span>
         ) : mode === "item" ? (
-          <span className={"c-tick" + (mine ? " on" : "")}>
-            <span className="c-tick-num">·</span>
+          <span
+            className={
+              "c-tick" +
+              (isLoading ? " loading" : mine ? " on" : "")
+            }
+            aria-busy={isLoading || undefined}
+          >
+            {isLoading ? (
+              <span className="c-tick-spinner" aria-hidden="true" />
+            ) : (
+              <span className="c-tick-num">{mine ? "✓" : "·"}</span>
+            )}
           </span>
         ) : (
           <span className="c-item-emoji">{item.emoji}</span>
@@ -256,7 +282,10 @@ export function BillItemRow({
             <span className="paid-tag">Pagado</span>
           ) : (
             <>
-              {mode === "item" && claimants.length > 0 && (
+              {mode === "item" && isLoading && (
+                <span className="sync-tag">Guardando…</span>
+              )}
+              {mode === "item" && !isLoading && claimants.length > 0 && (
                 <AvatarStack
                   ids={claimants}
                   roster={members}
@@ -443,8 +472,10 @@ export interface BillStageProps {
   members: readonly TableMember[];
   config: RestaurantConfig;
   shareEnabled?: boolean;
-  /** Authoritative claims from server — used for claimant pills under items. */
+  /** Authoritative claims from server — check + avatars only after sync. */
   sessionClaims?: Claims;
+  /** In-flight claim/release on this device — spinner until server confirms. */
+  pendingClaims?: Readonly<Record<string, PendingClaimOp>>;
 }
 
 export function BillStage({
@@ -454,16 +485,12 @@ export function BillStage({
   config,
   shareEnabled = true,
   sessionClaims,
+  pendingClaims = {},
 }: BillStageProps) {
   const { state, derived } = flow;
   const { mode, tip, people, paidItemIds, claims: localClaims } = state;
-  const displayClaims = useMemo(
-    () =>
-      sessionClaims
-        ? mergeClaimsPreserveLocal(sessionClaims, localClaims, flow.youId)
-        : localClaims,
-    [sessionClaims, localClaims, flow.youId],
-  );
+  /** Server is source of truth for item selection UI (no optimistic check flicker). */
+  const displayClaims = sessionClaims ?? localClaims;
 
   const [otherTip, setOtherTip] = useState(false);
   // Monto en USD que el usuario teclea en "Otro" — persiste aunque el parent
@@ -696,6 +723,7 @@ export function BillStage({
               mode={mode}
               paid={isItemPaid(paidItemIds, it.id)}
               displayClaims={displayClaims}
+              pendingClaims={pendingClaims}
             />
           ))}
         </div>

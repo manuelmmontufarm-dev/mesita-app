@@ -215,6 +215,15 @@
 .c-tick.on .c-tick-num,.c-tick.paid-tick.on .c-tick-num { color:#fff; }
 .c-tick.on { background:var(--accent); border-color:var(--accent); box-shadow:0 4px 12px -4px rgba(47,179,126,.6); }
 .c-tick.paid-tick.on { background:var(--ok); border-color:var(--ok); box-shadow:0 4px 12px -4px rgba(30,158,99,.45); }
+.c-tick.loading { background:#fff; border-color:var(--c-sep); box-shadow:none; }
+.c-tick-spinner {
+  width:14px; height:14px; flex:0 0 auto;
+  border:2px solid rgba(47,179,126,.22); border-top-color:var(--accent);
+  border-radius:50%; animation:c-tick-spin .65s linear infinite;
+}
+@keyframes c-tick-spin { to { transform:rotate(360deg); } }
+.c-item.syncing { opacity:.92; pointer-events:none; }
+.sync-tag { font-size:12px; font-weight:600; color:var(--c-ink-2); letter-spacing:.01em; }
 
 /* compact list row (iguales / por monto) */
 .c-bl-list { border-radius:22px; overflow:hidden; }
