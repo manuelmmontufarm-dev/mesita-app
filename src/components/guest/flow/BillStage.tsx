@@ -84,11 +84,14 @@ function NameField({
   invalid,
   onChange,
   youHue,
+  fallbackLabel,
 }: {
   value: string;
   invalid: boolean;
   onChange: (next: string) => void;
   youHue: number;
+  /** Shown in the avatar pill when the input is empty — e.g. "Persona 1". */
+  fallbackLabel?: string;
 }) {
   const [ph, setPh] = useState(NAME_PLACEHOLDERS[0]);
   const [focused, setFocused] = useState(false);
@@ -132,6 +135,12 @@ function NameField({
               hue: youHue,
               isYou: true,
             }}
+            size={40}
+          />
+        ) : fallbackLabel ? (
+          <NamePill
+            label={fallbackLabel}
+            member={{ hue: youHue, isYou: true }}
             size={40}
           />
         ) : null}
@@ -558,6 +567,7 @@ export function BillStage({
           invalid={state.nameErr}
           onChange={(v) => flow.setName(v)}
           youHue={youMember.hue}
+          fallbackLabel={youMember.seatLabel ?? undefined}
         />
       </div>
 

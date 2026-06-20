@@ -66,6 +66,8 @@ export interface PaidPayload {
   selectedItemIds?: string[];
   equalSplitPeople?: number;
   voluntaryTipAmount?: number;
+  /** Live form-state name (what the user just typed) — source of truth for pay POST. */
+  typedName?: string;
 }
 
 export interface ReceiptLineItem {
@@ -554,6 +556,7 @@ export function useGuestPaymentFlow(opts: UseGuestPaymentFlowOptions) {
         selectedItemIds,
         equalSplitPeople: state.people,
         voluntaryTipAmount: derived.totals.propina,
+        typedName: state.name.trim() || undefined,
       };
       if (opts.onPaid) {
         await opts.onPaid(enriched);

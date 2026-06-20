@@ -390,7 +390,13 @@ export async function recordDemoPayment(
   const guest = requireGuest(state, input.guestId);
   const incoming = input.guestName?.trim();
   if (incoming && incoming.toLowerCase() !== "invitado") {
-    guest.name = incoming;
+    // Guardrail: don't clobber a real typed name with an auto "Persona N" label.
+    // (Belt-and-suspenders for the legacy code path; clients now send typedName.)
+    const incomingIsAutoLabel = personNumberFromLabel(incoming) != null;
+    const existingIsAutoLabel = personNumberFromLabel(guest.name) != null;
+    if (!incomingIsAutoLabel || existingIsAutoLabel) {
+      guest.name = incoming;
+    }
   }
   guest.status = "paid";
   guest.updatedAt = ts;

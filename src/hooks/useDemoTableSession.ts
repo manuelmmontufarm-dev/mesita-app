@@ -59,6 +59,8 @@ export interface UseDemoTableSessionResult {
   resetDemo: () => Promise<void>;
   payDemo: (body: {
     guestName: string;
+    /** Live form-state typed name — wins over server-derived guestName when set. */
+    typedName?: string;
     mode: "item" | "equal" | "todo";
     amount: number;
     subtotal: number;
@@ -275,10 +277,14 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   const [joinAttempt, setJoinAttempt] = useState(0);
   const [sseConnected, setSseConnected] = useState(false);
   const renameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Last typed name not yet POSTed (paired with renameTimer). */
+  const pendingRename = useRef<string | null>(null);
   const lastVersion = useRef<number | undefined>(undefined);
   const lastResetSeq = useRef<number | undefined>(undefined);
   const guestSessionIdRef = useRef<string | null>(null);
   const rejoining = useRef(false);
+  /** True while a pay POST is in flight — blocks the silent heal re-join. */
+  const paying = useRef(false);
   const joinTableRef = useRef<
     | ((opts?: { guestId?: string; clearStored?: boolean }) => Promise<string | null>)
     | null
@@ -348,12 +354,15 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
 
       // Lost-update heal: entered + has guestId + no reset + guest NOT in roster → silent re-join.
       // deviceId on server makes this idempotent (same Persona N reused).
+      // Blocked while paying/joining to prevent a transient snapshot mid-pay
+      // from triggering a spurious "ghost" re-join that surfaces as a new Persona.
       if (
         readStoredEntered(token) &&
         gid &&
         demo.resetSeq === (prevReset ?? demo.resetSeq) &&
         !demo.guests.some((g) => g.id === gid) &&
-        !rejoining.current
+        !rejoining.current &&
+        !paying.current
       ) {
         demoDebug("rejoin", "ghost detected — silent re-join via deviceId");
         void joinTableRef.current?.().catch(() => {
@@ -574,6 +583,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     (name: string) => {
       if (!guestSessionId) return;
       const trimmed = name.trim().slice(0, NAME_PILL_MAX);
+      pendingRename.current = trimmed;
       setRaw((prev) => {
         if (!prev) return prev;
         return {
@@ -594,13 +604,32 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       });
       if (renameTimer.current) clearTimeout(renameTimer.current);
       renameTimer.current = setTimeout(() => {
-        void postAction({ action: "rename", guestId: guestSessionId, name: trimmed }).catch(
+        const toSend = pendingRename.current;
+        if (toSend == null) return;
+        pendingRename.current = null;
+        void postAction({ action: "rename", guestId: guestSessionId, name: toSend }).catch(
           console.error,
         );
       }, 150);
     },
     [guestSessionId, postAction],
   );
+
+  /** Force-send any pending rename synchronously before a critical action (pay). */
+  const flushRename = useCallback(async () => {
+    if (renameTimer.current) {
+      clearTimeout(renameTimer.current);
+      renameTimer.current = null;
+    }
+    const toSend = pendingRename.current;
+    if (toSend == null || !guestSessionId) return;
+    pendingRename.current = null;
+    try {
+      await postAction({ action: "rename", guestId: guestSessionId, name: toSend });
+    } catch (err) {
+      console.error(err);
+    }
+  }, [guestSessionId, postAction]);
 
   const onClaim = useCallback(
     (billItemId: string, _units: number) => {
@@ -655,6 +684,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   const payDemo = useCallback(
     async (body: {
       guestName: string;
+      typedName?: string;
       mode: "item" | "equal" | "todo";
       amount: number;
       subtotal: number;
@@ -666,9 +696,25 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       method: string;
     }) => {
       if (!guestSessionId) return;
-      await postAction({ action: "pay", guestId: guestSessionId, ...body });
+      // Flush any pending rename FIRST so the server has the typed name before pay.
+      await flushRename();
+      // Form-state name wins over server-derived guestName (which can lag mid-typing).
+      const typed = body.typedName?.trim();
+      const resolvedName = typed && typed.length > 0 ? typed : body.guestName;
+      paying.current = true;
+      try {
+        const { typedName: _typed, ...rest } = body;
+        await postAction({
+          action: "pay",
+          guestId: guestSessionId,
+          ...rest,
+          guestName: resolvedName,
+        });
+      } finally {
+        paying.current = false;
+      }
     },
-    [guestSessionId, postAction],
+    [guestSessionId, postAction, flushRename],
   );
 
   const claims = useMemo(() => (state ? mapClaimsFromDemo(state) : {}), [state]);

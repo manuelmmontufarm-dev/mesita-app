@@ -92,6 +92,8 @@ function GuestPayShell({
         guestLabel(live.members.length || 1);
       await live.payDemo({
         guestName: displayName,
+        // Form-state name wins over server-derived guestName — see Fix C.
+        typedName: payload.typedName,
         mode: mapSplitModeToDemo(payload.splitMode),
         amount: payload.amount,
         subtotal,

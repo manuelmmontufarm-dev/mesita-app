@@ -31,7 +31,7 @@ import {
 } from "@/hooks/useGuestPaymentFlow";
 import type { LiveSessionActions } from "@/hooks/useLiveTableSession";
 import { fmt } from "@/lib/guest-billing";
-import { freeUnits, isTableFullyPaid, unitsOf } from "@/lib/guest-billing/split-math";
+import { freeUnits, isTableFullyPaid, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
 import type {
   BillItem,
   Claims,
@@ -202,7 +202,14 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     flow.reset({
       ...init,
       initialStage: "bill",
-      initialName: youMember?.name?.trim() || flow.state.name.trim() || undefined,
+      initialName:
+        (() => {
+          const fromMember = youMember?.name?.trim();
+          if (fromMember && personNumberFromLabel(fromMember) == null) return fromMember;
+          const fromFlow = flow.state.name.trim();
+          if (fromFlow && personNumberFromLabel(fromFlow) == null) return fromFlow;
+          return undefined;
+        })(),
       initialClaims: serverSync.claims,
       initialPaidItemIds: serverSync.paidItemIds,
       initialPaidIds: serverSync.paidIds,
@@ -228,8 +235,14 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
   useEffect(() => {
     if (seededName.current || !youMember?.name.trim()) return;
     if (!flow.state.name.trim()) {
-      flow.setName(youMember.name);
-      seededName.current = true;
+      // Skip auto-seed when the server name is just a "Persona N" auto-label —
+      // we want the input EMPTY so the placeholder ("Ej: Juanito…") signals that
+      // the field is editable. The avatar pill shows the Persona N as fallback.
+      const isAutoLabel = personNumberFromLabel(youMember.name) != null;
+      if (!isAutoLabel) {
+        flow.setName(youMember.name);
+        seededName.current = true;
+      }
     }
   }, [youMember?.name, flow.state.name, flow]);
 

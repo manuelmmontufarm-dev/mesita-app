@@ -3140,12 +3140,12 @@ html.has-receipt-peek .ws-wait-foot {
   max-width: 280px;
 }
 
-/* Playful payer badges */
+/* Chill single badge per payer — compact, low-saturation. */
 .ws-your-badges,
 .ws-mesa-badges {
-  border-radius: 22px;
-  padding: 14px 16px;
-  margin-top: 12px;
+  border-radius: 18px;
+  padding: 10px 12px;
+  margin-top: 8px;
 }
 .ws-payer-badge-row {
   display: flex;
@@ -3180,17 +3180,17 @@ html.has-receipt-peek .ws-wait-foot {
 .ws-payer-badge-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, rgba(26, 158, 98, 0.12), rgba(47, 179, 126, 0.06));
-  border: 1px solid rgba(26, 158, 98, 0.2);
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(26, 158, 98, 0.06), rgba(47, 179, 126, 0.03));
+  border: 1px solid rgba(26, 158, 98, 0.14);
 }
 .ws-payer-badge-card-featured {
-  box-shadow: 0 8px 24px rgba(26, 158, 98, 0.12);
+  /* low-key — no shadow, no compete with primary CTAs */
 }
 .ws-payer-badge-card-emoji {
-  font-size: 32px;
+  font-size: 24px;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -3213,9 +3213,11 @@ html.has-receipt-peek .ws-wait-foot {
 }
 .ws-mesa-badge-row {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 0;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
   border-top: 1px solid var(--c-sep);
 }
 .ws-mesa-badge-row:first-of-type {

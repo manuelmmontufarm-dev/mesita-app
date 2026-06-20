@@ -115,18 +115,11 @@ function PayerBadgeCard({ badge, featured }: { badge: PayerBadge; featured?: boo
 function YourBadgesSection({ badges }: { badges: readonly PayerBadge[] }) {
   if (!badges.length) return null;
   const primary = badges[0];
-  const rest = badges.slice(1);
+  if (!primary) return null;
   return (
     <div className="ws-your-badges surfx" data-testid="ws-your-badges">
-      <div className="ws-paid-sofar-title">Tu medalla</div>
-      {primary ? <PayerBadgeCard badge={primary} featured /> : null}
-      {rest.length > 0 && (
-        <div className="ws-payer-badge-row">
-          {rest.map((b) => (
-            <PayerBadgeChip key={b.id} badge={b} />
-          ))}
-        </div>
-      )}
+      <div className="ws-paid-sofar-title">Tu paso por la mesa</div>
+      <PayerBadgeCard badge={primary} featured />
     </div>
   );
 }
@@ -140,16 +133,16 @@ function MesaBadgesSection({
   return (
     <div className="ws-mesa-badges surfx" data-testid="ws-mesa-badges">
       <div className="ws-paid-sofar-title">Medallas de la mesa 🏆</div>
-      {awards.map((row) => (
-        <div key={row.guestId} className="ws-mesa-badge-row">
-          <span className="ws-mesa-badge-name">{row.guestName}</span>
-          <div className="ws-payer-badge-row">
-            {row.badges.map((b) => (
-              <PayerBadgeChip key={b.id} badge={b} />
-            ))}
+      {awards.map((row) => {
+        const top = row.badges[0];
+        if (!top) return null;
+        return (
+          <div key={row.guestId} className="ws-mesa-badge-row">
+            <span className="ws-mesa-badge-name">{row.guestName}</span>
+            <PayerBadgeChip badge={top} />
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -231,13 +224,11 @@ function MesaProgressRing({
             <div key={member.id} className="ws-paid-sofar-row">
               <div className="ws-paid-sofar-left">
                 <NamePill member={member} size={34} />
-                {badges.length > 0 && (
+                {badges[0] ? (
                   <div className="ws-payer-badge-row ws-payer-badge-row-inline">
-                    {badges.slice(0, 2).map((b) => (
-                      <PayerBadgeChip key={b.id} badge={b} />
-                    ))}
+                    <PayerBadgeChip badge={badges[0]} />
                   </div>
-                )}
+                ) : null}
               </div>
               <span className="ws-paid-sofar-amt">{amount}</span>
             </div>
