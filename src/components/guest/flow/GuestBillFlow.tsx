@@ -34,7 +34,7 @@ import { fmt } from "@/lib/guest-billing";
 import { computeBillShellScrollMetrics } from "@/lib/guest-billing/bill-shell-scroll";
 import { mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
 import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
-import { freeUnits, isTableFullyPaid, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
+import { freeUnits, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
 import type {
   BillItem,
   Claims,
@@ -241,9 +241,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
 
   useEffect(() => {
     if (!serverSync || items.length === 0) return;
-    const tableClosed =
-      serverSync.tableClosed === true ||
-      isTableFullyPaid(items, serverSync.paidItemIds);
+    const tableClosed = serverSync.tableClosed === true;
     if (!tableClosed) return;
     const { stage } = flow.state;
     // Solo avanzar a éxito desde waiting — no saltar confirm/pago ni cerrar mesa parcial.

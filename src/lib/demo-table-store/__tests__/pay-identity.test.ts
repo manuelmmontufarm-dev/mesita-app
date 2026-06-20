@@ -86,17 +86,17 @@ describe("recordDemoPayment — name preservation guardrail", () => {
     expect(updated?.name).toBe("Persona 1");
   });
 
-  it("marks the guest as paid after pay regardless of name fields", async () => {
+  it("marks the guest as paid after todo closes the table", async () => {
     const { guest } = await joinDemoTable(TOKEN, { deviceId: "d-pay-4" });
     await renameDemoGuest(TOKEN, guest.id, "Ale");
     await recordDemoPayment(TOKEN, {
       guestId: guest.id,
       guestName: "Ale",
       mode: "todo",
-      amount: 12,
-      subtotal: 10,
-      iva: 1.5,
-      service: 0.5,
+      amount: 50,
+      subtotal: 33.4,
+      iva: 5,
+      service: 3.3,
       tip: 0,
       itemIds: [],
       method: "demo",

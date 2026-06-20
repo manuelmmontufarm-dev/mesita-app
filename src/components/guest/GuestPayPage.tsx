@@ -88,7 +88,6 @@ function GuestPayShell({
   const onPaid = async (payload: PaidPayload) => {
     if (isDemo && "payDemo" in live) {
       if (!live.guestSessionId) return;
-      const subtotal = payload.amount / 1.25;
       const you = live.members.find((m) => m.isYou);
       const displayName =
         live.yourDisplayName.trim() ||
@@ -102,11 +101,12 @@ function GuestPayShell({
         typedName: payload.typedName,
         mode: mapSplitModeToDemo(payload.splitMode),
         amount: payload.amount,
-        subtotal,
-        iva: subtotal * 0.15,
-        service: subtotal * 0.1,
+        subtotal: payload.foodSubtotal ?? payload.amount / 1.25,
+        iva: (payload.foodSubtotal ?? payload.amount / 1.25) * 0.15,
+        service: (payload.foodSubtotal ?? payload.amount / 1.25) * 0.1,
         tip: payload.voluntaryTipAmount ?? 0,
         itemIds: payload.selectedItemIds ?? [],
+        itemUnits: payload.itemUnits,
         equalPeople: payload.equalSplitPeople,
         method: "Tarjeta demo",
       });

@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-20 — Fix: pagos parciales (½ plato, ¼ mesa) no cierran la mesa
+- **Qué:** `useGuestPaymentFlow.ts`, `demo-table-store.ts`, `GuestPayPage.tsx`, `WaitingSuccessStage.tsx`, `GuestBillFlow.tsx`, `customer.css`, tests/scenarios.
+- **Por qué:** Pagar ½ plato marcaba el ítem entero como pagado y saltaba a éxito; modo equal solo cerraba por headcount; subtotal demo mal calculado (`amount/1.25`).
+- **Qué hace:** Solo marca ítem pagado si cubres el qty completo; pagos parciales restan vía receipts/`itemPaidUnits`; guest queda `reviewing` hasta cerrar mesa; botón Ver mesa en pill; fase success solo si `tableClosed`.
+
 ### 2026-06-20 — Polish guest UX: widget MA+name, propina, % real, medallas al final, recall tarjeta
 - **Qué:** `BillStage.tsx`, `WaitingSuccessStage.tsx`, `ConfirmStage.tsx`, `GuestBillFlow.tsx`, `PaymentStage.tsx`, `demo-table-progress.ts`, `payment-form-storage.ts`, `customer.css`, tests, tip presets en hooks demo/live.
 - **Por qué:** Nombre duplicado en Lo mío; propina "Sin" no deseada; % pagado inflado por headcount; medallas antes de cerrar mesa; keys duplicadas en resumen; tarjeta/factura no se recordaban al volver a pagar; espaciado dock; Reiniciar visible al scrollear.

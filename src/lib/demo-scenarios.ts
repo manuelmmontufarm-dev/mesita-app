@@ -340,8 +340,8 @@ export const SCENARIOS: Scenario[] = [
       expectTrue(!state.paidItemIds.includes("ceviche"), "ceviche NOT paid");
       expectEq(
         state.guests.find((g) => g.id === a.guestId)?.status,
-        "paid",
-        "a marked paid",
+        "reviewing",
+        "a stays reviewing until table closes",
       );
     },
   },
@@ -463,8 +463,8 @@ export const SCENARIOS: Scenario[] = [
       expectEq(state.paidItemIds.length, 0, "no items paid");
       expectEq(
         state.guests.find((g) => g.id === a.guestId)?.status,
-        "paid",
-        "guest marked paid",
+        "reviewing",
+        "guest stays reviewing on partial payment",
       );
     },
   },

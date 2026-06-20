@@ -50,6 +50,8 @@ export interface DemoPayment {
   service: number;
   tip: number;
   itemIds: string[];
+  /** Units settled per item in this payment (BY_ITEM partial shares). */
+  itemUnits?: Record<string, number>;
   equalPeople?: number;
   method: string;
   ref: string;
@@ -57,7 +59,7 @@ export interface DemoPayment {
 }
 
 /** Bump when default demo seed shape changes — migrated in-place, never wipes guests. */
-const DEMO_STATE_VERSION = 4;
+const DEMO_STATE_VERSION = 5;
 
 export class DemoGuestNotFoundError extends Error {
   constructor(public readonly guestId: string) {
@@ -84,6 +86,8 @@ export interface DemoTableState {
   guests: DemoGuest[];
   claims: Record<string, string>;
   paidItemIds: string[];
+  /** Cumulative units paid toward each item (supports partial BY_ITEM). */
+  itemPaidUnits: Record<string, number>;
   payments: DemoPayment[];
   nextGuestNumber: number;
   resetSeq: number;
@@ -144,6 +148,7 @@ function createState(token: string): DemoTableState {
     guests: [],
     claims: {},
     paidItemIds: [],
+    itemPaidUnits: {},
     payments: [],
     nextGuestNumber: 1,
     stateVersion: DEMO_STATE_VERSION,
@@ -183,6 +188,8 @@ function migrateState(state: DemoTableState): DemoTableState {
   }
 
   scrubOrphanClaims(state);
+
+  if (!state.itemPaidUnits) state.itemPaidUnits = {};
 
   state.stateVersion = DEMO_STATE_VERSION;
   return touch(state);
@@ -290,6 +297,7 @@ async function mutateDemoState(
         guests: state.guests.map((g) => ({ ...g })),
         items: [...state.items],
         paidItemIds: [...state.paidItemIds],
+        itemPaidUnits: { ...state.itemPaidUnits },
         payments: [...state.payments],
       };
       mutator(draft);
@@ -468,10 +476,44 @@ export async function recordDemoPayment(
     };
     draft.payments.unshift(payment);
 
+    if (!draft.itemPaidUnits) draft.itemPaidUnits = {};
+
+    const billSub = draft.items.reduce((s, it) => s + it.qty * it.unitPrice, 0);
+    const paymentsSub = draft.payments.reduce((s, p) => s + p.subtotal, 0);
+
     if (input.mode === "todo") {
       draft.paidItemIds = draft.items.map((item) => item.id);
+      for (const item of draft.items) {
+        draft.itemPaidUnits[item.id] = item.qty;
+      }
     } else if (input.mode === "item") {
-      draft.paidItemIds = Array.from(new Set([...draft.paidItemIds, ...input.itemIds]));
+      const unitsMap = input.itemUnits ?? {};
+      for (const itemId of input.itemIds) {
+        const item = draft.items.find((candidate) => candidate.id === itemId);
+        if (!item) continue;
+        const units = unitsMap[itemId] ?? item.qty;
+        draft.itemPaidUnits[itemId] =
+          Math.round(((draft.itemPaidUnits[itemId] ?? 0) + units) * 100) / 100;
+        if (draft.itemPaidUnits[itemId] >= item.qty - 0.001) {
+          draft.paidItemIds = Array.from(new Set([...draft.paidItemIds, itemId]));
+        }
+      }
+      for (const [itemId, units] of Object.entries(unitsMap)) {
+        if (input.itemIds.includes(itemId)) continue;
+        const item = draft.items.find((candidate) => candidate.id === itemId);
+        if (!item) continue;
+        draft.itemPaidUnits[itemId] =
+          Math.round(((draft.itemPaidUnits[itemId] ?? 0) + units) * 100) / 100;
+        if (draft.itemPaidUnits[itemId] >= item.qty - 0.001) {
+          draft.paidItemIds = Array.from(new Set([...draft.paidItemIds, itemId]));
+        }
+      }
+    } else if (input.mode === "equal") {
+      const equalPeople = input.equalPeople ?? 2;
+      const equalSharesPaid = draft.payments.filter((p) => p.mode === "equal").length;
+      if (equalSharesPaid >= equalPeople || paymentsSub >= billSub - 0.02) {
+        draft.paidItemIds = draft.items.map((item) => item.id);
+      }
     }
 
     const guest = requireGuest(draft, input.guestId);
@@ -483,16 +525,12 @@ export async function recordDemoPayment(
         guest.name = incoming;
       }
     }
-    guest.status = "paid";
-    guest.updatedAt = ts;
 
-    if (
-      input.mode === "equal" &&
-      draft.guests.length > 0 &&
-      draft.guests.every((g) => g.status === "paid")
-    ) {
-      draft.paidItemIds = draft.items.map((item) => item.id);
-    }
+    const tableClosed =
+      draft.items.every((it) => draft.paidItemIds.includes(it.id)) ||
+      paymentsSub >= billSub - 0.02;
+    guest.status = tableClosed ? "paid" : "reviewing";
+    guest.updatedAt = ts;
   });
 }
 

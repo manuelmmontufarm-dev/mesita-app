@@ -80,6 +80,7 @@ export interface UseDemoTableSessionResult {
     service: number;
     tip: number;
     itemIds: string[];
+    itemUnits?: Record<string, number>;
     equalPeople?: number;
     method: string;
   }) => Promise<void>;
@@ -778,6 +779,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       service: number;
       tip: number;
       itemIds: string[];
+      itemUnits?: Record<string, number>;
       equalPeople?: number;
       method: string;
     }) => {

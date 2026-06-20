@@ -141,6 +141,7 @@ function MesaProgressRing({
   totalCount,
   paidRows,
   showBadges = false,
+  tableOpen = true,
 }: {
   paidPct: number;
   remainingAmt: string;
@@ -148,6 +149,7 @@ function MesaProgressRing({
   totalCount: number;
   paidRows: Array<{ member: TableMember; amount: string; badges: PayerBadge[]; key: string }>;
   showBadges?: boolean;
+  tableOpen?: boolean;
 }) {
   const r = 52;
   const c = 2 * Math.PI * r;
@@ -186,7 +188,11 @@ function MesaProgressRing({
           <span className="dot" /> En vivo
         </span>
         <span className="ws-mesa-ring-count">
-          {paidCount} de {totalCount} pagaron
+          {tableOpen
+            ? paidCount === 1
+              ? "1 pago en la mesa"
+              : `${paidCount} pagos en la mesa`
+            : `${paidCount} de ${Math.max(totalCount, paidCount)} pagaron`}
         </span>
       </div>
 
@@ -275,8 +281,11 @@ export function WaitingSuccessStage({
 
   /* ── phase derivation ─────────────────────────────────────────────────── */
 
-  const phase: "waiting" | "success" =
-    demoTableProgress?.tableClosed || derived.remainingSub <= 0.01
+  const phase: "waiting" | "success" = demoTableProgress
+    ? demoTableProgress.tableClosed
+      ? "success"
+      : "waiting"
+    : derived.remainingSub <= 0.01
       ? "success"
       : "waiting";
 
@@ -629,6 +638,7 @@ export function WaitingSuccessStage({
         totalCount={totalGuestCount}
         paidRows={paidRows}
         showBadges={false}
+        tableOpen={!demoTableProgress?.tableClosed}
       />
 
       {pendingMembers.length > 0 && (
@@ -749,7 +759,7 @@ export function WaitingSuccessStage({
           <div className="flow-foot ws-wait-foot">
             <button
               type="button"
-              className="flow-secondary solid"
+              className="flow-secondary ws-back-mesa-btn"
               onClick={() => flow.goToBill()}
               data-testid="waiting-back-btn"
             >

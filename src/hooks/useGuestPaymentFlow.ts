@@ -68,6 +68,10 @@ export interface PaidPayload {
   voluntaryTipAmount?: number;
   /** Live form-state name (what the user just typed) — source of truth for pay POST. */
   typedName?: string;
+  /** Food subtotal for this payment (excludes IVA/servicio/propina). */
+  foodSubtotal?: number;
+  /** Item → units settled in this payment (BY_ITEM partial shares). */
+  itemUnits?: Record<string, number>;
 }
 
 export interface ReceiptLineItem {
@@ -172,7 +176,7 @@ export type FlowAction =
   | { type: "stage/goWaiting" }
   | { type: "stage/goSuccess" }
   | { type: "payment/cacheMethod"; method: PaymentMethod; eInvoice: EInvoicePayload | null }
-  | { type: "payment/complete"; receipt: Receipt; markedItems: ItemId[]; youId: MemberId }
+  | { type: "payment/complete"; receipt: Receipt; markedItems: ItemId[]; partialItemIds: ItemId[]; youId: MemberId }
   | {
       type: "sync/fromServer";
       claims: Claims;
@@ -266,12 +270,20 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
       const paidItemIds = Array.from(
         new Set([...state.paidItemIds, ...action.markedItems]),
       );
+      const nextClaims = { ...state.claims };
+      for (const itemId of action.partialItemIds) {
+        const itemMap = { ...(nextClaims[itemId] || {}) };
+        delete itemMap[action.youId];
+        if (Object.keys(itemMap).length === 0) delete nextClaims[itemId];
+        else nextClaims[itemId] = itemMap;
+      }
       return {
         ...state,
         stage: "waiting",
         receipts: [...state.receipts, action.receipt],
         paidIds,
         paidItemIds,
+        claims: nextClaims,
       };
     }
 
@@ -324,8 +336,12 @@ export function deriveTotals(
   youId: MemberId,
 ): DerivedTotals {
   const fullSub = billSubtotal(items);
-  const paidSub = paidSubtotal(items, state.paidItemIds);
-  const remainingSub = Math.max(0, fullSub - paidSub);
+  const paidFromItems = paidSubtotal(items, state.paidItemIds);
+  const paidFromReceipts = round2(
+    state.receipts.reduce((s, r) => s + r.subtotal, 0),
+  );
+  const effectivePaidSub = Math.max(paidFromItems, paidFromReceipts);
+  const remainingSub = Math.max(0, fullSub - effectivePaidSub);
   const paidPeople = state.paidIds.length;
   const remainingPeople = Math.max(1, state.people - paidPeople);
   const myUnpaidSub = items.reduce(
@@ -342,7 +358,7 @@ export function deriveTotals(
   const totals = computeTotals(subtotal, config, state.tip);
   return {
     fullSub,
-    paidSub,
+    paidSub: effectivePaidSub,
     remainingSub,
     paidPeople,
     remainingPeople,
@@ -447,13 +463,50 @@ export function itemsToMarkPaid(
   items: readonly BillItem[],
   youId: MemberId,
 ): ItemId[] {
-  if (state.mode === "todo") return items.map((it) => it.id);
+  if (state.mode === "todo") {
+    return items
+      .filter((it) => !state.paidItemIds.includes(it.id))
+      .map((it) => it.id);
+  }
   if (state.mode === "item") {
     return items
-      .filter((it) => unitsOf(state.claims, it.id, youId) > 0)
+      .filter((it) => {
+        if (state.paidItemIds.includes(it.id)) return false;
+        const yours = unitsOf(state.claims, it.id, youId);
+        return yours >= it.qty - 0.001;
+      })
       .map((it) => it.id);
   }
   return [];
+}
+
+export function itemsPartiallyPaid(
+  state: FlowState,
+  items: readonly BillItem[],
+  youId: MemberId,
+): ItemId[] {
+  if (state.mode !== "item") return [];
+  const marked = new Set(itemsToMarkPaid(state, items, youId));
+  return items
+    .filter((it) => {
+      const yours = unitsOf(state.claims, it.id, youId);
+      return yours > 0.001 && !marked.has(it.id);
+    })
+    .map((it) => it.id);
+}
+
+export function itemUnitsForPayment(
+  state: FlowState,
+  items: readonly BillItem[],
+  youId: MemberId,
+): Record<string, number> {
+  if (state.mode !== "item") return {};
+  const units: Record<string, number> = {};
+  for (const it of items) {
+    const yours = unitsOf(state.claims, it.id, youId);
+    if (yours > 0.001) units[it.id] = yours;
+  }
+  return units;
 }
 
 export function latestReceipt(state: FlowState): Receipt | null {
@@ -542,21 +595,24 @@ export function useGuestPaymentFlow(opts: UseGuestPaymentFlowOptions) {
           : state.mode === "equal"
             ? "EQUAL"
             : "FULL";
-      const selectedItemIds =
-        state.mode === "item"
-          ? itemsToMarkPaid(state, opts.items, youId)
-          : state.mode === "todo"
-            ? opts.items
-                .filter((it) => !state.paidItemIds.includes(it.id))
-                .map((it) => it.id)
-            : undefined;
+      const selectedItemIds = itemsToMarkPaid(state, opts.items, youId);
+      const itemUnits = itemUnitsForPayment(state, opts.items, youId);
       const enriched: PaidPayload = {
         ...payload,
         splitMode,
-        selectedItemIds,
+        selectedItemIds:
+          state.mode === "item"
+            ? selectedItemIds
+            : state.mode === "todo"
+              ? opts.items
+                  .filter((it) => !state.paidItemIds.includes(it.id))
+                  .map((it) => it.id)
+              : undefined,
+        itemUnits,
         equalSplitPeople: state.people,
         voluntaryTipAmount: derived.totals.propina,
         typedName: state.name.trim() || undefined,
+        foodSubtotal: derived.subtotal,
       };
       if (opts.onPaid) {
         await opts.onPaid(enriched);
@@ -573,7 +629,14 @@ export function useGuestPaymentFlow(opts: UseGuestPaymentFlowOptions) {
         now,
       });
       const markedItems = itemsToMarkPaid(state, opts.items, youId);
-      dispatch({ type: "payment/complete", receipt, markedItems, youId });
+      const partialItemIds = itemsPartiallyPaid(state, opts.items, youId);
+      dispatch({
+        type: "payment/complete",
+        receipt,
+        markedItems,
+        partialItemIds,
+        youId,
+      });
     },
     [state, opts.items, opts.config.ivaRate, opts.onPaid, opts.now, derived.totals, youId],
   );

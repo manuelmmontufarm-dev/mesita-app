@@ -199,6 +199,7 @@ describe("flowReducer — payment/complete", () => {
       type: "payment/complete",
       receipt,
       markedItems: ["sec", "loc"],
+      partialItemIds: [],
       youId: "you",
     });
     expect(s.stage).toBe("waiting");
@@ -210,6 +211,7 @@ describe("flowReducer — payment/complete", () => {
       type: "payment/complete",
       receipt,
       markedItems: ["cev"],
+      partialItemIds: [],
       youId: "you",
     });
     expect(again.paidIds).toEqual(["ana", "you"]);
@@ -274,6 +276,34 @@ describe("deriveTotals", () => {
     expect(d.isLastPayer).toBe(true);
   });
 
+  it("remainingSub accounts for receipt subtotals on partial payments", () => {
+    const receipt = {
+      name: "Tú",
+      amount: 8.4,
+      subtotal: 4.5,
+      iva: 0.68,
+      propina: 0.68,
+      servicio: 0.45,
+      ivaRate: 0.15,
+      mode: "item" as const,
+      items: [{ name: "Locro", emoji: "🥣", amt: 4.5 }],
+      how: "½ plato",
+      method: "card" as const,
+      methodLabel: "Tarjeta",
+      eInvoice: null,
+      ref: "MQR-1",
+      date: "2026-06-14",
+    };
+    const d = deriveTotals(
+      withState({ mode: "item", receipts: [receipt] }),
+      items,
+      config,
+      "you",
+    );
+    expect(d.remainingSub).toBeCloseTo(24.4, 1);
+    expect(d.paidSub).toBeCloseTo(4.5, 2);
+  });
+
   it("canPay = false when subtotal ≈ 0", () => {
     const d = deriveTotals(withState({ mode: "item" }), items, config, "you");
     expect(d.canPay).toBe(false);
@@ -286,7 +316,7 @@ describe("itemsToMarkPaid", () => {
     expect(ids.sort()).toEqual(["cev", "enc", "loc", "sec"]);
   });
 
-  it("item → just the ones I claimed", () => {
+  it("item → only items where you own the full qty", () => {
     const ids = itemsToMarkPaid(
       withState({
         mode: "item",
@@ -295,7 +325,43 @@ describe("itemsToMarkPaid", () => {
       items,
       "you",
     );
-    expect(ids.sort()).toEqual(["cev", "sec"]);
+    expect(ids).toEqual(["sec"]);
+  });
+
+  it("partial item payment clears your claim but keeps item unpaid", () => {
+    const receipt = {
+      name: "Tú",
+      amount: 4.75,
+      subtotal: 4.75,
+      iva: 0,
+      propina: 0,
+      servicio: 0,
+      ivaRate: 0.15,
+      mode: "item" as const,
+      items: [{ name: "Ceviche", emoji: "🦐", amt: 4.75 }],
+      how: "½ plato",
+      method: "card" as const,
+      methodLabel: "Tarjeta",
+      eInvoice: null,
+      ref: "MQR-P",
+      date: "2026-06-14",
+    };
+    const s = flowReducer(
+      withState({
+        mode: "item",
+        claims: { cev: { you: 0.5, ana: 0.5 } },
+      }),
+      {
+        type: "payment/complete",
+        receipt,
+        markedItems: [],
+        partialItemIds: ["cev"],
+        youId: "you",
+      },
+    );
+    expect(s.paidItemIds).toEqual([]);
+    expect(s.claims.cev).toEqual({ ana: 0.5 });
+    expect(s.stage).toBe("waiting");
   });
 
   it("equal → none (others may still owe)", () => {
