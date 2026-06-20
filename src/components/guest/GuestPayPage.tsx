@@ -134,6 +134,8 @@ function GuestPayShell({
           : undefined
       }
       onResetDemo={isDemo && "resetDemo" in live ? live.resetDemo : undefined}
+      sessionClaims={live.claims}
+      paidSummaries={"paidSummaries" in live ? live.paidSummaries : undefined}
     />
   );
 }

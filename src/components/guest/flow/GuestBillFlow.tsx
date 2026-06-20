@@ -39,6 +39,7 @@ import type {
   MemberId,
   RestaurantConfig,
   TableMember,
+  TablePaymentSummary,
 } from "@/lib/guest-billing";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
@@ -48,6 +49,9 @@ interface StageProps {
   items: readonly BillItem[];
   members: readonly TableMember[];
   config: RestaurantConfig;
+  sessionClaims?: Claims;
+  paidSummaries?: readonly TablePaymentSummary[];
+  onResetDemo?: () => Promise<void>;
 }
 
 export interface GuestBillFlowProps {
@@ -76,6 +80,10 @@ export interface GuestBillFlowProps {
   };
   /** Demo-only: reset shared table state for all devices. */
   onResetDemo?: () => Promise<void>;
+  /** Server-authoritative claims for pill display (avoids one-frame stale local state). */
+  sessionClaims?: Claims;
+  /** Payments recorded on the shared session (for waiting summaries). */
+  paidSummaries?: readonly TablePaymentSummary[];
 }
 
 export function GuestBillFlow(props: GuestBillFlowProps) {
@@ -92,6 +100,8 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     liveSession,
     serverSync,
     onResetDemo,
+    sessionClaims,
+    paidSummaries,
   } = props;
 
   const resolvedYouId = youId ?? liveSession?.guestSessionId ?? "you";
@@ -159,7 +169,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
 
   const activeFlow = liveSession ? liveFlow : flow;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!serverSync) return;
     flow.syncFromServer({
       claims: serverSync.claims,
@@ -228,7 +238,15 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalLoading, externalError]);
 
-  const stageProps: StageProps = { flow: activeFlow, items, members, config };
+  const stageProps: StageProps = {
+    flow: activeFlow,
+    items,
+    members,
+    config,
+    sessionClaims,
+    paidSummaries,
+    onResetDemo,
+  };
   const stage = flow.state.stage;
   const receiptDrawer =
     flow.state.receipts.length > 0 ? (
@@ -263,7 +281,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     case "error":
       return (<><ErrorStage {...stageProps} externalError={externalError ?? null} />{receiptDrawer}</>);
     case "bill":
-      return (<><BillShellStage {...stageProps} onResetDemo={onResetDemo} />{receiptDrawer}</>);
+      return (<><BillShellStage {...stageProps} />{receiptDrawer}</>);
     case "confirm":
       return (<><ConfirmStage {...stageProps} />{receiptDrawer}</>);
     case "payment":
@@ -282,8 +300,9 @@ function BillShellStage({
   items,
   members,
   config,
+  sessionClaims,
   onResetDemo,
-}: StageProps & { onResetDemo?: () => Promise<void> }) {
+}: StageProps) {
   const { state, derived } = flow;
   const [resetting, setResetting] = useState(false);
 
@@ -368,6 +387,7 @@ function BillShellStage({
           items={items}
           members={members}
           config={config}
+          sessionClaims={sessionClaims}
         />
       </div>
 

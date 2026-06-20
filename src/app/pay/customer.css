@@ -3031,6 +3031,93 @@ html.has-receipt-peek .ws-wait-foot {
   color: var(--c-ink-2);
 }
 
+.ws-paid-sofar {
+  width: 100%;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--c-sep);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ws-paid-sofar-success {
+  margin: 16px 0 4px;
+  padding: 14px 16px;
+  border-top: none;
+  border-radius: 20px;
+}
+.ws-paid-sofar-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--c-ink-2);
+  margin-bottom: 4px;
+}
+.ws-paid-sofar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ws-paid-sofar-amt {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-ink);
+}
+
+.ws-payer-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 8px auto 18px;
+  position: relative;
+}
+.ws-payer-emoji {
+  font-size: 28px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 10px rgba(27,23,20,.12));
+}
+.ws-payer-emoji-left {
+  position: absolute;
+  left: calc(50% - 72px);
+  top: 18px;
+  animation: wsFloatEmoji 2.8s ease-in-out infinite;
+}
+.ws-payer-emoji-right {
+  position: absolute;
+  right: calc(50% - 72px);
+  top: 24px;
+  animation: wsFloatEmoji 3.1s ease-in-out infinite reverse;
+}
+@keyframes wsFloatEmoji {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.ws-payer-title {
+  margin: 10px 0 0;
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--c-ink);
+}
+.ws-payer-sub {
+  margin: 0;
+  font-size: 14px;
+  color: var(--c-ink-2);
+  text-align: center;
+  max-width: 280px;
+}
+
+.demo-reset-success-btn {
+  background: rgba(26, 158, 98, 0.1) !important;
+  color: var(--ok) !important;
+  font-weight: 700 !important;
+  border: 1px solid rgba(26, 158, 98, 0.22) !important;
+}
+
 /* Pending payers list (Gracias) */
 .ws-pending-list {
   border-radius: 22px;

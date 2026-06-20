@@ -29,6 +29,16 @@ export interface TableMember {
   initials: string;
   hue: number;
   isYou?: boolean;
+  /** Server-assigned sequential label, e.g. "Persona 2". */
+  seatLabel?: string;
+}
+
+/** A payment recorded on the shared table session (for waiting/success summaries). */
+export interface TablePaymentSummary {
+  guestId: MemberId;
+  guestName: string;
+  amount: number;
+  method: string;
 }
 
 /** claims[itemId][memberId] = units (float, fractional allowed, Σ ≤ item.qty) */

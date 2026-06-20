@@ -10,6 +10,7 @@ import type {
   Claims,
   RestaurantConfig,
   TableMember,
+  TablePaymentSummary,
 } from "@/lib/guest-billing";
 import {
   guestAvatarHue,
@@ -45,6 +46,7 @@ export interface UseDemoTableSessionResult {
   resetDemo: () => Promise<void>;
   retry: () => void;
   resetSeq: number;
+  paidSummaries: TablePaymentSummary[];
   isDemo: true;
 }
 
@@ -69,14 +71,59 @@ function mapDemoItems(raw: DemoTableState): BillItem[] {
   }));
 }
 
-function mapDemoMembers(guests: TableSessionState["guests"], youId: string | null): TableMember[] {
-  return guests.map((g, idx) => ({
-    id: g.id,
-    name: g.displayName || guestLabel(idx + 1),
-    initials: initialsFor(g.displayName || guestLabel(idx + 1)),
-    hue: g.colorHue ?? guestAvatarHue(idx),
-    isYou: g.id === youId,
-  }));
+/** Full roster from Redis — every guest + anyone referenced in claims. */
+function buildDemoRoster(
+  raw: DemoTableState | null,
+  youId: string | null,
+): TableMember[] {
+  if (!raw) return [];
+  const byId = new Map<string, TableMember>();
+
+  for (const g of raw.guests) {
+    const name = g.name?.trim() || g.label;
+    byId.set(g.id, {
+      id: g.id,
+      name,
+      seatLabel: g.label,
+      initials: initialsFor(name),
+      hue: g.hue,
+      isYou: g.id === youId,
+    });
+  }
+
+  for (const guestId of Object.values(raw.claims)) {
+    if (!guestId || byId.has(guestId)) continue;
+    const guest = raw.guests.find((g) => g.id === guestId);
+    const name =
+      guest?.name?.trim() || guest?.label || guestLabel(byId.size + 1);
+    byId.set(guestId, {
+      id: guestId,
+      name,
+      seatLabel: guest?.label,
+      initials: initialsFor(name),
+      hue: guest?.hue ?? guestAvatarHue(byId.size),
+      isYou: guestId === youId,
+    });
+  }
+
+  return Array.from(byId.values());
+}
+
+function mapPaidSummaries(raw: DemoTableState | null): TablePaymentSummary[] {
+  if (!raw) return [];
+  return raw.payments.map((p) => {
+    const guest = raw.guests.find((g) => g.id === p.guestId);
+    return {
+      guestId: p.guestId,
+      guestName:
+        p.guestName?.trim() ||
+        guest?.name?.trim() ||
+        guest?.label ||
+        "Persona",
+      amount: p.amount,
+      method: p.method,
+    };
+  });
 }
 
 async function postDemo<T>(token: string, body: Record<string, unknown>): Promise<T> {
@@ -271,9 +318,10 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   );
   const items = useMemo(() => (raw ? mapDemoItems(raw) : []), [raw]);
   const members = useMemo(
-    () => (state ? mapDemoMembers(state.guests, guestSessionId) : []),
-    [state, guestSessionId],
+    () => buildDemoRoster(raw, guestSessionId),
+    [raw, guestSessionId],
   );
+  const paidSummaries = useMemo(() => mapPaidSummaries(raw), [raw]);
   const config: RestaurantConfig = useMemo(
     () => ({
       name: "Mesita Demo",
@@ -309,6 +357,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     resetDemo,
     retry: () => setJoinAttempt((n) => n + 1),
     resetSeq: raw?.resetSeq ?? 0,
+    paidSummaries,
     isDemo: true,
   };
 }

@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Demo UX: nombres en pills, resumen pagos, éxito con emoji + reset
+- **Qué:** `useDemoTableSession`, `split-math`, `BillStage`, `WaitingSuccessStage`, `GuestBillFlow`, `GuestPayPage`, `customer.css`, `types.ts`.
+- **Por qué:** Pills mostraban "Invitado" en otro dispositivo; pantalla de espera sin resumen de pagos; check roto en éxito parcial; faltaba reiniciar demo al cerrar mesa.
+- **Qué hace:** Roster desde Redis + claims con nombre/Persona N; pills usan claims del servidor; waiting muestra "Ya pagaron"; éxito parcial muestra pill + emoji; botón Reiniciar demo en pantalla final.
+
 ### 2026-06-19 — Fix demo: locro fantasma, pills invisibles, crash al pagar
 - **Qué:** `demo-table-store`, `split-math`, `GuestBillFlow`, `WaitingSuccessStage`, `_shared`, `BillStage`, `customer.css`.
 - **Por qué:** Locro precargado como “Persona 1” confundía numeración; ítems bloqueados sin pill; pagar solo crashaba la app (cierre de mesa prematuro + member undefined).

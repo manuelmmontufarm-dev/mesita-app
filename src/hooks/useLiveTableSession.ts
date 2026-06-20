@@ -125,13 +125,17 @@ function mapMembers(
   guests: TableSessionState["guests"],
   youId: string | null,
 ): TableMember[] {
-  return guests.map((g, idx) => ({
-    id: g.id,
-    name: g.displayName || guestLabel(idx + 1),
-    initials: initialsFor(g.displayName || guestLabel(idx + 1)),
-    hue: g.colorHue ?? guestAvatarHue(idx),
-    isYou: g.id === youId,
-  }));
+  return guests.map((g, idx) => {
+    const name = g.displayName?.trim() || g.label || guestLabel(idx + 1);
+    return {
+      id: g.id,
+      name,
+      seatLabel: g.label,
+      initials: initialsFor(name),
+      hue: g.colorHue ?? guestAvatarHue(idx),
+      isYou: g.id === youId,
+    };
+  });
 }
 
 function mapItems(raw: TableSessionState["items"]): BillItem[] {

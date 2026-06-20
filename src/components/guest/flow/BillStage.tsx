@@ -44,6 +44,7 @@ import {
 } from "@/lib/guest-billing/split-math";
 import type {
   BillItem,
+  Claims,
   RestaurantConfig,
   TableMember,
 } from "@/lib/guest-billing/types";
@@ -160,21 +161,23 @@ export function BillItemRow({
   members,
   mode,
   paid,
+  displayClaims,
 }: {
   item: BillItem;
   flow: Flow;
   members: readonly TableMember[];
   mode: "item" | "equal" | "todo";
   paid: boolean;
+  displayClaims: Claims;
 }) {
   const { state, youId } = flow;
-  const yours = unitsOf(state.claims, item.id, youId);
-  const free = freeUnits(item, state.claims);
-  const claimants = claimantsOf(state.claims, item.id, members);
+  const yours = unitsOf(displayClaims, item.id, youId);
+  const free = freeUnits(item, displayClaims);
+  const claimants = claimantsOf(displayClaims, item.id, members);
   const mine = yours > 0;
   const shared = claimants.length > 1;
   const interactive = mode === "item" && !paid;
-  const myAmt = itemOwed(item, state.claims, youId);
+  const myAmt = itemOwed(item, displayClaims, youId);
 
   const displayIndex = item.displayIndex ?? null;
   const displayLabel = item.displayLabel ?? item.name;
@@ -429,6 +432,8 @@ export interface BillStageProps {
   members: readonly TableMember[];
   config: RestaurantConfig;
   shareEnabled?: boolean;
+  /** Authoritative claims from server — used for claimant pills under items. */
+  sessionClaims?: Claims;
 }
 
 export function BillStage({
@@ -437,9 +442,11 @@ export function BillStage({
   members,
   config,
   shareEnabled = true,
+  sessionClaims,
 }: BillStageProps) {
   const { state, derived } = flow;
-  const { mode, tip, people, paidItemIds, claims } = state;
+  const { mode, tip, people, paidItemIds, claims: localClaims } = state;
+  const displayClaims = sessionClaims ?? localClaims;
 
   const [otherTip, setOtherTip] = useState(false);
   // Monto en USD que el usuario teclea en "Otro" — persiste aunque el parent
@@ -470,7 +477,7 @@ export function BillStage({
   );
 
   const fullSub = useMemo(() => billSubtotal(items), [items]);
-  const claimedAll = unclaimedItems(items, claims).length === 0;
+  const claimedAll = unclaimedItems(items, displayClaims).length === 0;
   const paidSub = paidSubtotal(items, paidItemIds);
   const someonePaid = paidItemIds.length > 0;
 
@@ -483,7 +490,7 @@ export function BillStage({
 
   const myItemCount = items.filter(
     (it) =>
-      unitsOf(claims, it.id, flow.youId) > 0 && !paidItemIds.includes(it.id),
+      unitsOf(displayClaims, it.id, flow.youId) > 0 && !paidItemIds.includes(it.id),
   ).length;
 
   const tipPresets = config.tipPresets;
@@ -666,6 +673,7 @@ export function BillStage({
               members={displayMembers}
               mode={mode}
               paid={isItemPaid(paidItemIds, it.id)}
+              displayClaims={displayClaims}
             />
           ))}
         </div>

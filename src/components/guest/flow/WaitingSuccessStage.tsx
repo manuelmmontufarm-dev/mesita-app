@@ -30,6 +30,7 @@ import {
   memberSubtotal,
   resolveMemberDisplay,
   resolveRoster,
+  initialsFor,
   unitsOf,
 } from "@/lib/guest-billing/split-math";
 import type {
@@ -37,6 +38,7 @@ import type {
   MemberId,
   RestaurantConfig,
   TableMember,
+  TablePaymentSummary,
 } from "@/lib/guest-billing/types";
 
 import { Ic, LogoMark, NamePill } from "./_shared";
@@ -48,6 +50,8 @@ export interface WaitingSuccessStageProps {
   items: readonly BillItem[];
   members: readonly TableMember[];
   config: RestaurantConfig;
+  paidSummaries?: readonly TablePaymentSummary[];
+  onResetDemo?: () => Promise<void>;
 }
 
 /* ── helpers ────────────────────────────────────────────────────────────── */
@@ -79,11 +83,13 @@ function MesaProgressRing({
   remainingAmt,
   paidCount,
   totalCount,
+  paidRows,
 }: {
   paidPct: number;
   remainingAmt: string;
   paidCount: number;
   totalCount: number;
+  paidRows: Array<{ member: TableMember; amount: string }>;
 }) {
   const r = 52;
   const c = 2 * Math.PI * r;
@@ -125,6 +131,18 @@ function MesaProgressRing({
           {paidCount} de {totalCount} pagaron
         </span>
       </div>
+
+      {paidRows.length > 0 && (
+        <div className="ws-paid-sofar">
+          <div className="ws-paid-sofar-title">Ya pagaron</div>
+          {paidRows.map(({ member, amount }) => (
+            <div key={member.id} className="ws-paid-sofar-row">
+              <NamePill member={member} size={34} />
+              <span className="ws-paid-sofar-amt">{amount}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -149,41 +167,37 @@ function TodoChampionHero({
   );
 }
 
+const PAYER_EMOJIS = ["🎉", "✨", "🙌", "😎", "🔥", "💚"] as const;
+
+function PayerCelebrationHero({
+  member,
+  name,
+}: {
+  member: TableMember;
+  name?: string;
+}) {
+  const emoji = PAYER_EMOJIS[Math.abs(member.id.charCodeAt(0)) % PAYER_EMOJIS.length];
+  return (
+    <div className="ws-payer-hero" data-testid="ws-payer-celebration">
+      <span className="ws-payer-emoji ws-payer-emoji-left" aria-hidden="true">
+        {emoji}
+      </span>
+      <NamePill member={member} name={name} size={76} />
+      <span className="ws-payer-emoji ws-payer-emoji-right" aria-hidden="true">
+        🍽️
+      </span>
+      <p className="ws-payer-title">¡Listo, pagaste!</p>
+      <p className="ws-payer-sub">Tu parte quedó registrada. Buen provecho.</p>
+    </div>
+  );
+}
+
 const SUCCESS_QUIPS = [
   "El mesero ya te admira.",
   "Factura en camino — sin filas.",
   "Mesa cerrada. Buen servicio.",
   "Eso sí es pagar con estilo.",
 ];
-
-function AnimatedCheckRing() {
-  return (
-    <div className="ws-check-wrap" aria-hidden="true">
-      <span className="ws-pulse-ring ws-pulse-ring-1" />
-      <span className="ws-pulse-ring ws-pulse-ring-2" />
-      <div className="ws-disc ws-disc-pop">
-        <svg
-          viewBox="0 0 24 24"
-          width="38"
-          height="38"
-          fill="none"
-          stroke="#fff"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path
-            className="ws-check-stroke"
-            d="M5 12.5l5 5 9-10"
-            pathLength="1"
-            strokeDasharray="1"
-            strokeDashoffset="1"
-          />
-        </svg>
-      </div>
-    </div>
-  );
-}
 
 /* ── main component ─────────────────────────────────────────────────────── */
 
@@ -192,9 +206,12 @@ export function WaitingSuccessStage({
   items,
   members,
   config,
+  paidSummaries = [],
+  onResetDemo,
 }: WaitingSuccessStageProps) {
   const { state, derived, youId } = flow;
   const { mode, claims, paidIds, people } = state;
+  const [resetting, setResetting] = useState(false);
 
   /* ── phase derivation ─────────────────────────────────────────────────── */
 
@@ -390,6 +407,43 @@ export function WaitingSuccessStage({
 
   const expandedItems = useMemo(() => expandRepeatedItems(items), [items]);
 
+  const paidRows = useMemo(() => {
+    const rows: Array<{ member: TableMember; amount: string }> = [];
+    for (const payment of paidSummaries) {
+      const member =
+        displayMembers.find((m) => m.id === payment.guestId) ??
+        resolveMemberDisplay(
+          {
+            id: payment.guestId,
+            name: payment.guestName,
+            initials: initialsFor(payment.guestName),
+            hue: 210,
+          },
+          payment.guestId === youId ? state.name : "",
+          youId,
+        );
+      rows.push({
+        member: resolveMemberDisplay(
+          member,
+          member.id === youId ? state.name : "",
+          youId,
+        ),
+        amount: fmt(payment.amount),
+      });
+    }
+    if (rows.length === 0) {
+      for (const id of paidIds) {
+        const member = displayMembers.find((m) => m.id === id);
+        if (!member) continue;
+        rows.push({
+          member: resolveMemberDisplay(member, state.name, youId),
+          amount: fmt(latestReceipt(state)?.amount ?? 0),
+        });
+      }
+    }
+    return rows;
+  }, [paidSummaries, paidIds, displayMembers, youId, state.name, state]);
+
   /* ── pending members list (for waiting phase) ─────────────────────────── */
 
   const pendingMembers = members.filter(
@@ -452,8 +506,9 @@ export function WaitingSuccessStage({
             ? `Faltan ${fmt(derived.remainingSub)}`
             : "¡Mesa completa!"
         }
-        paidCount={state.paidIds.length}
-        totalCount={members.length}
+        paidCount={paidRows.length || state.paidIds.length}
+        totalCount={Math.max(members.length, people, paidRows.length)}
+        paidRows={paidRows}
       />
 
       {pendingMembers.length > 0 && (
@@ -488,7 +543,7 @@ export function WaitingSuccessStage({
       {mode === "todo" ? (
         <TodoChampionHero member={youDisplay} />
       ) : (
-        <AnimatedCheckRing />
+        <PayerCelebrationHero member={youDisplay} name={state.name} />
       )}
       <div className="ok-title">
         {mode === "todo" ? "¡Cuenta completada!" : "¡Mesa cerrada!"}
@@ -500,12 +555,38 @@ export function WaitingSuccessStage({
       </div>
       <p className="ws-success-quip">{successQuip}</p>
 
+      {paidRows.length > 0 && (
+        <div className="ws-paid-sofar ws-paid-sofar-success surfx">
+          <div className="ws-paid-sofar-title">Resumen de la mesa</div>
+          {paidRows.map(({ member, amount }) => (
+            <div key={member.id} className="ws-paid-sofar-row">
+              <NamePill member={member} size={36} />
+              <span className="ws-paid-sofar-amt">{amount}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="completed-brand">
         <LogoMark size={30} />
         <span>Gracias por visitar {config.name}</span>
       </div>
 
       <div className="completed-actions">
+        {config.demoMode && onResetDemo ? (
+          <button
+            type="button"
+            className="completed-btn demo-reset-success-btn"
+            disabled={resetting}
+            onClick={() => {
+              setResetting(true);
+              void onResetDemo().finally(() => setResetting(false));
+            }}
+            data-testid="demo-reset-success-btn"
+          >
+            {resetting ? "Reiniciando…" : "Reiniciar demo"}
+          </button>
+        ) : null}
         <button
           className="completed-btn"
           data-testid="success-review-btn"

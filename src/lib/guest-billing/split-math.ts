@@ -156,7 +156,7 @@ export function isTableFullyPaid(
   return items.length > 0 && items.every((it) => paidItemIds.includes(it.id));
 }
 
-/** Resolve a roster entry for a claimant id (fallback when roster is stale). */
+/** Resolve a roster entry for a claimant id (fallback uses Persona N, never "Invitado"). */
 export function resolveClaimantMember(
   id: MemberId,
   roster: readonly TableMember[],
@@ -171,12 +171,15 @@ export function resolveClaimantMember(
     return found;
   }
   const isYou = id === youId;
-  const label = isYou ? youName?.trim() || "Tú" : "Invitado";
+  const ordinal = roster.length + 1;
+  const fallbackName = isYou
+    ? youName?.trim() || "Tú"
+    : guestLabel(ordinal);
   return {
     id,
-    name: label,
-    initials: initialsFor(label),
-    hue: guestAvatarHue(Math.abs(id.charCodeAt(0)) % 3),
+    name: fallbackName,
+    initials: initialsFor(fallbackName),
+    hue: guestAvatarHue(ordinal - 1),
     isYou,
   };
 }
