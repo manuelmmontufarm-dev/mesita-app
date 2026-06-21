@@ -3619,6 +3619,24 @@ html.has-receipt-peek .c-dock.has-receipt-dock {
   pointer-events: none;
   opacity: 0;
 }
+html.has-receipt-peek .cust-app[data-stage="bill"] .c-dock.pay-dock-return {
+  visibility: visible;
+  pointer-events: auto;
+  opacity: 1;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + var(--receipt-peek, 84px));
+  z-index: 94;
+}
+.item-row-fp.pay-nudge {
+  animation: pay-item-nudge 1.2s var(--ease);
+}
+@keyframes pay-item-nudge {
+  0%, 100% { box-shadow: 0 0 0 rgba(47, 179, 126, 0); }
+  35%, 65% { box-shadow: 0 0 0 3px rgba(47, 179, 126, 0.35); }
+}
+.c-pay-btn.is-soft {
+  opacity: 0.92;
+  filter: none;
+}
 .receipt-drawer {
   position: fixed;
   left: 0;

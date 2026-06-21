@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { BillItem } from "../types";
-import { expandRepeatedItems, buildItemPayerNames, payButtonLabel } from "../bill-display";
+import { expandRepeatedItems, buildItemPayerNames, payButtonLabel, backToBillLabel } from "../bill-display";
 import { equalShareSubtotal } from "../split-math";
 
 const makeItem = (id: string, name: string, overrides?: Partial<BillItem>): BillItem => ({
@@ -120,9 +120,25 @@ describe("payButtonLabel", () => {
     expect(payButtonLabel("todo", "$50.00")).toBe("Pagar todo · $50.00");
   });
 
+  it("uses again variant when requested", () => {
+    expect(payButtonLabel("item", "$12.00", { again: true })).toBe(
+      "Pagar otra vez · $12.00",
+    );
+  });
+
   it("uses Pagar tu parte in item and equal modes", () => {
     expect(payButtonLabel("item", "$12.00")).toBe("Pagar tu parte · $12.00");
     expect(payButtonLabel("equal", "$12.00")).toBe("Pagar tu parte · $12.00");
+  });
+});
+
+describe("backToBillLabel", () => {
+  it("shows Volver a pagar when balance remains", () => {
+    expect(backToBillLabel(20, false)).toBe("Volver a pagar");
+  });
+
+  it("shows Ver mesa when table is closed", () => {
+    expect(backToBillLabel(0, true)).toBe("Ver mesa");
   });
 });
 

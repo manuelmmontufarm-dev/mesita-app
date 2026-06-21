@@ -666,7 +666,7 @@ export function BillStage({
         )}
 
         {/* Items */}
-        <div>
+        <div className="bill-items-list" data-testid="bill-items-list">
           {sortedItems.map((it) => (
             <BillItemRow
               key={it.id}

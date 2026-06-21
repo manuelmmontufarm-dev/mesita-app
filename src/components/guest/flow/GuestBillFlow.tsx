@@ -31,11 +31,15 @@ import {
 } from "@/hooks/useGuestPaymentFlow";
 import type { LiveSessionActions } from "@/hooks/useLiveTableSession";
 import { fmt } from "@/lib/guest-billing";
-import { dockAmountLabel, payButtonLabel } from "@/lib/guest-billing/bill-display";
+import {
+  dockAmountLabel,
+  payAgainSelectLabel,
+  payButtonLabel,
+} from "@/lib/guest-billing/bill-display";
+import { computeTotals, freeUnits, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
 import { computeBillShellScrollMetrics } from "@/lib/guest-billing/bill-shell-scroll";
 import { mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
 import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
-import { freeUnits, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
 import type {
   BillItem,
   Claims,
@@ -397,6 +401,41 @@ function BillShellStage({
 
   const dockExpanded = atBottom || !scrollable;
   const bump = useBumpOnChange(Math.round(derived.totals.total * 100));
+  const hasPaidBefore = state.receipts.length > 0;
+  const showPayDock = derived.canPayMore;
+  const payReady = derived.canPay;
+
+  const scrollToUnpaidItems = () => {
+    const root = scrollRef.current;
+    if (!root) return;
+    const firstUnpaid = root.querySelector<HTMLElement>(".item-row-fp:not(.paid)");
+    if (firstUnpaid) {
+      firstUnpaid.scrollIntoView({ behavior: "smooth", block: "center" });
+      firstUnpaid.classList.add("pay-nudge");
+      window.setTimeout(() => firstUnpaid.classList.remove("pay-nudge"), 1400);
+    }
+  };
+
+  const handleDockPay = () => {
+    if (payReady) {
+      flow.goToConfirm();
+      return;
+    }
+    if (derived.canPayMore && state.mode === "item") {
+      scrollToUnpaidItems();
+    }
+  };
+
+  const dockLabel = payReady
+    ? payButtonLabel(state.mode, fmt(derived.totals.total), {
+        again: hasPaidBefore,
+      })
+    : payAgainSelectLabel(state.mode);
+
+  const dockHint =
+    hasPaidBefore && derived.canPayMore && !payReady
+      ? "Aún falta en la mesa · elige lo tuyo"
+      : state.name.trim() || "tu parte";
 
   return (
     <div
@@ -449,31 +488,40 @@ function BillShellStage({
         />
       </div>
 
-      {/* sticky bottom pay dock */}
-      <div className={"c-dock glass-dock " + (dockExpanded ? "dock-full" : "dock-mini") + (flow.state.receipts.length > 0 ? " has-receipt-dock" : "")}>
-        <div className="dock-top">
-          <div className="dock-k">
-            {dockAmountLabel(state.mode)}
-            <small>
-              {state.name.trim() || "tu parte"} · Mesa {config.table}
-            </small>
-          </div>
-          <div className={"dock-total" + (bump ? " bump" : "")}>
-            {fmt(derived.totals.total)}
-          </div>
-        </div>
-        <button
-          className="c-pay-btn"
-          onClick={() => flow.goToConfirm()}
-          disabled={!derived.canPay}
-          data-testid="dock-pay-btn"
+      {/* sticky bottom pay dock — stays visible after prior payments (receipt peek) */}
+      {showPayDock ? (
+        <div
+          className={
+            "c-dock glass-dock pay-dock-return " +
+            (dockExpanded ? "dock-full" : "dock-mini")
+          }
         >
-          <Ic.lock s={18} /> {payButtonLabel(state.mode, fmt(derived.totals.total))}
-        </button>
-        <div className="pay-secure">
-          <Ic.shield s={13} /> Pago cifrado · Factura electrónica automática
+          <div className="dock-top">
+            <div className="dock-k">
+              {dockAmountLabel(state.mode)}
+              <small>
+                {dockHint} · Mesa {config.table}
+              </small>
+            </div>
+            <div className={"dock-total" + (bump ? " bump" : "")}>
+              {payReady ? fmt(derived.totals.total) : fmt(
+                computeTotals(derived.remainingSub, config, 0).total,
+              )}
+            </div>
+          </div>
+          <button
+            className={"c-pay-btn" + (payReady ? "" : " is-soft")}
+            onClick={handleDockPay}
+            aria-disabled={!payReady && state.mode !== "item"}
+            data-testid="dock-pay-btn"
+          >
+            <Ic.lock s={18} /> {dockLabel}
+          </button>
+          <div className="pay-secure">
+            <Ic.shield s={13} /> Pago cifrado · Factura electrónica automática
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {state.shareItem && (
         <ShareSheet flow={flow} items={items} members={members} />

@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-20 — Volver a pagar tras primer pago
+- **Qué:** `useGuestPaymentFlow.ts`, `GuestBillFlow.tsx`, `BillStage.tsx`, `WaitingSuccessStage.tsx`, `bill-display.ts`, `customer.css`, tests.
+- **Por qué:** Tras pagar y pulsar "Ver mesa", el dock desaparecía (recibo lo ocultaba) y no había forma clara de pagar ítems olvidados.
+- **Qué hace:** Dock visible con "Pagar otra vez"; CTA guía a elegir platos si falta selección; "Volver a pagar" en waiting/éxito; bloquea segundo cobro en modo iguales.
+
 ### 2026-06-20 — UX demo: split iguales, lobby iPhone, pagador por ítem
 - **Qué:** `split-math.ts`, `bill-display.ts`, `useGuestPaymentFlow.ts`, `BillStage.tsx`, `GuestBillFlow.tsx`, `ConfirmStage.tsx`, `PaymentStage.tsx`, `WaitingSuccessStage.tsx`, `DemoTableEntry.tsx`, `useDemoTableSession.ts`, `types.ts`, `customer.css`, tests.
 - **Por qué:** Split iguales cobraba el total restante al último; lobby sin scroll en iPhone pequeño; ítems pagados no mostraban quién pagó; modo Todo decía "Pagar tu parte"; propina Otro sin estilos; nombre poco visible.
