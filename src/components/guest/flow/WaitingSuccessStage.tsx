@@ -22,7 +22,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { latestReceipt, type useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
-import { expandRepeatedItems } from "@/lib/guest-billing/bill-display";
+import { expandRepeatedItems, backToBillLabel } from "@/lib/guest-billing/bill-display";
 import {
   assignPayerBadges,
   badgesForGuest,
@@ -32,6 +32,7 @@ import {
 import {
   billSubtotal,
   computeTotals,
+  equalShareSubtotal,
   fmt,
   memberSubtotal,
   resolveMemberDisplay,
@@ -487,6 +488,8 @@ export function WaitingSuccessStage({
     paidSummaries.length,
   );
 
+  const tableClosed = demoTableProgress?.tableClosed ?? remainingTotal <= 0.01;
+  const backToBillCta = backToBillLabel(remainingTotal, tableClosed);
   const displayMembers = resolveRoster(members, state.name, youId);
   const youDisplay = resolveMemberDisplay(
     displayMembers.find((m) => m.id === youId) ?? displayMembers[0],
@@ -494,15 +497,14 @@ export function WaitingSuccessStage({
     youId,
   );
 
-  const remainingPeople = Math.max(1, people - paidIds.length);
-
   const owed = (id: MemberId): number => {
     if (mode === "equal") {
-      return computeTotals(
-        derived.remainingSub / remainingPeople,
-        config,
-        0,
-      ).total;
+      const shareSub = equalShareSubtotal(
+        billSubtotal(items),
+        people,
+        derived.remainingSub,
+      );
+      return computeTotals(shareSub, config, 0).total;
     }
     const itemAmt = computeTotals(
       memberSubtotal(items, claims, id),
@@ -692,7 +694,7 @@ export function WaitingSuccessStage({
         onClick={() => flow.goToBill()}
         data-testid="waiting-back-btn"
       >
-        <Ic.users s={16} /> Ver mesa
+        <Ic.users s={16} /> {backToBillCta}
       </button>
     </div>
   );
@@ -751,7 +753,7 @@ export function WaitingSuccessStage({
           onClick={() => flow.goToBill()}
           data-testid="success-back-mesa-btn"
         >
-          <Ic.users s={16} /> Ver mesa
+          <Ic.users s={16} /> {backToBillCta}
         </button>
         {config.demoMode && onResetDemo ? (
           <button

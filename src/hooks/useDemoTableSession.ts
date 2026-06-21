@@ -179,6 +179,10 @@ function mapPaidSummaries(raw: DemoTableState | null): TablePaymentSummary[] {
       createdAt: p.createdAt,
       itemCount: p.itemIds?.length ?? 0,
       subtotal: p.subtotal,
+      itemIds: p.itemIds?.length ? [...p.itemIds] : undefined,
+      ref: p.ref,
+      iva: p.iva,
+      service: p.service,
     };
   });
 }

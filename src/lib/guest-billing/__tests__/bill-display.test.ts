@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { BillItem } from "../types";
-import { expandRepeatedItems } from "../bill-display";
+import { expandRepeatedItems, buildItemPayerNames, payButtonLabel, backToBillLabel, dockPayButtonLabel } from "../bill-display";
+import { equalShareSubtotal } from "../split-math";
 
 const makeItem = (id: string, name: string, overrides?: Partial<BillItem>): BillItem => ({
   id,
@@ -93,5 +94,64 @@ describe("expandRepeatedItems", () => {
 
     expect(result[0].id).toBe("id-abc-123");
     expect(result[1].id).toBe("id-def-456");
+  });
+});
+
+describe("buildItemPayerNames", () => {
+  it("maps item ids to the first payer name", () => {
+    const map = buildItemPayerNames([
+      { guestName: "María", mode: "item", itemIds: ["loc"] },
+      { guestName: "Pedro", mode: "item", itemIds: ["cev"] },
+    ]);
+    expect(map).toEqual({ loc: "María", cev: "Pedro" });
+  });
+
+  it("ignores equal and todo payments", () => {
+    const map = buildItemPayerNames([
+      { guestName: "Ana", mode: "equal", itemIds: ["loc"] },
+      { guestName: "Luis", mode: "todo", itemIds: ["cev"] },
+    ]);
+    expect(map).toEqual({});
+  });
+});
+
+describe("payButtonLabel", () => {
+  it("uses Pagar todo in todo mode", () => {
+    expect(payButtonLabel("todo", "$50.00")).toBe("Pagar todo · $50.00");
+  });
+
+  it("uses again variant when requested", () => {
+    expect(payButtonLabel("item", "$12.00", { again: true })).toBe(
+      "Pagar otra vez · $12.00",
+    );
+  });
+
+  it("uses Pagar tu parte in item and equal modes", () => {
+    expect(payButtonLabel("item", "$12.00")).toBe("Pagar tu parte · $12.00");
+    expect(payButtonLabel("equal", "$12.00")).toBe("Pagar tu parte · $12.00");
+  });
+
+  it("compact dock label omits duplicate amount", () => {
+    expect(dockPayButtonLabel("item", "$12.00", { again: true, compact: true })).toBe(
+      "Pagar otra vez",
+    );
+  });
+});
+
+describe("backToBillLabel", () => {
+  it("shows Volver a pagar when balance remains", () => {
+    expect(backToBillLabel(20, false)).toBe("Volver a pagar");
+  });
+
+  it("shows Ver mesa when table is closed", () => {
+    expect(backToBillLabel(0, true)).toBe("Ver mesa");
+  });
+});
+
+describe("equalShareSubtotal", () => {
+  it("splits full bill by people and caps by remaining", () => {
+    expect(equalShareSubtotal(100, 4, 100)).toBe(25);
+    expect(equalShareSubtotal(100, 4, 30)).toBe(25);
+    expect(equalShareSubtotal(100, 4, 10)).toBe(10);
   });
 });

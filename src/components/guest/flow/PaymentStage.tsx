@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect, useState, type InputHTMLAttributes } from "
 
 import type { CameraCardData } from "@/components/guest/CameraScanner";
 import { CameraScanner } from "@/components/guest/CameraScanner";
+import { billYourPartLabel } from "@/lib/guest-billing/bill-display";
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
 import type { EInvoicePayload, PaidPayload } from "@/hooks/useGuestPaymentFlow";
 import { INVOICE_MANDATORY_THRESHOLD } from "@/hooks/useGuestPaymentFlow";
@@ -239,7 +240,7 @@ export function PaymentStage({ flow, config, tableToken }: PaymentStageProps) {
               <Ic.chevron s={20} />
             </button>
             <div className="pay-head-mid">
-              <div className="pay-head-k">Pagar tu parte</div>
+              <div className="pay-head-k">{billYourPartLabel(flow.state.mode)}</div>
               <div className="pay-head-v">{fmt(yourTotal)}</div>
             </div>
             <div className="pay-head-lock">

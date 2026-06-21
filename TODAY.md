@@ -79,6 +79,26 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-20 — Fix producción: UX guest aún no en main
+- **Qué:** PR a `main` desde `feat/multi-qr-demo-mesas`; ajustes en `GuestBillFlow.tsx`, `drawer-receipts.ts`, `customer.css`.
+- **Por qué:** Producción (`mesita-demo.vercel.app`) quedó en merge PR #1 sin los 3 commits de UX; el usuario no veía ningún cambio.
+- **Qué hace:** Merge trae pay-again, recibo multi-pago y dock móvil a producción; no expulsa de bill al cerrar mesa; dock siempre expandido si falta saldo.
+
+### 2026-06-20 — Recibo multi-pago, dock móvil, volver a pagar
+- **Qué:** `drawer-receipts.ts`, `ReceiptDrawer.tsx`, `GuestBillFlow.tsx`, `useGuestPaymentFlow.ts`, `bill-display.ts`, `types.ts`, `useDemoTableSession.ts`, `customer.css`, tests.
+- **Por qué:** Recibo mostraba solo el último pago; dock mini aplastaba el CTA en móvil; Ver mesa no dejaba pagar más (modo iguales + dock oculto + saldo solo local).
+- **Qué hace:** Recibo lista Pago 1/2 desde servidor; chips en peek; dock expandido sin precio duplicado; saldo autoritativo del server; al volver de waiting fuerza modo ítem.
+
+### 2026-06-20 — Volver a pagar tras primer pago
+- **Qué:** `useGuestPaymentFlow.ts`, `GuestBillFlow.tsx`, `BillStage.tsx`, `WaitingSuccessStage.tsx`, `bill-display.ts`, `customer.css`, tests.
+- **Por qué:** Tras pagar y pulsar "Ver mesa", el dock desaparecía (recibo lo ocultaba) y no había forma clara de pagar ítems olvidados.
+- **Qué hace:** Dock visible con "Pagar otra vez"; CTA guía a elegir platos si falta selección; "Volver a pagar" en waiting/éxito; bloquea segundo cobro en modo iguales.
+
+### 2026-06-20 — UX demo: split iguales, lobby iPhone, pagador por ítem
+- **Qué:** `split-math.ts`, `bill-display.ts`, `useGuestPaymentFlow.ts`, `BillStage.tsx`, `GuestBillFlow.tsx`, `ConfirmStage.tsx`, `PaymentStage.tsx`, `WaitingSuccessStage.tsx`, `DemoTableEntry.tsx`, `useDemoTableSession.ts`, `types.ts`, `customer.css`, tests.
+- **Por qué:** Split iguales cobraba el total restante al último; lobby sin scroll en iPhone pequeño; ítems pagados no mostraban quién pagó; modo Todo decía "Pagar tu parte"; propina Otro sin estilos; nombre poco visible.
+- **Qué hace:** Cuota fija = total÷N; CTA "Pagar todo" en modo Todo; lobby con scroll + botón fijo abajo; badge "Pagó {nombre}" en ítems; tip Otro con display POS; campo nombre más destacado.
+
 ### 2026-06-20 — Multi-mesa demo + QR pack
 - **Qué:** `src/lib/demo-table-catalog/` (nuevo), `demo-table-store.ts`, `demo-restaurant.ts`, `useDemoTableSession.ts`, `src/app/pay/demo/[slug]/`, `qr-utils.ts`, `scripts/generate-demo-qr-pack.mjs`, `scripts/smoke-demo-tables.mjs`, tests e2e por mesa, `docs/DEMO_TABLES_DEBUG_REPORT.md`.
 - **Por qué:** Tener 4 mesas demo independientes con menús distintos (vacía, parcial, larga, ≥$50) para mostrar todos los flujos en una sola feria.
