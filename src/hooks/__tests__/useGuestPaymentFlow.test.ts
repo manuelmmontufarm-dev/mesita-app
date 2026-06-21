@@ -342,9 +342,62 @@ describe("deriveTotals", () => {
     expect(d.paidSub).toBeCloseTo(4.5, 2);
   });
 
-  it("canPay = false when subtotal ≈ 0", () => {
-    const d = deriveTotals(withState({ mode: "item" }), items, config, "you");
+  it("canPayMore when table still has balance after partial pay", () => {
+    const d = deriveTotals(
+      withState({ mode: "item", paidItemIds: ["loc"], receipts: [{
+        name: "Tú",
+        amount: 5,
+        subtotal: 4.5,
+        iva: 0.68,
+        propina: 0,
+        servicio: 0.45,
+        ivaRate: 0.15,
+        mode: "item" as const,
+        items: [],
+        how: "",
+        method: "card" as const,
+        methodLabel: "Tarjeta",
+        eInvoice: null,
+        ref: "MQR-1",
+        date: "2026-06-14",
+      }] }),
+      items,
+      config,
+      "you",
+    );
     expect(d.canPay).toBe(false);
+    expect(d.canPayMore).toBe(true);
+  });
+
+  it("equal mode: no second equal charge after already paid equal share", () => {
+    const d = deriveTotals(
+      withState({
+        mode: "equal",
+        people: 4,
+        receipts: [{
+          name: "Tú",
+          amount: 10,
+          subtotal: 7.23,
+          iva: 1,
+          propina: 0,
+          servicio: 0,
+          ivaRate: 0.15,
+          mode: "equal" as const,
+          items: [],
+          how: "División en partes iguales",
+          method: "card" as const,
+          methodLabel: "Tarjeta",
+          eInvoice: null,
+          ref: "MQR-1",
+          date: "2026-06-14",
+        }],
+      }),
+      items,
+      config,
+      "you",
+    );
+    expect(d.canPay).toBe(false);
+    expect(d.canPayMore).toBe(true);
   });
 });
 

@@ -380,7 +380,10 @@ export function ConfirmStage({
             disabled={!derived.canPay}
             data-testid="confirm-pay-btn"
           >
-            <Ic.lock s={18} /> {payButtonLabel(state.mode, fmt(derived.totals.total))}
+            <Ic.lock s={18} />{" "}
+            {payButtonLabel(state.mode, fmt(derived.totals.total), {
+              again: flow.state.receipts.length > 0,
+            })}
           </button>
           <button className="flow-secondary solid" onClick={() => flow.goToBill()} data-testid="confirm-back-btn">
             ← Volver a editar

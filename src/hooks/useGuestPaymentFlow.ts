@@ -329,6 +329,8 @@ export interface DerivedTotals {
   subtotal: number;
   totals: BillTotals;
   canPay: boolean;
+  /** Table still has unpaid balance — guest may return for another payment. */
+  canPayMore: boolean;
   /** True iff fewer than 2 people remain to pay. Drives forced e-invoice. */
   isLastPayer: boolean;
   /** Full-table pay (Todo) with total ≥ threshold — invoice mandatory even with others at table. */
@@ -369,9 +371,12 @@ export function deriveTotals(
       s + (state.paidItemIds.includes(it.id) ? 0 : itemOwed(it, state.claims, youId)),
     0,
   );
+  const youPaidEqualShare = state.receipts.some((r) => r.mode === "equal");
   const subtotal =
     state.mode === "equal"
-      ? equalShareSubtotal(fullSub, state.people, remainingSub)
+      ? youPaidEqualShare
+        ? 0
+        : equalShareSubtotal(fullSub, state.people, remainingSub)
       : state.mode === "todo"
         ? remainingSub
         : myUnpaidSub;
@@ -393,6 +398,7 @@ export function deriveTotals(
     subtotal,
     totals,
     canPay: subtotal > 0.001,
+    canPayMore: remainingSub > 0.001,
     isLastPayer,
     requiresFullBillInvoice:
       state.mode === "todo" && totals.total >= INVOICE_MANDATORY_THRESHOLD,

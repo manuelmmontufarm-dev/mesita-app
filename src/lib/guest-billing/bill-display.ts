@@ -23,9 +23,32 @@ export function dockAmountLabel(mode: SplitMode): string {
   return mode === "todo" ? "Total mesa" : "Tu parte";
 }
 
-export function payButtonLabel(mode: SplitMode, formattedTotal: string): string {
-  if (mode === "todo") return `Pagar todo · ${formattedTotal}`;
-  return `Pagar tu parte · ${formattedTotal}`;
+export function payButtonLabel(
+  mode: SplitMode,
+  formattedTotal: string,
+  opts?: { again?: boolean },
+): string {
+  const again = opts?.again ?? false;
+  if (mode === "todo") {
+    return again
+      ? `Pagar todo otra vez · ${formattedTotal}`
+      : `Pagar todo · ${formattedTotal}`;
+  }
+  return again
+    ? `Pagar otra vez · ${formattedTotal}`
+    : `Pagar tu parte · ${formattedTotal}`;
+}
+
+/** Dock CTA when the table still owes but nothing is selected yet. */
+export function payAgainSelectLabel(mode: SplitMode): string {
+  if (mode === "item") return "Pagar otra vez — elige platos";
+  if (mode === "equal") return "Pagar otra vez — tu parte";
+  return "Pagar otra vez";
+}
+
+export function backToBillLabel(remainingTotal: number, tableClosed: boolean): string {
+  if (tableClosed || remainingTotal <= 0.01) return "Ver mesa";
+  return "Volver a pagar";
 }
 
 export function billYourPartLabel(mode: SplitMode): string {
