@@ -33,9 +33,10 @@ import type { LiveSessionActions } from "@/hooks/useLiveTableSession";
 import { fmt } from "@/lib/guest-billing";
 import {
   dockAmountLabel,
+  dockPayButtonLabel,
   payAgainSelectLabel,
-  payButtonLabel,
 } from "@/lib/guest-billing/bill-display";
+import { mergeDrawerReceipts } from "@/lib/guest-billing/drawer-receipts";
 import { computeTotals, freeUnits, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
 import { computeBillShellScrollMetrics } from "@/lib/guest-billing/bill-shell-scroll";
 import { mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
@@ -296,18 +297,29 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     tableToken,
   };
   const stage = flow.state.stage;
+  const drawerReceipts = useMemo(
+    () =>
+      mergeDrawerReceipts(
+        flow.state.receipts,
+        paidSummaries ?? [],
+        resolvedYouId,
+        items,
+        config,
+      ),
+    [flow.state.receipts, paidSummaries, resolvedYouId, items, config],
+  );
   const receiptDrawer =
-    flow.state.receipts.length > 0 ? (
-      <ReceiptDrawer receipts={flow.state.receipts} config={config} />
+    drawerReceipts.length > 0 ? (
+      <ReceiptDrawer receipts={drawerReceipts} config={config} />
     ) : null;
 
   useEffect(() => {
     document.documentElement.classList.toggle(
       "has-receipt-peek",
-      flow.state.receipts.length > 0,
+      drawerReceipts.length > 0,
     );
     return () => document.documentElement.classList.remove("has-receipt-peek");
-  }, [flow.state.receipts.length]);
+  }, [drawerReceipts.length]);
 
   // Waiting and Success share a single WaitingSuccessStage so the component
   // root never unmounts during the transition. ReceiptDrawer is also kept
@@ -351,6 +363,7 @@ function BillShellStage({
   sessionClaims,
   pendingClaims,
   paidSummaries,
+  demoTableProgress,
   onResetDemo,
 }: StageProps) {
   const { state, derived } = flow;
@@ -401,9 +414,18 @@ function BillShellStage({
 
   const dockExpanded = atBottom || !scrollable;
   const bump = useBumpOnChange(Math.round(derived.totals.total * 100));
-  const hasPaidBefore = state.receipts.length > 0;
-  const showPayDock = derived.canPayMore;
+  const yourServerPayments =
+    paidSummaries?.filter((p) => p.guestId === flow.youId).length ?? 0;
+  const hasPaidBefore = state.receipts.length > 0 || yourServerPayments > 0;
+  const tableRemainingSub =
+    demoTableProgress?.tableClosed === true
+      ? 0
+      : (demoTableProgress?.remainingSub ?? derived.remainingSub);
+  const showPayDock = tableRemainingSub > 0.001;
   const payReady = derived.canPay;
+  const mesaRemainingTotal = computeTotals(tableRemainingSub, config, 0).total;
+
+  const dockLayoutFull = hasPaidBefore || dockExpanded;
 
   const scrollToUnpaidItems = () => {
     const root = scrollRef.current;
@@ -421,14 +443,15 @@ function BillShellStage({
       flow.goToConfirm();
       return;
     }
-    if (derived.canPayMore && state.mode === "item") {
+    if (showPayDock && state.mode === "item") {
       scrollToUnpaidItems();
     }
   };
 
   const dockLabel = payReady
-    ? payButtonLabel(state.mode, fmt(derived.totals.total), {
+    ? dockPayButtonLabel(state.mode, fmt(derived.totals.total), {
         again: hasPaidBefore,
+        compact: dockLayoutFull,
       })
     : payAgainSelectLabel(state.mode);
 
@@ -493,26 +516,23 @@ function BillShellStage({
         <div
           className={
             "c-dock glass-dock pay-dock-return " +
-            (dockExpanded ? "dock-full" : "dock-mini")
+            (dockLayoutFull ? "dock-full" : "dock-mini dock-mini-compact")
           }
         >
           <div className="dock-top">
             <div className="dock-k">
-              {dockAmountLabel(state.mode)}
+              {hasPaidBefore ? "Falta por pagar" : dockAmountLabel(state.mode)}
               <small>
                 {dockHint} · Mesa {config.table}
               </small>
             </div>
             <div className={"dock-total" + (bump ? " bump" : "")}>
-              {payReady ? fmt(derived.totals.total) : fmt(
-                computeTotals(derived.remainingSub, config, 0).total,
-              )}
+              {payReady ? fmt(derived.totals.total) : fmt(mesaRemainingTotal)}
             </div>
           </div>
           <button
             className={"c-pay-btn" + (payReady ? "" : " is-soft")}
             onClick={handleDockPay}
-            aria-disabled={!payReady && state.mode !== "item"}
             data-testid="dock-pay-btn"
           >
             <Ic.lock s={18} /> {dockLabel}

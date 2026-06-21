@@ -102,6 +102,14 @@ describe("flowReducer — stage transitions", () => {
     s = flowReducer(s, { type: "stage/goSuccess" });
     expect(s.stage).toBe("success");
   });
+
+  it("waiting → goBill switches to item mode for another payment", () => {
+    const s = flowReducer(withState({ stage: "waiting", mode: "equal" }), {
+      type: "stage/goBill",
+    });
+    expect(s.stage).toBe("bill");
+    expect(s.mode).toBe("item");
+  });
 });
 
 describe("flowReducer — name / mode / tip / people", () => {
