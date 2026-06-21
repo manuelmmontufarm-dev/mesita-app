@@ -1,4 +1,36 @@
-import type { BillItem } from "./types";
+import type { BillItem, ItemId, SplitMode } from "./types";
+
+/** Guest name that paid each item (item split mode), oldest payment wins. */
+export function buildItemPayerNames(
+  payments: readonly {
+    guestName: string;
+    mode?: SplitMode;
+    itemIds?: readonly ItemId[];
+  }[],
+): Record<ItemId, string> {
+  const map: Record<ItemId, string> = {};
+  for (let i = payments.length - 1; i >= 0; i--) {
+    const p = payments[i];
+    if (p.mode !== "item" || !p.itemIds?.length) continue;
+    for (const id of p.itemIds) {
+      if (!(id in map)) map[id] = p.guestName;
+    }
+  }
+  return map;
+}
+
+export function dockAmountLabel(mode: SplitMode): string {
+  return mode === "todo" ? "Total mesa" : "Tu parte";
+}
+
+export function payButtonLabel(mode: SplitMode, formattedTotal: string): string {
+  if (mode === "todo") return `Pagar todo · ${formattedTotal}`;
+  return `Pagar tu parte · ${formattedTotal}`;
+}
+
+export function billYourPartLabel(mode: SplitMode): string {
+  return mode === "todo" ? "Total mesa" : "Tu parte";
+}
 
 /**
  * Asigna displayIndex (1..N) y displayLabel a cada item.

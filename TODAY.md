@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-20 — UX demo: split iguales, lobby iPhone, pagador por ítem
+- **Qué:** `split-math.ts`, `bill-display.ts`, `useGuestPaymentFlow.ts`, `BillStage.tsx`, `GuestBillFlow.tsx`, `ConfirmStage.tsx`, `PaymentStage.tsx`, `WaitingSuccessStage.tsx`, `DemoTableEntry.tsx`, `useDemoTableSession.ts`, `types.ts`, `customer.css`, tests.
+- **Por qué:** Split iguales cobraba el total restante al último; lobby sin scroll en iPhone pequeño; ítems pagados no mostraban quién pagó; modo Todo decía "Pagar tu parte"; propina Otro sin estilos; nombre poco visible.
+- **Qué hace:** Cuota fija = total÷N; CTA "Pagar todo" en modo Todo; lobby con scroll + botón fijo abajo; badge "Pagó {nombre}" en ítems; tip Otro con display POS; campo nombre más destacado.
+
 ### 2026-06-20 — Multi-mesa demo + QR pack
 - **Qué:** `src/lib/demo-table-catalog/` (nuevo), `demo-table-store.ts`, `demo-restaurant.ts`, `useDemoTableSession.ts`, `src/app/pay/demo/[slug]/`, `qr-utils.ts`, `scripts/generate-demo-qr-pack.mjs`, `scripts/smoke-demo-tables.mjs`, tests e2e por mesa, `docs/DEMO_TABLES_DEBUG_REPORT.md`.
 - **Por qué:** Tener 4 mesas demo independientes con menús distintos (vacía, parcial, larga, ≥$50) para mostrar todos los flujos en una sola feria.

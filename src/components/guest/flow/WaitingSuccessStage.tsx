@@ -32,6 +32,7 @@ import {
 import {
   billSubtotal,
   computeTotals,
+  equalShareSubtotal,
   fmt,
   memberSubtotal,
   resolveMemberDisplay,
@@ -494,15 +495,14 @@ export function WaitingSuccessStage({
     youId,
   );
 
-  const remainingPeople = Math.max(1, people - paidIds.length);
-
   const owed = (id: MemberId): number => {
     if (mode === "equal") {
-      return computeTotals(
-        derived.remainingSub / remainingPeople,
-        config,
-        0,
-      ).total;
+      const shareSub = equalShareSubtotal(
+        billSubtotal(items),
+        people,
+        derived.remainingSub,
+      );
+      return computeTotals(shareSub, config, 0).total;
     }
     const itemAmt = computeTotals(
       memberSubtotal(items, claims, id),

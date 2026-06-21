@@ -19,6 +19,7 @@ import { useCallback, useMemo, useReducer } from "react";
 import {
   billSubtotal,
   computeTotals,
+  equalShareSubtotal,
   freeUnits,
   guestLabel,
   itemOwed,
@@ -360,6 +361,7 @@ export function deriveTotals(
   );
   const effectivePaidSub = Math.max(paidFromItems, paidFromReceipts);
   const remainingSub = Math.max(0, fullSub - effectivePaidSub);
+  const splitCount = Math.max(2, Math.round(state.people));
   const paidPeople = state.paidIds.length;
   const remainingPeople = Math.max(1, state.people - paidPeople);
   const myUnpaidSub = items.reduce(
@@ -369,12 +371,18 @@ export function deriveTotals(
   );
   const subtotal =
     state.mode === "equal"
-      ? remainingSub / remainingPeople
+      ? equalShareSubtotal(fullSub, state.people, remainingSub)
       : state.mode === "todo"
         ? remainingSub
         : myUnpaidSub;
   const totals = computeTotals(subtotal, config, state.tip);
-  const isLastPayer = remainingPeople <= 1;
+  const equalShareSub = equalShareSubtotal(fullSub, state.people, fullSub);
+  const isLastPayer =
+    state.mode === "equal"
+      ? paidPeople >= splitCount - 1 || remainingSub <= equalShareSub + 0.01
+      : state.mode === "todo"
+        ? true
+        : remainingPeople <= 1;
   return {
     fullSub,
     paidSub: effectivePaidSub,
