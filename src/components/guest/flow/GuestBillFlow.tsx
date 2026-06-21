@@ -249,8 +249,8 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     if (!serverSync || items.length === 0) return;
     if (!serverSync.tableClosed) return;
     const { stage } = flow.state;
-    if (stage === "success") return;
-    // Mesa cerrada: todos ven la pantalla final (pagaron o no).
+    // Dejar ver la cuenta (bill) o quedarse en éxito; no expulsar al volver a pagar.
+    if (stage === "success" || stage === "bill") return;
     flow.finishWaiting();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverSync?.version, serverSync?.tableClosed, items.length, flow.state.stage]);
@@ -425,7 +425,7 @@ function BillShellStage({
   const payReady = derived.canPay;
   const mesaRemainingTotal = computeTotals(tableRemainingSub, config, 0).total;
 
-  const dockLayoutFull = hasPaidBefore || dockExpanded;
+  const dockLayoutFull = hasPaidBefore || dockExpanded || showPayDock;
 
   const scrollToUnpaidItems = () => {
     const root = scrollRef.current;

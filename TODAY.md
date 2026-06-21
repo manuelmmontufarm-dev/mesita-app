@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-20 — Fix producción: UX guest aún no en main
+- **Qué:** PR a `main` desde `feat/multi-qr-demo-mesas`; ajustes en `GuestBillFlow.tsx`, `drawer-receipts.ts`, `customer.css`.
+- **Por qué:** Producción (`mesita-demo.vercel.app`) quedó en merge PR #1 sin los 3 commits de UX; el usuario no veía ningún cambio.
+- **Qué hace:** Merge trae pay-again, recibo multi-pago y dock móvil a producción; no expulsa de bill al cerrar mesa; dock siempre expandido si falta saldo.
+
 ### 2026-06-20 — Recibo multi-pago, dock móvil, volver a pagar
 - **Qué:** `drawer-receipts.ts`, `ReceiptDrawer.tsx`, `GuestBillFlow.tsx`, `useGuestPaymentFlow.ts`, `bill-display.ts`, `types.ts`, `useDemoTableSession.ts`, `customer.css`, tests.
 - **Por qué:** Recibo mostraba solo el último pago; dock mini aplastaba el CTA en móvil; Ver mesa no dejaba pagar más (modo iguales + dock oculto + saldo solo local).

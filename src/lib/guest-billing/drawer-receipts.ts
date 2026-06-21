@@ -87,7 +87,16 @@ export function mergeDrawerReceipts(
     .slice()
     .reverse();
 
-  const fromServer = yours.map((p) => receiptFromSummary(p, items, config));
+  let fromServer = yours.map((p) => receiptFromSummary(p, items, config));
+
+  // Fallback: if guestId mismatch but we have local receipts, use all summaries
+  // for this guest's payment refs (single-device demo sessions).
+  if (fromServer.length === 0 && localReceipts.length > 0 && paidSummaries.length > 0) {
+    fromServer = paidSummaries
+      .slice()
+      .reverse()
+      .map((p) => receiptFromSummary(p, items, config));
+  }
   const refs = new Set(fromServer.map((r) => r.ref));
   const extras = localReceipts.filter((r) => !refs.has(r.ref));
 
