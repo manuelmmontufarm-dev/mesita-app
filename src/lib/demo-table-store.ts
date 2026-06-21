@@ -5,6 +5,7 @@ import {
   guestAvatarHue,
   personNumberFromLabel,
 } from "@/lib/guest-billing/split-math";
+import { resolveDemoTableToken } from "@/lib/demo-table-catalog";
 
 export interface JoinDemoTableOpts {
   guestId?: string;
@@ -59,7 +60,7 @@ export interface DemoPayment {
 }
 
 /** Bump when default demo seed shape changes — migrated in-place, never wipes guests. */
-const DEMO_STATE_VERSION = 5;
+const DEMO_STATE_VERSION = 6;
 
 export class DemoGuestNotFoundError extends Error {
   constructor(public readonly guestId: string) {
@@ -97,17 +98,6 @@ export interface DemoTableState {
 
 type DemoStore = Map<string, DemoTableState>;
 
-const DEMO_ITEMS: DemoFoodItem[] = [
-  { id: "locro", name: "Locro de papa", note: "", emoji: "🥣", qty: 1, unitPrice: 4.5 },
-  { id: "seco", name: "Seco de chivo", note: "", emoji: "🍖", qty: 1, unitPrice: 8.9 },
-  { id: "encebollado", name: "Encebollado", note: "", emoji: "🐟", qty: 1, unitPrice: 6 },
-  { id: "ceviche", name: "Ceviche de camarón", note: "", emoji: "🦐", qty: 1, unitPrice: 9.5 },
-  { id: "jugo-1", name: "Jugo de naranjilla", note: "", emoji: "🧃", qty: 1, unitPrice: 2.5 },
-  { id: "jugo-2", name: "Jugo de naranjilla", note: "", emoji: "🧃", qty: 1, unitPrice: 2.5 },
-  { id: "club-1", name: "Club Verde", note: "", emoji: "🍺", qty: 1, unitPrice: 2.75 },
-  { id: "club-2", name: "Club Verde", note: "", emoji: "🍺", qty: 1, unitPrice: 2.75 },
-];
-
 const REDIS_KEY = (token: string) => `mesita:demo:table:${token}`;
 
 function getMemoryStore(): DemoStore {
@@ -133,22 +123,34 @@ function nowIso(): string {
 
 function createState(token: string): DemoTableState {
   const ts = nowIso();
+  // Tokens that match the catalog (`demo`, `demo-mesa-N`) get their declared
+  // restaurant/menu/seed. Anything else (test harness tokens like `rigor-…`,
+  // legacy ad-hoc tokens) falls back to the default catalog entry so state
+  // shape stays useful.
+  const def =
+    resolveDemoTableToken(token) ?? resolveDemoTableToken("demo");
+  const restaurant = def?.restaurant ?? {
+    name: "La Doña Pepa",
+    tagline: "Comida casera ecuatoriana",
+    city: "Quito",
+    ivaRate: 0.15,
+    serviceRate: 0.1,
+    serviceEnabled: true,
+  };
+  const tableName = def?.table.name ?? "12";
+  const items = def?.items
+    ? def.items.map((it) => ({ ...it }))
+    : [];
+  const seed = def?.seed;
   return {
     token,
-    restaurant: {
-      name: "La Doña Pepa",
-      tagline: "Comida casera ecuatoriana",
-      city: "Quito",
-      ivaRate: 0.15,
-      serviceRate: 0.1,
-      serviceEnabled: true,
-    },
-    table: { name: "12" },
-    items: DEMO_ITEMS,
+    restaurant: { ...restaurant },
+    table: { name: tableName },
+    items,
     guests: [],
-    claims: {},
-    paidItemIds: [],
-    itemPaidUnits: {},
+    claims: { ...(seed?.claims ?? {}) },
+    paidItemIds: [...(seed?.paidItemIds ?? [])],
+    itemPaidUnits: { ...(seed?.itemPaidUnits ?? {}) },
     payments: [],
     nextGuestNumber: 1,
     stateVersion: DEMO_STATE_VERSION,
@@ -336,14 +338,13 @@ export async function getDemoTableState(token: string): Promise<DemoTableState> 
 
 export async function resetDemoTableState(token: string): Promise<DemoTableState> {
   const prev = await loadState(token);
+  // createState now seeds from the catalog (preserves mesa-2 partial payments,
+  // empty for the rest). Reset bumps resetSeq + version so SSE clients re-sync.
   const state = createState(token);
   state.resetSeq = (prev?.resetSeq ?? 0) + 1;
   state.version = (prev?.version ?? 0) + 1;
-  state.claims = {};
   state.guests = [];
   state.payments = [];
-  state.paidItemIds = [];
-  state.itemPaidUnits = {};
   state.nextGuestNumber = 1;
   getMemoryStore().set(token, state);
   const redis = getRedis();

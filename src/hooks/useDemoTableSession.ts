@@ -15,7 +15,7 @@ import {
   type PendingClaimOp,
   type PendingDemoOps,
 } from "@/lib/demo-optimistic-merge";
-import { DEMO_LOBBY, emojiForItemName } from "@/lib/demo-restaurant";
+import { emojiForItemName, getDemoLobbyFallback } from "@/lib/demo-restaurant";
 import type { DemoTableState } from "@/lib/demo-table-store";
 import { shouldApplyDemoVersion } from "@/lib/demo-table-store";
 import { isFreshDocumentNavigation } from "@/lib/navigation-kind";
@@ -838,12 +838,14 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       : g?.label || "";
   }, [raw, guestSessionId]);
 
+  const lobbyFallback = useMemo(() => getDemoLobbyFallback(token), [token]);
+
   const config: RestaurantConfig = useMemo(
     () => ({
-      name: raw?.restaurant.name ?? DEMO_LOBBY.restaurantName,
-      tagline: raw?.restaurant.tagline ?? DEMO_LOBBY.tagline,
-      table: raw?.table.name ?? DEMO_LOBBY.table,
-      city: raw?.restaurant.city ?? DEMO_LOBBY.city,
+      name: raw?.restaurant.name ?? lobbyFallback.restaurantName,
+      tagline: raw?.restaurant.tagline ?? lobbyFallback.tagline,
+      table: raw?.table.name ?? lobbyFallback.table,
+      city: raw?.restaurant.city ?? lobbyFallback.city,
       currency: "USD",
       ivaRate: IVA_RATE,
       serviceRate: PROPINA_RATE,
@@ -852,17 +854,17 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       defaultTip: 15,
       demoMode: true,
     }),
-    [raw],
+    [raw, lobbyFallback],
   );
 
   const lobby = useMemo(
     () => ({
-      restaurantName: raw?.restaurant.name ?? DEMO_LOBBY.restaurantName,
-      tagline: raw?.restaurant.tagline ?? DEMO_LOBBY.tagline,
-      table: raw?.table.name ?? DEMO_LOBBY.table,
-      city: raw?.restaurant.city ?? DEMO_LOBBY.city,
+      restaurantName: raw?.restaurant.name ?? lobbyFallback.restaurantName,
+      tagline: raw?.restaurant.tagline ?? lobbyFallback.tagline,
+      table: raw?.table.name ?? lobbyFallback.table,
+      city: raw?.restaurant.city ?? lobbyFallback.city,
     }),
-    [raw],
+    [raw, lobbyFallback],
   );
   const people = state?.guests.length ?? 1;
 

@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-20 — Multi-mesa demo + QR pack
+- **Qué:** `src/lib/demo-table-catalog/` (nuevo), `demo-table-store.ts`, `demo-restaurant.ts`, `useDemoTableSession.ts`, `src/app/pay/demo/[slug]/`, `qr-utils.ts`, `scripts/generate-demo-qr-pack.mjs`, `scripts/smoke-demo-tables.mjs`, tests e2e por mesa, `docs/DEMO_TABLES_DEBUG_REPORT.md`.
+- **Por qué:** Tener 4 mesas demo independientes con menús distintos (vacía, parcial, larga, ≥$50) para mostrar todos los flujos en una sola feria.
+- **Qué hace:** Token `demo` sigue idéntico. `demo-mesa-1..4` resuelven a `/pay/demo/{slug}` con menús propios, una pre-pagada parcial, y un PDF A4 multi-página con QRs (`npm run demo:qr-pack`).
+
 ### 2026-06-20 — Fix recibo z-index, Ver mesa, PDF legible
 - **Qué:** `customer.css`, `WaitingSuccessStage.tsx`, `ReceiptDrawer.tsx`, `receipt-pdf.ts`.
 - **Por qué:** Ver mesa y Pagar tu parte quedaban encima del recibo; botón con fondo gris incorrecto; PDF A5 ilegible.
