@@ -44,12 +44,6 @@ export interface TablePaymentSummary {
   createdAt?: string;
   itemCount?: number;
   subtotal?: number;
-  /** Item ids covered by this payment (item split mode). */
-  itemIds?: readonly ItemId[];
-  /** Payment reference (demo / POS). */
-  ref?: string;
-  iva?: number;
-  service?: number;
 }
 
 /** claims[itemId][memberId] = units (float, fractional allowed, Σ ≤ item.qty) */

@@ -102,14 +102,6 @@ describe("flowReducer — stage transitions", () => {
     s = flowReducer(s, { type: "stage/goSuccess" });
     expect(s.stage).toBe("success");
   });
-
-  it("waiting → goBill switches to item mode for another payment", () => {
-    const s = flowReducer(withState({ stage: "waiting", mode: "equal" }), {
-      type: "stage/goBill",
-    });
-    expect(s.stage).toBe("bill");
-    expect(s.mode).toBe("item");
-  });
 });
 
 describe("flowReducer — name / mode / tip / people", () => {
@@ -253,7 +245,7 @@ describe("deriveTotals", () => {
     expect(d.canPay).toBe(true);
   });
 
-  it("equal mode: subtotal = fixed share of full bill capped by remaining", () => {
+  it("equal mode: subtotal = remainingSub / remainingPeople", () => {
     const d = deriveTotals(
       withState({ mode: "equal", people: 4, paidItemIds: ["loc"] }),
       items,
@@ -261,24 +253,7 @@ describe("deriveTotals", () => {
       "you",
     );
     expect(d.remainingSub).toBeCloseTo(24.4, 5);
-    // fullSub ≈ 28.9 → share ≈ 7.225, not remaining/remainingPeople
-    expect(d.subtotal).toBeCloseTo(7.23, 1);
-  });
-
-  it("equal mode with one payer left does not charge full remaining bill", () => {
-    const d = deriveTotals(
-      withState({
-        mode: "equal",
-        people: 4,
-        paidIds: ["a", "b", "c"],
-      }),
-      items,
-      config,
-      "you",
-    );
-    expect(d.remainingPeople).toBe(1);
-    expect(d.subtotal).toBeLessThan(d.remainingSub - 0.01);
-    expect(d.isLastPayer).toBe(true);
+    expect(d.subtotal).toBeCloseTo(6.1, 5);
   });
 
   it("todo mode: subtotal = remainingSub", () => {
@@ -302,7 +277,7 @@ describe("deriveTotals", () => {
       config,
       "you",
     );
-    expect(d.isLastPayer).toBe(true);
+    expect(d.isLastPayer).toBe(false);
     expect(d.requiresFullBillInvoice).toBe(true);
     expect(requiresMandatoryInvoice({
       isLastPayer: d.isLastPayer,
@@ -350,62 +325,9 @@ describe("deriveTotals", () => {
     expect(d.paidSub).toBeCloseTo(4.5, 2);
   });
 
-  it("canPayMore when table still has balance after partial pay", () => {
-    const d = deriveTotals(
-      withState({ mode: "item", paidItemIds: ["loc"], receipts: [{
-        name: "Tú",
-        amount: 5,
-        subtotal: 4.5,
-        iva: 0.68,
-        propina: 0,
-        servicio: 0.45,
-        ivaRate: 0.15,
-        mode: "item" as const,
-        items: [],
-        how: "",
-        method: "card" as const,
-        methodLabel: "Tarjeta",
-        eInvoice: null,
-        ref: "MQR-1",
-        date: "2026-06-14",
-      }] }),
-      items,
-      config,
-      "you",
-    );
+  it("canPay = false when subtotal ≈ 0", () => {
+    const d = deriveTotals(withState({ mode: "item" }), items, config, "you");
     expect(d.canPay).toBe(false);
-    expect(d.canPayMore).toBe(true);
-  });
-
-  it("equal mode: no second equal charge after already paid equal share", () => {
-    const d = deriveTotals(
-      withState({
-        mode: "equal",
-        people: 4,
-        receipts: [{
-          name: "Tú",
-          amount: 10,
-          subtotal: 7.23,
-          iva: 1,
-          propina: 0,
-          servicio: 0,
-          ivaRate: 0.15,
-          mode: "equal" as const,
-          items: [],
-          how: "División en partes iguales",
-          method: "card" as const,
-          methodLabel: "Tarjeta",
-          eInvoice: null,
-          ref: "MQR-1",
-          date: "2026-06-14",
-        }],
-      }),
-      items,
-      config,
-      "you",
-    );
-    expect(d.canPay).toBe(false);
-    expect(d.canPayMore).toBe(true);
   });
 });
 

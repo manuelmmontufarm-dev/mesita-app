@@ -14,7 +14,6 @@
 
 import { useMemo, useRef, useState } from "react";
 
-import { payButtonLabel } from "@/lib/guest-billing/bill-display";
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
 import {
   billSubtotal,
@@ -380,10 +379,7 @@ export function ConfirmStage({
             disabled={!derived.canPay}
             data-testid="confirm-pay-btn"
           >
-            <Ic.lock s={18} />{" "}
-            {payButtonLabel(state.mode, fmt(derived.totals.total), {
-              again: flow.state.receipts.length > 0,
-            })}
+            <Ic.lock s={18} /> Pagar tu parte · {fmt(derived.totals.total)}
           </button>
           <button className="flow-secondary solid" onClick={() => flow.goToBill()} data-testid="confirm-back-btn">
             ← Volver a editar

@@ -46,13 +46,8 @@ import type {
   Claims,
   RestaurantConfig,
   TableMember,
-  TablePaymentSummary,
 } from "@/lib/guest-billing/types";
-import {
-  billYourPartLabel,
-  buildItemPayerNames,
-  expandRepeatedItems,
-} from "@/lib/guest-billing/bill-display";
+import { expandRepeatedItems } from "@/lib/guest-billing/bill-display";
 import { payerAvatarInitials } from "@/lib/guest-billing/bill-shell-scroll";
 import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
 
@@ -163,7 +158,6 @@ export function BillItemRow({
   paid,
   displayClaims,
   pendingClaims = {},
-  paidByName,
 }: {
   item: BillItem;
   flow: Flow;
@@ -172,7 +166,6 @@ export function BillItemRow({
   paid: boolean;
   displayClaims: Claims;
   pendingClaims?: Readonly<Record<string, PendingClaimOp>>;
-  paidByName?: string;
 }) {
   const { state, youId } = flow;
   const pendingOp = pendingClaims[item.id];
@@ -259,11 +252,7 @@ export function BillItemRow({
         </div>
         <div className="item-fp-sub">
           {paid ? (
-            paidByName ? (
-              <span className="paid-by-tag">Pagó {paidByName}</span>
-            ) : (
-              <span className="paid-tag">Pagado</span>
-            )
+            <span className="paid-tag">Pagado</span>
           ) : mode === "item" && isLoading ? (
             <span className="sync-tag">Guardando…</span>
           ) : mode === "item" && claimants.length > 0 ? (
@@ -422,7 +411,6 @@ export interface BillStageProps {
   sessionClaims?: Claims;
   /** In-flight claim/release on this device — spinner until server confirms. */
   pendingClaims?: Readonly<Record<string, PendingClaimOp>>;
-  paidSummaries?: readonly TablePaymentSummary[];
 }
 
 export function BillStage({
@@ -433,16 +421,11 @@ export function BillStage({
   shareEnabled = true,
   sessionClaims,
   pendingClaims = {},
-  paidSummaries = [],
 }: BillStageProps) {
   const { state, derived } = flow;
   const { mode, tip, people, paidItemIds, claims: localClaims } = state;
   /** Server is source of truth for item selection UI (no optimistic check flicker). */
   const displayClaims = sessionClaims ?? localClaims;
-  const itemPayerNames = useMemo(
-    () => buildItemPayerNames(paidSummaries),
-    [paidSummaries],
-  );
 
   const [otherTip, setOtherTip] = useState(false);
   // Monto en USD que el usuario teclea en "Otro" — persiste aunque el parent
@@ -666,7 +649,7 @@ export function BillStage({
         )}
 
         {/* Items */}
-        <div className="bill-items-list" data-testid="bill-items-list">
+        <div>
           {sortedItems.map((it) => (
             <BillItemRow
               key={it.id}
@@ -677,7 +660,6 @@ export function BillStage({
               paid={isItemPaid(paidItemIds, it.id)}
               displayClaims={displayClaims}
               pendingClaims={pendingClaims}
-              paidByName={itemPayerNames[it.id]}
             />
           ))}
         </div>
@@ -826,9 +808,7 @@ export function BillStage({
         <hr className="bill-card-hr" />
 
         <div className="bill-your-part-row">
-          <span className="bill-your-part-label">
-            {billYourPartLabel(mode)}
-          </span>
+          <span className="bill-your-part-label">{COPY.yourPart}</span>
           <span className="bill-your-part-amt" data-testid="bill-total">
             {fmt(derived.totals.total)}
           </span>

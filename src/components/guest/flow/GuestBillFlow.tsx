@@ -31,16 +31,10 @@ import {
 } from "@/hooks/useGuestPaymentFlow";
 import type { LiveSessionActions } from "@/hooks/useLiveTableSession";
 import { fmt } from "@/lib/guest-billing";
-import {
-  dockAmountLabel,
-  dockPayButtonLabel,
-  payAgainSelectLabel,
-} from "@/lib/guest-billing/bill-display";
-import { mergeDrawerReceipts } from "@/lib/guest-billing/drawer-receipts";
-import { computeTotals, freeUnits, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
 import { computeBillShellScrollMetrics } from "@/lib/guest-billing/bill-shell-scroll";
 import { mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
 import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
+import { freeUnits, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
 import type {
   BillItem,
   Claims,
@@ -249,8 +243,8 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     if (!serverSync || items.length === 0) return;
     if (!serverSync.tableClosed) return;
     const { stage } = flow.state;
-    // Dejar ver la cuenta (bill) o quedarse en éxito; no expulsar al volver a pagar.
-    if (stage === "success" || stage === "bill") return;
+    if (stage === "success") return;
+    // Mesa cerrada: todos ven la pantalla final (pagaron o no).
     flow.finishWaiting();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverSync?.version, serverSync?.tableClosed, items.length, flow.state.stage]);
@@ -297,29 +291,18 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     tableToken,
   };
   const stage = flow.state.stage;
-  const drawerReceipts = useMemo(
-    () =>
-      mergeDrawerReceipts(
-        flow.state.receipts,
-        paidSummaries ?? [],
-        resolvedYouId,
-        items,
-        config,
-      ),
-    [flow.state.receipts, paidSummaries, resolvedYouId, items, config],
-  );
   const receiptDrawer =
-    drawerReceipts.length > 0 ? (
-      <ReceiptDrawer receipts={drawerReceipts} config={config} />
+    flow.state.receipts.length > 0 ? (
+      <ReceiptDrawer receipts={flow.state.receipts} config={config} />
     ) : null;
 
   useEffect(() => {
     document.documentElement.classList.toggle(
       "has-receipt-peek",
-      drawerReceipts.length > 0,
+      flow.state.receipts.length > 0,
     );
     return () => document.documentElement.classList.remove("has-receipt-peek");
-  }, [drawerReceipts.length]);
+  }, [flow.state.receipts.length]);
 
   // Waiting and Success share a single WaitingSuccessStage so the component
   // root never unmounts during the transition. ReceiptDrawer is also kept
@@ -362,8 +345,6 @@ function BillShellStage({
   config,
   sessionClaims,
   pendingClaims,
-  paidSummaries,
-  demoTableProgress,
   onResetDemo,
 }: StageProps) {
   const { state, derived } = flow;
@@ -414,51 +395,6 @@ function BillShellStage({
 
   const dockExpanded = atBottom || !scrollable;
   const bump = useBumpOnChange(Math.round(derived.totals.total * 100));
-  const yourServerPayments =
-    paidSummaries?.filter((p) => p.guestId === flow.youId).length ?? 0;
-  const hasPaidBefore = state.receipts.length > 0 || yourServerPayments > 0;
-  const tableRemainingSub =
-    demoTableProgress?.tableClosed === true
-      ? 0
-      : (demoTableProgress?.remainingSub ?? derived.remainingSub);
-  const showPayDock = tableRemainingSub > 0.001;
-  const payReady = derived.canPay;
-  const mesaRemainingTotal = computeTotals(tableRemainingSub, config, 0).total;
-
-  const dockLayoutFull = hasPaidBefore || dockExpanded || showPayDock;
-
-  const scrollToUnpaidItems = () => {
-    const root = scrollRef.current;
-    if (!root) return;
-    const firstUnpaid = root.querySelector<HTMLElement>(".item-row-fp:not(.paid)");
-    if (firstUnpaid) {
-      firstUnpaid.scrollIntoView({ behavior: "smooth", block: "center" });
-      firstUnpaid.classList.add("pay-nudge");
-      window.setTimeout(() => firstUnpaid.classList.remove("pay-nudge"), 1400);
-    }
-  };
-
-  const handleDockPay = () => {
-    if (payReady) {
-      flow.goToConfirm();
-      return;
-    }
-    if (showPayDock && state.mode === "item") {
-      scrollToUnpaidItems();
-    }
-  };
-
-  const dockLabel = payReady
-    ? dockPayButtonLabel(state.mode, fmt(derived.totals.total), {
-        again: hasPaidBefore,
-        compact: dockLayoutFull,
-      })
-    : payAgainSelectLabel(state.mode);
-
-  const dockHint =
-    hasPaidBefore && derived.canPayMore && !payReady
-      ? "Aún falta en la mesa · elige lo tuyo"
-      : state.name.trim() || "tu parte";
 
   return (
     <div
@@ -507,41 +443,34 @@ function BillShellStage({
           config={config}
           sessionClaims={sessionClaims}
           pendingClaims={pendingClaims}
-          paidSummaries={paidSummaries}
         />
       </div>
 
-      {/* sticky bottom pay dock — stays visible after prior payments (receipt peek) */}
-      {showPayDock ? (
-        <div
-          className={
-            "c-dock glass-dock pay-dock-return " +
-            (dockLayoutFull ? "dock-full" : "dock-mini dock-mini-compact")
-          }
-        >
-          <div className="dock-top">
-            <div className="dock-k">
-              {hasPaidBefore ? "Falta por pagar" : dockAmountLabel(state.mode)}
-              <small>
-                {dockHint} · Mesa {config.table}
-              </small>
-            </div>
-            <div className={"dock-total" + (bump ? " bump" : "")}>
-              {payReady ? fmt(derived.totals.total) : fmt(mesaRemainingTotal)}
-            </div>
+      {/* sticky bottom pay dock */}
+      <div className={"c-dock glass-dock " + (dockExpanded ? "dock-full" : "dock-mini") + (flow.state.receipts.length > 0 ? " has-receipt-dock" : "")}>
+        <div className="dock-top">
+          <div className="dock-k">
+            Tu parte
+            <small>
+              {state.name.trim() || "tu parte"} · Mesa {config.table}
+            </small>
           </div>
-          <button
-            className={"c-pay-btn" + (payReady ? "" : " is-soft")}
-            onClick={handleDockPay}
-            data-testid="dock-pay-btn"
-          >
-            <Ic.lock s={18} /> {dockLabel}
-          </button>
-          <div className="pay-secure">
-            <Ic.shield s={13} /> Pago cifrado · Factura electrónica automática
+          <div className={"dock-total" + (bump ? " bump" : "")}>
+            {fmt(derived.totals.total)}
           </div>
         </div>
-      ) : null}
+        <button
+          className="c-pay-btn"
+          onClick={() => flow.goToConfirm()}
+          disabled={!derived.canPay}
+          data-testid="dock-pay-btn"
+        >
+          <Ic.lock s={18} /> Pagar tu parte · {fmt(derived.totals.total)}
+        </button>
+        <div className="pay-secure">
+          <Ic.shield s={13} /> Pago cifrado · Factura electrónica automática
+        </div>
+      </div>
 
       {state.shareItem && (
         <ShareSheet flow={flow} items={items} members={members} />

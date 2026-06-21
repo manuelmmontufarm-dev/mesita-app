@@ -19,7 +19,6 @@ import { useCallback, useMemo, useReducer } from "react";
 import {
   billSubtotal,
   computeTotals,
-  equalShareSubtotal,
   freeUnits,
   guestLabel,
   itemOwed,
@@ -251,14 +250,7 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
     case "stage/goPayment":
       return { ...state, stage: "payment" };
     case "stage/goBill":
-      return {
-        ...state,
-        stage: "bill",
-        mode:
-          state.stage === "waiting" || state.stage === "success"
-            ? "item"
-            : state.mode,
-      };
+      return { ...state, stage: "bill" };
     case "stage/goWaiting":
       return { ...state, stage: "waiting" };
     case "stage/goSuccess":
@@ -336,8 +328,6 @@ export interface DerivedTotals {
   subtotal: number;
   totals: BillTotals;
   canPay: boolean;
-  /** Table still has unpaid balance — guest may return for another payment. */
-  canPayMore: boolean;
   /** True iff fewer than 2 people remain to pay. Drives forced e-invoice. */
   isLastPayer: boolean;
   /** Full-table pay (Todo) with total ≥ threshold — invoice mandatory even with others at table. */
@@ -370,7 +360,6 @@ export function deriveTotals(
   );
   const effectivePaidSub = Math.max(paidFromItems, paidFromReceipts);
   const remainingSub = Math.max(0, fullSub - effectivePaidSub);
-  const splitCount = Math.max(2, Math.round(state.people));
   const paidPeople = state.paidIds.length;
   const remainingPeople = Math.max(1, state.people - paidPeople);
   const myUnpaidSub = items.reduce(
@@ -378,23 +367,14 @@ export function deriveTotals(
       s + (state.paidItemIds.includes(it.id) ? 0 : itemOwed(it, state.claims, youId)),
     0,
   );
-  const youPaidEqualShare = state.receipts.some((r) => r.mode === "equal");
   const subtotal =
     state.mode === "equal"
-      ? youPaidEqualShare
-        ? 0
-        : equalShareSubtotal(fullSub, state.people, remainingSub)
+      ? remainingSub / remainingPeople
       : state.mode === "todo"
         ? remainingSub
         : myUnpaidSub;
   const totals = computeTotals(subtotal, config, state.tip);
-  const equalShareSub = equalShareSubtotal(fullSub, state.people, fullSub);
-  const isLastPayer =
-    state.mode === "equal"
-      ? paidPeople >= splitCount - 1 || remainingSub <= equalShareSub + 0.01
-      : state.mode === "todo"
-        ? true
-        : remainingPeople <= 1;
+  const isLastPayer = remainingPeople <= 1;
   return {
     fullSub,
     paidSub: effectivePaidSub,
@@ -405,7 +385,6 @@ export function deriveTotals(
     subtotal,
     totals,
     canPay: subtotal > 0.001,
-    canPayMore: remainingSub > 0.001,
     isLastPayer,
     requiresFullBillInvoice:
       state.mode === "todo" && totals.total >= INVOICE_MANDATORY_THRESHOLD,

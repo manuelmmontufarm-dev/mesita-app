@@ -44,17 +44,6 @@ export const lineTotal = (it: Pick<BillItem, "qty" | "unitPrice">): number =>
 export const billSubtotal = (items: readonly BillItem[]): number =>
   items.reduce((s, it) => s + lineTotal(it), 0);
 
-/** Fixed N-way equal share, capped by what remains on the bill. */
-export function equalShareSubtotal(
-  fullSub: number,
-  people: number,
-  remainingSub: number,
-): number {
-  const splitCount = Math.max(2, Math.round(people));
-  const share = round2(fullSub / splitCount);
-  return Math.min(remainingSub, share);
-}
-
 /* ---------------- member / guest labelling ---------------- */
 
 export const NAME_PILL_MAX = 10;
