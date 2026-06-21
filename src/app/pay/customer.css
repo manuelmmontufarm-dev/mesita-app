@@ -3623,8 +3623,13 @@ html.has-receipt-peek .cust-app[data-stage="bill"] .c-dock.pay-dock-return {
   visibility: visible;
   pointer-events: auto;
   opacity: 1;
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + var(--receipt-peek, 84px));
-  z-index: 94;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px) + var(--receipt-peek, 96px));
+  z-index: 97;
+}
+.c-dock.pay-dock-return {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 20px 44px -16px rgba(40, 34, 28, 0.38);
 }
 .c-dock.pay-dock-return.dock-full .c-pay-btn {
   font-size: 17px;
