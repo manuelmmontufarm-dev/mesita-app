@@ -251,7 +251,14 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
     case "stage/goPayment":
       return { ...state, stage: "payment" };
     case "stage/goBill":
-      return { ...state, stage: "bill" };
+      return {
+        ...state,
+        stage: "bill",
+        mode:
+          state.stage === "waiting" || state.stage === "success"
+            ? "item"
+            : state.mode,
+      };
     case "stage/goWaiting":
       return { ...state, stage: "waiting" };
     case "stage/goSuccess":

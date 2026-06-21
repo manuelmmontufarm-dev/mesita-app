@@ -27,12 +27,13 @@ function ReceiptSection({ receipt, config, index, total }: {
   const items = receipt.items ?? [];
   return (
     <section className="rcpt-payment-block" data-testid={`receipt-payment-${index}`}>
-      {total > 1 && (
-        <div className="rcpt-payment-head">
-          <span className="rcpt-payment-num">Pago {index + 1} de {total}</span>
-          <span className="rcpt-payment-date">{receipt.date || "—"}</span>
-        </div>
-      )}
+      <div className="rcpt-payment-head">
+        <span className="rcpt-payment-num">
+          Pago {index + 1}
+          {total > 1 ? ` de ${total}` : ""}
+        </span>
+        <span className="rcpt-payment-date">{receipt.date || "—"}</span>
+      </div>
       <div className="rcpt-amount">{fmt(receipt.amount || 0)}</div>
       <div className="rcpt-amount-l">Pagado por {receipt.name?.trim() || guestLabel(1)}</div>
       {receipt.how && <div className="rcpt-how"><Ic.split s={14} /> {receipt.how}</div>}
@@ -146,6 +147,15 @@ export function ReceiptDrawer({ receipts, config, peekLabel = "Tu recibo" }: Rec
               {fmt(totalAmt)} <Ic.chevron s={15} />
             </span>
           </div>
+          {count > 0 && (
+            <div className="rcpt-peek-payments" data-testid="receipt-peek-payments">
+              {receipts.map((r, i) => (
+                <span key={r.ref} className="rcpt-peek-pay-chip">
+                  Pago {i + 1} · {fmt(r.amount)}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       <div className="rcpt-paper">
