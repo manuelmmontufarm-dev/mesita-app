@@ -31,6 +31,7 @@ import {
 } from "@/hooks/useGuestPaymentFlow";
 import type { LiveSessionActions } from "@/hooks/useLiveTableSession";
 import { fmt } from "@/lib/guest-billing";
+import { dockAmountLabel, payButtonLabel } from "@/lib/guest-billing/bill-display";
 import { computeBillShellScrollMetrics } from "@/lib/guest-billing/bill-shell-scroll";
 import { mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
 import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
@@ -345,6 +346,7 @@ function BillShellStage({
   config,
   sessionClaims,
   pendingClaims,
+  paidSummaries,
   onResetDemo,
 }: StageProps) {
   const { state, derived } = flow;
@@ -443,6 +445,7 @@ function BillShellStage({
           config={config}
           sessionClaims={sessionClaims}
           pendingClaims={pendingClaims}
+          paidSummaries={paidSummaries}
         />
       </div>
 
@@ -450,7 +453,7 @@ function BillShellStage({
       <div className={"c-dock glass-dock " + (dockExpanded ? "dock-full" : "dock-mini") + (flow.state.receipts.length > 0 ? " has-receipt-dock" : "")}>
         <div className="dock-top">
           <div className="dock-k">
-            Tu parte
+            {dockAmountLabel(state.mode)}
             <small>
               {state.name.trim() || "tu parte"} · Mesa {config.table}
             </small>
@@ -465,7 +468,7 @@ function BillShellStage({
           disabled={!derived.canPay}
           data-testid="dock-pay-btn"
         >
-          <Ic.lock s={18} /> Pagar tu parte · {fmt(derived.totals.total)}
+          <Ic.lock s={18} /> {payButtonLabel(state.mode, fmt(derived.totals.total))}
         </button>
         <div className="pay-secure">
           <Ic.shield s={13} /> Pago cifrado · Factura electrónica automática

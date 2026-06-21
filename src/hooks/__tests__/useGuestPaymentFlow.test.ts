@@ -245,7 +245,7 @@ describe("deriveTotals", () => {
     expect(d.canPay).toBe(true);
   });
 
-  it("equal mode: subtotal = remainingSub / remainingPeople", () => {
+  it("equal mode: subtotal = fixed share of full bill capped by remaining", () => {
     const d = deriveTotals(
       withState({ mode: "equal", people: 4, paidItemIds: ["loc"] }),
       items,
@@ -253,7 +253,24 @@ describe("deriveTotals", () => {
       "you",
     );
     expect(d.remainingSub).toBeCloseTo(24.4, 5);
-    expect(d.subtotal).toBeCloseTo(6.1, 5);
+    // fullSub ≈ 28.9 → share ≈ 7.225, not remaining/remainingPeople
+    expect(d.subtotal).toBeCloseTo(7.23, 1);
+  });
+
+  it("equal mode with one payer left does not charge full remaining bill", () => {
+    const d = deriveTotals(
+      withState({
+        mode: "equal",
+        people: 4,
+        paidIds: ["a", "b", "c"],
+      }),
+      items,
+      config,
+      "you",
+    );
+    expect(d.remainingPeople).toBe(1);
+    expect(d.subtotal).toBeLessThan(d.remainingSub - 0.01);
+    expect(d.isLastPayer).toBe(true);
   });
 
   it("todo mode: subtotal = remainingSub", () => {
@@ -277,7 +294,7 @@ describe("deriveTotals", () => {
       config,
       "you",
     );
-    expect(d.isLastPayer).toBe(false);
+    expect(d.isLastPayer).toBe(true);
     expect(d.requiresFullBillInvoice).toBe(true);
     expect(requiresMandatoryInvoice({
       isLastPayer: d.isLastPayer,
