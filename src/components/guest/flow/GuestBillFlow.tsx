@@ -566,31 +566,14 @@ function BillShellStage({
           </div>
         </div>
       ) : demoTableProgress?.tableClosed ? (
-        <div
-          className={
-            "c-dock glass-dock pay-dock-return completed-dock " +
-            (dockExpanded ? "dock-full" : "dock-mini")
-          }
-        >
-          <div className="dock-top">
-            <div className="dock-k">
-              Mesa cerrada
-              <small>
-                {config.name} · Mesa {config.table}
-              </small>
-            </div>
-            <div className="dock-total completed-dock-mark" aria-hidden="true">
-              <Ic.check s={22} />
-            </div>
-          </div>
+        <div className="c-dock glass-dock pay-dock-return completed-dock dock-full">
           <button
             type="button"
             className="c-pay-btn completed-dock-btn"
             onClick={() => flow.finishWaiting()}
             data-testid="dock-completed-btn"
           >
-            <Ic.check s={18} />{" "}
-            {dockExpanded ? "Ver ¡Cuenta completada!" : "¡Cuenta completada!"}
+            <Ic.check s={18} /> Regresar al resumen de mesa
           </button>
         </div>
       ) : null}

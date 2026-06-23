@@ -79,6 +79,16 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-23 — Dock resumen, recibo compacto, confirm foot fijo
+- **Qué:** `GuestBillFlow.tsx`, `ReceiptDrawer.tsx`, `drawer-receipts.ts`, `customer.css`, `_shared.tsx` (share chip).
+- **Por qué:** Dock “cuenta completada” partido se veía raro; recibo peek muy alto; en confirm el botón pagar dejaba ver scroll por debajo; recibo a veces desaparecía tras cerrar mesa.
+- **Qué hace:** Un solo CTA verde **Regresar al resumen de mesa**; peek solo muestra fila “Tu recibo · N pagos · total” (chips al expandir); foot de confirm opaco y fijo sobre peek; merge de recibos más resiliente; chip **Compartido 50% c/u** en filas.
+
+### 2026-06-23 — Chip “Compartido” en filas (reemplaza barra de split)
+- **Qué:** `_shared.tsx` (`SharedPortionStrip`), `customer.css`.
+- **Por qué:** La barra horizontal segmentada con “Entre 2 · Persona 50%…” se veía tosca y repetía info.
+- **Qué hace:** Pill verde suave con avatares superpuestos + “Compartido” + badge `50% c/u` (o % por persona si el reparto es desigual); mismo brillo al tocar.
+
 ### 2026-06-23 — Split math + dock cuenta cerrada smooth + escenario [22]
 - **Qué:** `GuestBillFlow.tsx`, `demo-optimistic-merge.ts`, `ConfirmStage.tsx`, `split-math.ts`, `customer.css`, `demo-scenarios.ts` (escenario 22), tests.
 - **Por qué:** Totales del dock/precuenta ignoraban el reparto 50/50 (`derived` usaba claims sin merge); badge `%` no salía si el servidor tenía el split pero local solo tu mitad; dock “Ver ¡Cuenta completada!” fijo sin animación mini/full.

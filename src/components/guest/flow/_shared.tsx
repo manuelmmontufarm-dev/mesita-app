@@ -489,7 +489,7 @@ export function OwnerChip({
   );
 }
 
-/** Compact split bar on bill rows when a dish is shared between guests. */
+/** Compact shared-dish pill on bill rows — overlapping avatars + % badge. */
 export function SharedPortionStrip({
   itemId,
   itemQty,
@@ -511,42 +511,49 @@ export function SharedPortionStrip({
 }) {
   if (claimants.length < 2) return null;
   const total = Math.max(itemQty, 0.001);
+  const parts = claimants.map((id) => {
+    const u = unitsOf(claims, itemId, id);
+    const pct = Math.round((u / total) * 100);
+    const member = resolveClaimantMember(id, roster, youId, youName);
+    const name = memberPillLabel(member, youId === id ? youName : undefined, 8);
+    return { id, pct, name, member };
+  });
+  const allEqual =
+    parts.length > 0 && parts.every((p) => p.pct === parts[0]!.pct);
+  const ariaLabel = allEqual
+    ? `Compartido entre ${claimants.length}, ${parts[0]!.pct}% cada uno`
+    : `Compartido: ${parts.map((p) => `${p.name} ${p.pct}%`).join(", ")}`;
 
   return (
-    <div
-      className={"item-share-strip" + (emphasize ? " item-share-strip-attn" : "")}
+    <span
+      className={"share-chip" + (emphasize ? " share-chip-attn" : "")}
       data-testid="item-share-strip"
+      role="status"
+      aria-label={ariaLabel}
     >
-      <div className="item-share-bar" aria-hidden="true">
-        {claimants.map((id) => {
-          const u = unitsOf(claims, itemId, id);
-          const member = resolveClaimantMember(id, roster, youId, youName);
-          return (
-            <span
-              key={id}
-              className="item-share-seg"
-              style={{ flexGrow: Math.max(u, 0.001) }}
-              title={memberPillLabel(member, youId === id ? youName : undefined, 12)}
-            >
-              <AvatarDot
-                member={member}
-                name={youId === id ? youName : undefined}
-                size={16}
-              />
-            </span>
-          );
-        })}
-      </div>
-      <span className="item-share-meta">
-        Entre {claimants.length}
-        {claimants.map((id) => {
-          const pct = Math.round((unitsOf(claims, itemId, id) / total) * 100);
-          const member = resolveClaimantMember(id, roster, youId, youName);
-          const short = memberPillLabel(member, youId === id ? youName : undefined, 8);
-          return ` · ${short} ${pct}%`;
-        })}
+      <span className="share-chip-avs" aria-hidden="true">
+        {parts.map(({ id, member }) => (
+          <AvatarDot
+            key={id}
+            member={member}
+            name={youId === id ? youName : undefined}
+            size={18}
+          />
+        ))}
       </span>
-    </div>
+      <span className="share-chip-label">Compartido</span>
+      <span className="share-chip-pcts" aria-hidden="true">
+        {allEqual ? (
+          <span className="share-pct-pill">{parts[0]!.pct}% c/u</span>
+        ) : (
+          parts.map((p) => (
+            <span key={p.id} className="share-pct-pill">
+              {p.name} {p.pct}%
+            </span>
+          ))
+        )}
+      </span>
+    </span>
   );
 }
 

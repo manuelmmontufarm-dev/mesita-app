@@ -89,23 +89,17 @@ export function mergeDrawerReceipts(
 
   let fromServer = yours.map((p) => receiptFromSummary(p, items, config));
 
-  // Fallback: if guestId mismatch but we have local receipts, use all summaries
-  // for this guest's payment refs (single-device demo sessions).
-  const usedFallback =
-    fromServer.length === 0 && localReceipts.length > 0 && paidSummaries.length > 0;
-  if (usedFallback) {
+  if (fromServer.length === 0 && paidSummaries.length > 0) {
     fromServer = paidSummaries
       .slice()
       .reverse()
       .map((p) => receiptFromSummary(p, items, config));
   }
+
   const refs = new Set(fromServer.map((r) => r.ref));
   const extras = localReceipts.filter((r) => !refs.has(r.ref));
 
-  // Server payments are authoritative when present — local receipts are a
-  // client-side cache that often carries a different ref than recordDemoPayment.
-  const merged =
-    fromServer.length > 0 ? fromServer : extras.length > 0 ? extras : fromServer;
+  if (fromServer.length > 0) return fromServer;
 
-  return merged;
+  return extras.length > 0 ? extras : [];
 }

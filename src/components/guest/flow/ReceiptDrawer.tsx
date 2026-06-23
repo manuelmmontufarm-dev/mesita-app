@@ -104,8 +104,21 @@ export function ReceiptDrawer({ receipts, config, peekLabel = "Tu recibo" }: Rec
     const peek = `${hd.offsetHeight}px`;
     el.style.setProperty("--peek", peek);
     root.style.setProperty("--receipt-peek", peek);
-    return () => { root.style.removeProperty("--receipt-peek"); };
-  });
+    const ro = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(() => {
+          const h = perfRef.current?.offsetHeight;
+          if (!h || !containerRef.current) return;
+          const px = `${h}px`;
+          containerRef.current.style.setProperty("--peek", px);
+          root.style.setProperty("--receipt-peek", px);
+        })
+      : null;
+    ro?.observe(hd);
+    return () => {
+      ro?.disconnect();
+      root.style.removeProperty("--receipt-peek");
+    };
+  }, [count, pos, totalAmt]);
 
   const peekPx = () => {
     const el = containerRef.current;
@@ -147,7 +160,7 @@ export function ReceiptDrawer({ receipts, config, peekLabel = "Tu recibo" }: Rec
               {fmt(totalAmt)} <Ic.chevron s={15} />
             </span>
           </div>
-          {count > 0 && (
+          {pos === "open" && count > 0 && (
             <div className="rcpt-peek-payments" data-testid="receipt-peek-payments">
               {receipts.map((r, i) => (
                 <span key={r.ref} className="rcpt-peek-pay-chip">
