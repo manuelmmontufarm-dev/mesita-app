@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-23 — Dock mini/full en confirm y payment + anti-flicker scroll
+- **Qué:** `useCollapsiblePayDock.ts`, `bill-shell-scroll.ts`, `GuestBillFlow.tsx`, `ConfirmStage.tsx`, `PaymentStage.tsx`, `customer.css`.
+- **Por qué:** Con recibo abajo, confirm/payment tenían foot fijo sin colapsar al scroll; el dock de bill parpadeaba mini↔full al bajar por feedback entre altura del dock y `padding-bottom`.
+- **Qué hace:** Misma lógica que primera página: mini con botones a los lados al subir, full al llegar abajo; histéresis de scroll + `--pay-stack-height` siempre mide dock expandido para padding estable.
+
 ### 2026-06-23 — Esquinas del stack pay+recibo y scroll en todas las fases
 - **Qué:** `GuestBillFlow.tsx`, `customer.css`.
 - **Por qué:** Al hacer scroll el contenido quedaba tapado bajo el stack (bill/confirm/payment); en la unión pay dock ↔ “Tu recibo” se veían triángulos de fondo por `border-radius` en ambos widgets.

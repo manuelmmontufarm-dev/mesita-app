@@ -42,7 +42,8 @@ import {
   shouldEnableSheetOpenClass,
 } from "@/lib/guest-billing/receipt-peek-layout";
 import { freeUnits, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
-import { computeBillShellScrollMetrics } from "@/lib/guest-billing/bill-shell-scroll";
+import { measureExpandedPayStackHeight } from "@/lib/guest-billing/bill-shell-scroll";
+import { useCollapsiblePayDock } from "@/hooks/useCollapsiblePayDock";
 import { mergeClaimsForDisplay } from "@/lib/demo-optimistic-merge";
 import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
 import type {
@@ -70,6 +71,7 @@ interface StageProps {
   demoTableProgress?: DemoTableProgress;
   onResetDemo?: () => Promise<void>;
   tableToken?: string;
+  receiptPeekActive?: boolean;
 }
 
 export interface GuestBillFlowProps {
@@ -343,6 +345,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     demoTableProgress,
     onResetDemo,
     tableToken,
+    receiptPeekActive: drawerReceipts.length > 0,
   };
 
   const receiptDrawer =
@@ -385,7 +388,10 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
         root.style.setProperty("--receipt-peek", `${peekHd.offsetHeight}px`);
       }
       if (payEl) {
-        root.style.setProperty("--pay-stack-height", `${payEl.offsetHeight}px`);
+        root.style.setProperty(
+          "--pay-stack-height",
+          `${measureExpandedPayStackHeight(payEl)}px`,
+        );
         root.classList.add("has-pay-stack-above");
       } else {
         root.style.removeProperty("--pay-stack-height");
@@ -478,49 +484,28 @@ function BillShellStage({
   const [resetting, setResetting] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [atBottom, setAtBottom] = useState(false);
   const [headCompact, setHeadCompact] = useState(false);
-  const [scrollable, setScrollable] = useState(false);
+
+  const { handleScroll: onDockScroll, dockExpanded } = useCollapsiblePayDock(
+    scrollRef,
+    [
+      state.mode,
+      state.claims,
+      state.people,
+      state.tip,
+      state.paidItemIds,
+      state.name,
+      config.serviceEnabled,
+      items.length,
+    ],
+    true,
+  );
 
   const handleScroll = (e: UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
-    const metrics = computeBillShellScrollMetrics(el);
-    setAtBottom(metrics.atBottom);
-    setHeadCompact(el.scrollTop > 16);
+    onDockScroll(e);
+    setHeadCompact(e.currentTarget.scrollTop > 16);
   };
 
-  const remeasureScroll = () => {
-    const el = scrollRef.current;
-    const metrics = computeBillShellScrollMetrics(el);
-    setScrollable(metrics.scrollable);
-    setAtBottom(metrics.atBottom);
-  };
-
-  // Measure whether the content is actually overflowing — if not, expand the
-  // dock immediately (no scroll needed). Re-measure on every state mutation
-  // that changes content height.
-  useLayoutEffect(() => {
-    remeasureScroll();
-    const el = scrollRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => remeasureScroll());
-    ro.observe(el);
-    for (const child of el.children) {
-      ro.observe(child);
-    }
-    return () => ro.disconnect();
-  }, [
-    state.mode,
-    state.claims,
-    state.people,
-    state.tip,
-    state.paidItemIds,
-    state.name,
-    config.serviceEnabled,
-    items.length,
-  ]);
-
-  const dockExpanded = atBottom || !scrollable;
   const bump = useBumpOnChange(Math.round(derived.totals.total * 100));
   const tableRemainingSub =
     demoTableProgress?.tableClosed === true

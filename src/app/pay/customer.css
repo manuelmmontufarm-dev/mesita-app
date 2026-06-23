@@ -4038,6 +4038,105 @@ html.has-receipt-peek .cust-app[data-stage="payment"] .flow-foot {
   -webkit-backdrop-filter: blur(22px) saturate(180%);
   backdrop-filter: blur(22px) saturate(180%);
   isolation: isolate;
+  transition: padding 0.38s var(--ease), border-radius 0.38s var(--ease);
+}
+html.has-receipt-peek .flow-foot.pay-flow-dock.dock-full {
+  border-radius: 22px 22px 0 0;
+}
+html.has-receipt-peek .flow-foot.pay-flow-dock.dock-mini {
+  padding: 10px 12px 12px;
+  border-radius: 22px 22px 0 0;
+  display: grid;
+  align-items: center;
+  column-gap: clamp(8px, 2.5vw, 12px);
+  row-gap: 0;
+  gap: 0;
+}
+html.has-receipt-peek .flow-foot.pay-flow-dock.dock-mini .dock-top {
+  display: contents;
+}
+html.has-receipt-peek .flow-foot.pay-flow-dock.dock-mini .dock-k {
+  min-width: 0;
+  font-size: clamp(12px, 3.4vw, 13px);
+  font-weight: 600;
+  color: var(--c-ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html.has-receipt-peek .flow-foot.pay-flow-dock.dock-mini .dock-k small {
+  display: none;
+}
+html.has-receipt-peek .flow-foot.pay-flow-dock.dock-mini .dock-total {
+  flex-shrink: 0;
+  font-size: clamp(17px, 4.8vw, 20px);
+  font-weight: 760;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-ink);
+}
+html.has-receipt-peek .flow-foot.pay-flow-dock.dock-mini .c-pay-btn {
+  width: auto;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 clamp(12px, 3.2vw, 18px);
+  font-size: clamp(13px, 3.5vw, 15px);
+  border-radius: 100px;
+  white-space: nowrap;
+}
+html.has-receipt-peek .flow-foot.confirm-pay-dock.dock-mini {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "back total pay";
+}
+html.has-receipt-peek .flow-foot.confirm-pay-dock.dock-mini .dock-back-btn {
+  grid-area: back;
+  width: auto;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+  border-radius: 100px;
+  font-size: clamp(13px, 3.5vw, 14px);
+  white-space: nowrap;
+}
+html.has-receipt-peek .flow-foot.confirm-pay-dock.dock-mini .dock-total {
+  grid-area: total;
+  text-align: center;
+}
+html.has-receipt-peek .flow-foot.confirm-pay-dock.dock-mini .c-pay-btn {
+  grid-area: pay;
+}
+html.has-receipt-peek .flow-foot.confirm-pay-dock.dock-mini .dock-k {
+  display: none;
+}
+html.has-receipt-peek .flow-foot.payment-pay-dock.dock-mini {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: "label total pay";
+}
+html.has-receipt-peek .flow-foot.payment-pay-dock.dock-mini .dock-k {
+  grid-area: label;
+}
+html.has-receipt-peek .flow-foot.payment-pay-dock.dock-mini .dock-total {
+  grid-area: total;
+}
+html.has-receipt-peek .flow-foot.payment-pay-dock.dock-mini .c-pay-btn {
+  grid-area: pay;
+}
+html.has-receipt-peek .flow-foot.pay-flow-dock.dock-mini .foot-error {
+  display: none;
+}
+html.has-receipt-peek .flow-foot.pay-flow-dock.dock-full .dock-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 2px 4px 10px;
+}
+html.has-receipt-peek .flow-foot.pay-flow-dock.dock-full .dock-total {
+  font-size: clamp(24px, 7vw, 30px);
+  font-weight: 780;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 html.has-receipt-peek .cust-app[data-stage="confirm"] .flow-scroll,
 html.has-receipt-peek .cust-app[data-stage="payment"] .flow-scroll {

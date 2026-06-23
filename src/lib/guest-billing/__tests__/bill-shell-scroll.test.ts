@@ -40,6 +40,12 @@ describe("bill-shell-scroll", () => {
         isScrollAtBottom({ scrollTop, clientHeight, scrollHeight }),
       ).toBe(true);
     });
+
+    it("keeps atBottom longer when dock is expanded (hysteresis)", () => {
+      const input = { scrollTop: 500, clientHeight: 400, scrollHeight: 1000 };
+      expect(isScrollAtBottom(input)).toBe(false);
+      expect(isScrollAtBottom(input, { dockExpanded: true })).toBe(true);
+    });
   });
 
   describe("isContentScrollable", () => {

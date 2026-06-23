@@ -4,11 +4,12 @@
  * PaymentStage — tarjeta de crédito/débito (demo o proveedor en producción).
  */
 
-import { useEffect, useLayoutEffect, useState, type InputHTMLAttributes } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type InputHTMLAttributes, type UIEvent } from "react";
 
 import type { CameraCardData } from "@/components/guest/CameraScanner";
 import { CameraScanner } from "@/components/guest/CameraScanner";
 import { billYourPartLabel } from "@/lib/guest-billing/bill-display";
+import { useCollapsiblePayDock } from "@/hooks/useCollapsiblePayDock";
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
 import type { EInvoicePayload, PaidPayload } from "@/hooks/useGuestPaymentFlow";
 import { INVOICE_MANDATORY_THRESHOLD } from "@/hooks/useGuestPaymentFlow";
@@ -69,9 +70,15 @@ export interface PaymentStageProps {
   flow: Flow;
   config: RestaurantConfig;
   tableToken?: string;
+  receiptPeekActive?: boolean;
 }
 
-export function PaymentStage({ flow, config, tableToken }: PaymentStageProps) {
+export function PaymentStage({
+  flow,
+  config,
+  tableToken,
+  receiptPeekActive = false,
+}: PaymentStageProps) {
   const yourTotal = flow.derived.totals.total;
   const { isLastPayer, requiresFullBillInvoice } = flow.derived;
   const mandatoryInvoice = isLastPayer || requiresFullBillInvoice;
@@ -97,6 +104,7 @@ export function PaymentStage({ flow, config, tableToken }: PaymentStageProps) {
   const [scanOpen, setScanOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useLayoutEffect(() => {
     if (!tableToken) {
@@ -151,6 +159,27 @@ export function PaymentStage({ flow, config, tableToken }: PaymentStageProps) {
   }
   const errKeys = Object.keys(errs);
   const canPay = errKeys.length === 0 && !busy;
+
+  const { handleScroll: onDockScroll, dockExpanded } = useCollapsiblePayDock(
+    scrollRef,
+    [
+      yourTotal,
+      wantBilling,
+      billChoice,
+      errKeys.length,
+      card.num,
+      card.holder,
+      card.exp,
+      card.cvv,
+      bill.legalName,
+      bill.idNumber,
+    ],
+    receiptPeekActive,
+  );
+
+  const handleScroll = (e: UIEvent<HTMLDivElement>) => {
+    onDockScroll(e);
+  };
 
   const fillTest = () => {
     setCard({ ...TEST_CARD });
@@ -229,7 +258,11 @@ export function PaymentStage({ flow, config, tableToken }: PaymentStageProps) {
       data-stage="payment"
     >
       <div className="flowscreen">
-        <div className="flow-scroll pay-scroll">
+        <div
+          className="flow-scroll pay-scroll"
+          ref={scrollRef}
+          onScroll={receiptPeekActive ? handleScroll : undefined}
+        >
           <div className="pay-head">
             <button
               className="icon-back"
@@ -414,12 +447,27 @@ export function PaymentStage({ flow, config, tableToken }: PaymentStageProps) {
           </div>
         </div>
 
-        <div className="flow-foot">
-          {showErrors && !canPay && (
+        <div
+          className={
+            "flow-foot" +
+            (receiptPeekActive
+              ? ` pay-flow-dock glass-dock payment-pay-dock ${
+                  dockExpanded ? "dock-full" : "dock-mini"
+                }`
+              : "")
+          }
+        >
+          {showErrors && !canPay && (!receiptPeekActive || dockExpanded) ? (
             <div className="foot-error">
               <Ic.bell s={14} /> {missingMsg()}
             </div>
-          )}
+          ) : null}
+          {receiptPeekActive ? (
+            <div className="dock-top">
+              <div className="dock-k">{billYourPartLabel(flow.state.mode)}</div>
+              <div className="dock-total">{fmt(yourTotal)}</div>
+            </div>
+          ) : null}
           <button
             className={"c-pay-btn" + (canPay ? "" : " is-soft")}
             onClick={pay}

@@ -12,9 +12,10 @@
  * scroll-nudge, resumen tax/propina/total, CTA "Pagar tu parte".
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type UIEvent } from "react";
 
 import { payButtonLabel } from "@/lib/guest-billing/bill-display";
+import { useCollapsiblePayDock } from "@/hooks/useCollapsiblePayDock";
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
 import {
   billSubtotal,
@@ -280,6 +281,7 @@ export interface ConfirmStageProps {
   members: readonly TableMember[];
   config: RestaurantConfig;
   displayClaims?: Claims;
+  receiptPeekActive?: boolean;
 }
 
 export function ConfirmStage({
@@ -288,6 +290,7 @@ export function ConfirmStage({
   members,
   config,
   displayClaims,
+  receiptPeekActive = false,
 }: ConfirmStageProps) {
   const { state, derived } = flow;
   const { mode } = state;
@@ -303,6 +306,25 @@ export function ConfirmStage({
   // Bump animation on total change (used by CTA label)
   const bump = useBumpOnChange(Math.round(derived.totals.total * 100));
 
+  const { handleScroll: onDockScroll, dockExpanded } = useCollapsiblePayDock(
+    scrollRef,
+    [
+      mode,
+      derived.totals.total,
+      needsAck,
+      acked,
+      items.length,
+      members.length,
+      Object.keys(claims).length,
+    ],
+    receiptPeekActive,
+  );
+
+  const handleScroll = (e: UIEvent<HTMLDivElement>) => {
+    onDockScroll(e);
+  };
+
+  const payLabel = payButtonLabel(state.mode, fmt(derived.totals.total));
 
   const tryPay = () => {
     if (needsAck && !acked) {
@@ -330,7 +352,11 @@ export function ConfirmStage({
       data-stage="confirm"
     >
       <div className="flowscreen">
-        <div className="flow-scroll" ref={scrollRef}>
+        <div
+          className="flow-scroll"
+          ref={scrollRef}
+          onScroll={receiptPeekActive ? handleScroll : undefined}
+        >
           {/* ── Header compacto ─────────────────────────────── */}
           <div className="bill-head-compact glassx">
             <div className="bill-head-row">
@@ -404,7 +430,27 @@ export function ConfirmStage({
         </div>
 
         {/* ── Footer CTA ─────────────────────────────────────── */}
-        <div className="flow-foot">
+        <div
+          className={
+            "flow-foot" +
+            (receiptPeekActive
+              ? ` pay-flow-dock glass-dock confirm-pay-dock ${
+                  dockExpanded ? "dock-full" : "dock-mini"
+                }`
+              : "")
+          }
+        >
+          {receiptPeekActive ? (
+            <div className="dock-top">
+              <div className="dock-k">
+                Tu parte
+                <small>{state.name.trim() || "tu parte"}</small>
+              </div>
+              <div className={"dock-total" + (bump ? " bump" : "")}>
+                {fmt(derived.totals.total)}
+              </div>
+            </div>
+          ) : null}
           <button
             className={
               "c-pay-btn" +
@@ -416,9 +462,13 @@ export function ConfirmStage({
             disabled={!derived.canPay}
             data-testid="confirm-pay-btn"
           >
-            <Ic.lock s={18} /> {payButtonLabel(state.mode, fmt(derived.totals.total))}
+            <Ic.lock s={18} /> {payLabel}
           </button>
-          <button className="flow-secondary solid" onClick={() => flow.goToBill()} data-testid="confirm-back-btn">
+          <button
+            className="flow-secondary solid dock-back-btn"
+            onClick={() => flow.goToBill()}
+            data-testid="confirm-back-btn"
+          >
             ← Volver a editar
           </button>
         </div>
