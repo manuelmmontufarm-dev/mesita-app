@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-23 — Compartir plato, 50% en confirm y dock cuenta cerrada
+- **Qué:** `BillStage.tsx`, `GuestBillFlow.tsx`, `useGuestPaymentFlow.ts`, `ConfirmStage.tsx`, `customer.css`.
+- **Por qué:** Tocar un plato compartido lo sacaba del reparto; Persona 1 no mostraba `50%` en el recibo de confirmación; tras pagar toda la mesa y “Ver mesa” no había forma de volver a ¡Cuenta completada!.
+- **Qué hace:** Tap en plato compartido solo hace brillar la barra (no `onRelease`); editar el split solo desde “¿Compartieron un plato?”; badge `%` igual en tu card y en otras personas; si la mesa ya está cerrada en bill, dock con **Ver ¡Cuenta completada!** → tab de éxito. **Ver comprobante** sigue fuera del dock (solo peek inferior).
+
 ### 2026-06-23 — Quita botón Ver comprobante del dock
 - **Qué:** `GuestBillFlow.tsx`, `ReceiptDrawer.tsx`, `customer.css`.
 - **Por qué:** El botón dentro del dock rompía el layout móvil (Pagar tu parte dejaba de subirse sobre el recibo peek) y ensuciaba el flujo.

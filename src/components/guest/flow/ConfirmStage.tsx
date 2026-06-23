@@ -30,6 +30,7 @@ import {
 import { expandRepeatedItems } from "@/lib/guest-billing/bill-display";
 import type {
   BillItem,
+  Claims,
   RestaurantConfig,
   TableMember,
 } from "@/lib/guest-billing/types";
@@ -132,7 +133,19 @@ function PersonCard({ member, claims, config, typedName, paid, paidItemIds, item
   );
 }
 
-function PersonasEnMesa({ flow, items, members, config }: { flow: Flow; items: readonly BillItem[]; members: readonly TableMember[]; config: RestaurantConfig; }) {
+function PersonasEnMesa({
+  flow,
+  items,
+  members,
+  config,
+  claims,
+}: {
+  flow: Flow;
+  items: readonly BillItem[];
+  members: readonly TableMember[];
+  config: RestaurantConfig;
+  claims: Claims;
+}) {
   const { state, youId } = flow;
   const others = members.filter((m) => m.id !== youId);
   if (others.length === 0) return null;
@@ -141,7 +154,7 @@ function PersonasEnMesa({ flow, items, members, config }: { flow: Flow; items: r
       <div className="sec-label" style={{ marginBottom: 10 }}>Personas en la mesa</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {others.map((m) => (
-          <PersonCard key={m.id} member={m} claims={state.claims} config={config}
+          <PersonCard key={m.id} member={m} claims={claims} config={config}
             typedName={state.name} paid={state.paidIds.includes(m.id)}
             paidItemIds={state.paidItemIds} items={items} />
         ))}
@@ -175,17 +188,18 @@ function CardSinReclamar({ items, flow }: { items: readonly BillItem[]; flow: Fl
 
 
 function ConfirmYoursCard({
-  flow, items, members, config, mode, derived,
+  flow, items, members, config, mode, derived, claims,
 }: {
   flow: Flow; items: readonly BillItem[]; members: readonly TableMember[];
   config: RestaurantConfig; mode: "item" | "equal" | "todo";
   derived: Flow["derived"];
+  claims: Claims;
 }) {
   const { state, youId } = flow;
   const youMember = members.find((m) => m.id === youId) ?? members[0];
   const expanded = useMemo(() => expandRepeatedItems(items), [items]);
   const myItems = expanded.filter(
-    (it) => itemOwed(it, state.claims, youId) > 0 && !state.paidItemIds.includes(it.id),
+    (it) => itemOwed(it, claims, youId) > 0 && !state.paidItemIds.includes(it.id),
   );
   const fullSub = billSubtotal(items);
   const paidSub = paidSubtotal(items, state.paidItemIds);
@@ -208,13 +222,26 @@ function ConfirmYoursCard({
       </div>
       {mode === "item" && myItems.length > 0 && (
         <div className="confirm-my-items">
-          {myItems.map((it) => (
-            <div key={it.id} className="confirm-my-row">
-              <span className="confirm-my-emoji">{it.emoji}</span>
-              <span className="confirm-my-name">{it.displayLabel ?? it.name}</span>
-              <span className="confirm-my-amt">{fmt(itemOwed(it, state.claims, youId))}</span>
-            </div>
-          ))}
+          {myItems.map((it) => {
+            const u = unitsOf(claims, it.id, youId);
+            const shared =
+              Object.keys(claims[it.id] ?? {}).filter(
+                (id) => (claims[it.id]?.[id] ?? 0) > 0,
+              ).length > 1;
+            const pct = it.qty > 0 ? Math.round((u / it.qty) * 100) : 0;
+            return (
+              <div key={it.id} className="confirm-my-row">
+                <span className="confirm-my-emoji">{it.emoji}</span>
+                <span className="confirm-my-name">{it.displayLabel ?? it.name}</span>
+                {shared ? (
+                  <span className="portion">{pct}%</span>
+                ) : it.qty > 1 ? (
+                  <span className="portion">×{u}</span>
+                ) : null}
+                <span className="confirm-my-amt">{fmt(itemOwed(it, claims, youId))}</span>
+              </div>
+            );
+          })}
         </div>
       )}
       {mode === "equal" && (
@@ -246,6 +273,7 @@ export interface ConfirmStageProps {
   items: readonly BillItem[];
   members: readonly TableMember[];
   config: RestaurantConfig;
+  displayClaims?: Claims;
 }
 
 export function ConfirmStage({
@@ -253,9 +281,11 @@ export function ConfirmStage({
   items,
   members,
   config,
+  displayClaims,
 }: ConfirmStageProps) {
   const { state, derived } = flow;
   const { mode } = state;
+  const claims = displayClaims ?? state.claims;
 
   const [acked, setAcked] = useState(false);
   const [nudge, setNudge] = useState(false);
@@ -334,10 +364,10 @@ export function ConfirmStage({
             Revisa y paga lo tuyo
           </h1>
 {/* ── Lo tuyo unificado ── */}
-          <ConfirmYoursCard flow={flow} items={items} members={members} config={config} mode={mode} derived={derived} />
+          <ConfirmYoursCard flow={flow} items={items} members={members} config={config} mode={mode} derived={derived} claims={claims} />
 
           {mode === "item" && (
-            <PersonasEnMesa flow={flow} items={items} members={members} config={config} />
+            <PersonasEnMesa flow={flow} items={items} members={members} config={config} claims={claims} />
           )}
           {mode === "item" && <CardSinReclamar items={items} flow={flow} />}
 

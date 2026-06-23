@@ -2330,6 +2330,15 @@
 .confirm-my-emoji { font-size: 18px; flex: 0 0 auto; width: 26px; text-align: center; }
 .confirm-my-name { flex: 1; min-width: 0; font-weight: 550; color: var(--c-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .confirm-my-amt { flex: 0 0 auto; font-weight: 650; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.confirm-my-row .portion {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  padding: 2px 9px;
+  border-radius: 100px;
+}
 
 /* Notes for equal / todo modes */
 .confirm-equal-note,
@@ -3838,6 +3847,12 @@ html.has-sheet-open .flow-foot {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.95) inset,
     0 20px 44px -16px rgba(40, 34, 28, 0.38);
+}
+.c-dock.completed-dock {
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+}
+.completed-dock-btn {
+  width: 100%;
 }
 .rcpt-peek-payments {
   display: flex;

@@ -185,12 +185,15 @@ export function BillItemRow({
   const yours = unitsOf(displayClaims, item.id, youId);
   const free = freeUnits(item, displayClaims);
   const claimants = claimantsOf(displayClaims, item.id, members);
+  const isShared = claimants.length > 1;
   const serverMine = yours > 0;
   const isLoading =
     (pendingOp === "claim" && !serverMine) ||
     (pendingOp === "release" && serverMine);
   const mine = serverMine && !isLoading;
-  const canToggle = mine || free > 0.001;
+  const isSharedMine = isShared && mine && !paid;
+  const canToggle =
+    !isSharedMine && (mine || free > 0.001);
   const interactive =
     mode === "item" && !paid && !isLoading && canToggle;
   const takenByOthers =
@@ -201,12 +204,26 @@ export function BillItemRow({
     free <= 0.001 &&
     claimants.length > 0;
   const rowActivatable =
-    mode === "item" && !paid && !isLoading && (canToggle || takenByOthers);
+    mode === "item" &&
+    !paid &&
+    !isLoading &&
+    (canToggle || takenByOthers || isSharedMine);
   const todoCovers = mode === "todo" && !paid;
   const rowSelected = (mode === "item" && mine && !paid) || todoCovers;
-  const isShared = claimants.length > 1;
 
   const displayLabel = item.displayLabel ?? item.name;
+
+  const [widgetPulse, setWidgetPulse] = useState(false);
+  const widgetPulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerWidgetPulse = () => {
+    if (widgetPulseTimer.current) clearTimeout(widgetPulseTimer.current);
+    setWidgetPulse(false);
+    requestAnimationFrame(() => {
+      setWidgetPulse(true);
+      widgetPulseTimer.current = setTimeout(() => setWidgetPulse(false), 620);
+    });
+  };
 
   const triggerRejectFeedback = () => {
     if (rejectTimer.current) clearTimeout(rejectTimer.current);
@@ -220,6 +237,7 @@ export function BillItemRow({
   useEffect(
     () => () => {
       if (rejectTimer.current) clearTimeout(rejectTimer.current);
+      if (widgetPulseTimer.current) clearTimeout(widgetPulseTimer.current);
     },
     [],
   );
@@ -231,6 +249,10 @@ export function BillItemRow({
 
     if (canToggle) {
       flow.toggleMine(item);
+      return;
+    }
+    if (isSharedMine) {
+      triggerWidgetPulse();
       return;
     }
     if (takenByOthers) triggerRejectFeedback();
@@ -339,7 +361,7 @@ export function BillItemRow({
               roster={members}
               youId={youId}
               youName={state.name}
-              emphasize={rejectShake}
+              emphasize={widgetPulse}
             />
           ) : mode === "item" && claimants.length === 1 ? (
             <OwnerChip

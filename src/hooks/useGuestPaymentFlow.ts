@@ -592,7 +592,10 @@ export function useGuestPaymentFlow(opts: UseGuestPaymentFlowOptions) {
   const toggleMine = useCallback(
     (item: BillItem) => {
       if (state.paidItemIds.includes(item.id)) return;
+      const itemMap = state.claims[item.id] ?? {};
+      const sharedCount = Object.values(itemMap).filter((u) => u > 0.001).length;
       const yours = unitsOf(state.claims, item.id, youId);
+      if (yours > 0 && sharedCount > 1) return;
       if (yours > 0) {
         dispatch({ type: "claim/setUnits", itemId: item.id, memberId: youId, units: 0 });
         return;

@@ -42,7 +42,7 @@ import {
 } from "@/lib/guest-billing/receipt-peek-layout";
 import { freeUnits, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
 import { computeBillShellScrollMetrics } from "@/lib/guest-billing/bill-shell-scroll";
-import { mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
+import { mergeClaimsForDisplay, mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
 import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
 import type {
   BillItem,
@@ -63,6 +63,7 @@ interface StageProps {
   members: readonly TableMember[];
   config: RestaurantConfig;
   sessionClaims?: Claims;
+  displayClaims?: Claims;
   pendingClaims?: Readonly<Record<string, PendingClaimOp>>;
   paidSummaries?: readonly TablePaymentSummary[];
   demoTableProgress?: DemoTableProgress;
@@ -154,7 +155,10 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
       },
       toggleMine: (item: BillItem) => {
         if (flow.state.paidItemIds.includes(item.id)) return;
+        const itemMap = flow.state.claims[item.id] ?? {};
+        const sharedCount = Object.values(itemMap).filter((u) => u > 0.001).length;
         const yours = unitsOf(flow.state.claims, item.id, sid);
+        if (yours > 0 && sharedCount > 1) return;
         if (yours > 0) {
           flow.toggleMine(item);
           liveSession.onRelease(item.id);
@@ -305,12 +309,21 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     [flow.state.receipts, paidSummaries, resolvedYouId, items, config],
   );
 
+  const displayClaimsForStages = useMemo(
+    () =>
+      sessionClaims
+        ? mergeClaimsForDisplay(sessionClaims, flow.state.claims, resolvedYouId)
+        : flow.state.claims,
+    [sessionClaims, flow.state.claims, resolvedYouId],
+  );
+
   const stageProps: StageProps = {
     flow: activeFlow,
     items,
     members,
     config,
     sessionClaims,
+    displayClaims: displayClaimsForStages,
     pendingClaims,
     paidSummaries,
     demoTableProgress,
@@ -537,6 +550,17 @@ function BillShellStage({
           <div className="pay-secure">
             <Ic.shield s={13} /> Pago cifrado · Factura electrónica automática
           </div>
+        </div>
+      ) : demoTableProgress?.tableClosed ? (
+        <div className="c-dock glass-dock pay-dock-return dock-full completed-dock">
+          <button
+            type="button"
+            className="c-pay-btn completed-dock-btn"
+            onClick={() => flow.finishWaiting()}
+            data-testid="dock-completed-btn"
+          >
+            <Ic.check s={18} /> Ver ¡Cuenta completada!
+          </button>
         </div>
       ) : null}
 
