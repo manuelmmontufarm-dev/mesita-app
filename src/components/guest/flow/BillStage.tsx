@@ -38,7 +38,6 @@ import {
   lineTotal,
   memberPillLabel,
   paidSubtotal,
-  resolveClaimantMember,
   resolveMemberDisplay,
   resolveRoster,
   unitsOf,
@@ -58,7 +57,7 @@ import {
 import { payerAvatarInitials } from "@/lib/guest-billing/bill-shell-scroll";
 import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
 
-import { AvatarStack, AvatarDot, EqualShareVisual, Ic, NamePill, OwnerChip, TableRosterCompact } from "./_shared";
+import { AvatarStack, AvatarDot, EqualShareVisual, Ic, NamePill, OwnerChip, SharedPortionStrip, TableRosterCompact } from "./_shared";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
 
@@ -203,13 +202,9 @@ export function BillItemRow({
     mode === "item" && !paid && !isLoading && (canToggle || takenByOthers);
   const todoCovers = mode === "todo" && !paid;
   const rowSelected = (mode === "item" && mine && !paid) || todoCovers;
+  const isShared = claimants.length > 1;
 
   const displayLabel = item.displayLabel ?? item.name;
-
-  const primaryClaimant = useMemo(() => {
-    if (claimants.length !== 1) return null;
-    return resolveClaimantMember(claimants[0]!, members, youId, state.name);
-  }, [claimants, members, youId, state.name]);
 
   const triggerRejectFeedback = () => {
     if (rejectTimer.current) clearTimeout(rejectTimer.current);
@@ -246,7 +241,7 @@ export function BillItemRow({
     (isLoading ? " syncing" : "") +
     (paid ? " paid" : "") +
     (takenByOthers ? " taken" : "") +
-    (rejectShake ? " item-row-reject" : "");
+    (isShared ? " shared" : "");
 
   const showCheck = mode === "item" || mode === "todo";
   const checkOn = paid || (mode === "item" && mine) || todoCovers;
@@ -303,7 +298,14 @@ export function BillItemRow({
       )}
 
       {(mode === "item" || mode === "todo") && (
-        <span className="item-fp-emoji" aria-hidden="true">
+        <span
+          className={
+            "item-fp-emoji" +
+            (mine && !paid && mode === "item" ? " item-fp-emoji-mine" : "") +
+            (rejectShake ? " item-fp-emoji-attn" : "")
+          }
+          aria-hidden="true"
+        >
           {item.emoji}
         </span>
       )}
@@ -326,21 +328,23 @@ export function BillItemRow({
             )
           ) : mode === "item" && isLoading ? (
             <span className="sync-tag">Guardando…</span>
-          ) : mode === "item" && claimants.length > 0 ? (
-            <span className="item-fp-claim-row">
-              <OwnerChip
-                ids={claimants}
-                roster={members}
-                youId={youId}
-                youName={state.name}
-                emphasize={rejectShake}
-              />
-              {rejectShake && primaryClaimant ? (
-                <span className="claim-hint-pop" role="status" aria-live="polite">
-                  Lo eligió {memberPillLabel(primaryClaimant, undefined, 14)}
-                </span>
-              ) : null}
-            </span>
+          ) : mode === "item" && isShared ? (
+            <SharedPortionStrip
+              itemId={item.id}
+              itemQty={item.qty}
+              claimants={claimants}
+              claims={displayClaims}
+              roster={members}
+              youId={youId}
+              youName={state.name}
+            />
+          ) : mode === "item" && claimants.length === 1 ? (
+            <OwnerChip
+              ids={claimants}
+              roster={members}
+              youId={youId}
+              youName={state.name}
+            />
           ) : mode === "todo" && !paid ? (
             <span className="todo-item-tag">Incluido en tu pago</span>
           ) : mode === "item" && free > 0.001 && !mine && claimants.length === 0 ? (

@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-22 — Compartir plato: sin duplicados + widget en lista + emoji suave
+- **Qué:** `ShareSheet.tsx`, `BillStage.tsx`, `_shared.tsx` (`SharedPortionStrip`), `customer.css`.
+- **Por qué:** Al dividir un plato cada persona salía dos veces; el banner “Quién comparte este plato” sobraba; el feedback de plato tomado era texto + shake de fila; y el reparto no se veía en la lista principal.
+- **Qué hace:** El picker muestra cada comensal una sola vez (solo `NamePill`); al guardar con 2+ personas queda solo “Así queda · entre N”; en la cuenta principal los platos compartidos muestran barra con avatares y %; al tocar un plato ajeno solo el emoji hace un pulso verde suave (sin “Lo eligió…” ni shake de fila).
+
 ### 2026-06-22 — Shake móvil + chip del comensal resaltado
 - **Qué:** `BillStage.tsx`, `_shared.tsx` (`OwnerChip`), `customer.css`.
 - **Por qué:** El shake no respondía en touch; faltaba explicar por qué no se puede reclamar el plato.

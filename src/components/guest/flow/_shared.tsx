@@ -7,13 +7,14 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { MemberId, TableMember } from "@/lib/guest-billing/types";
+import type { Claims, ItemId, MemberId, TableMember } from "@/lib/guest-billing/types";
 import {
   avatarColor,
   AVATAR_HUE_YOU,
   memberPillLabel,
   NAME_PILL_MAX,
   resolveClaimantMember,
+  unitsOf,
 } from "@/lib/guest-billing/split-math";
 
 /* ── icons ─────────────────────────────────────────────────── */
@@ -439,7 +440,6 @@ export function OwnerChip({
   roster: readonly TableMember[];
   youId?: MemberId;
   youName?: string;
-  /** Pulse when another guest taps a taken dish. */
   emphasize?: boolean;
 }) {
   if (ids.length === 0) return null;
@@ -486,6 +486,62 @@ export function OwnerChip({
       </span>
       <span className="owner-chip-label">{label}</span>
     </span>
+  );
+}
+
+/** Compact split bar on bill rows when a dish is shared between guests. */
+export function SharedPortionStrip({
+  itemId,
+  itemQty,
+  claimants,
+  claims,
+  roster,
+  youId,
+  youName,
+}: {
+  itemId: ItemId;
+  itemQty: number;
+  claimants: readonly MemberId[];
+  claims: Claims;
+  roster: readonly TableMember[];
+  youId?: MemberId;
+  youName?: string;
+}) {
+  if (claimants.length < 2) return null;
+  const total = Math.max(itemQty, 0.001);
+
+  return (
+    <div className="item-share-strip" data-testid="item-share-strip">
+      <div className="item-share-bar" aria-hidden="true">
+        {claimants.map((id) => {
+          const u = unitsOf(claims, itemId, id);
+          const member = resolveClaimantMember(id, roster, youId, youName);
+          return (
+            <span
+              key={id}
+              className="item-share-seg"
+              style={{ flexGrow: Math.max(u, 0.001) }}
+              title={memberPillLabel(member, youId === id ? youName : undefined, 12)}
+            >
+              <AvatarDot
+                member={member}
+                name={youId === id ? youName : undefined}
+                size={16}
+              />
+            </span>
+          );
+        })}
+      </div>
+      <span className="item-share-meta">
+        Entre {claimants.length}
+        {claimants.map((id) => {
+          const pct = Math.round((unitsOf(claims, itemId, id) / total) * 100);
+          const member = resolveClaimantMember(id, roster, youId, youName);
+          const short = memberPillLabel(member, youId === id ? youName : undefined, 8);
+          return ` · ${short} ${pct}%`;
+        })}
+      </span>
+    </div>
   );
 }
 

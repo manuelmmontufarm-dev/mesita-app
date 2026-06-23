@@ -12,7 +12,6 @@ import { expandRepeatedItems } from "@/lib/guest-billing/bill-display";
 import {
   fmt,
   lineTotal,
-  memberPillLabel,
   resolveRoster,
   round2,
 } from "@/lib/guest-billing/split-math";
@@ -113,38 +112,6 @@ export function ShareSheet({ flow, items, members }: ShareSheetProps) {
         </div>
 
         <div className="sheet-body">
-          {sel.length > 0 && (
-            <div
-              className="share-selected-banner"
-              data-testid="share-selected-summary"
-            >
-              <div className="sec-label">Quién comparte este plato</div>
-              <div className="portion-chips">
-                {sel.map((id) => {
-                  const m = displayMembers.find((mm) => mm.id === id) ?? null;
-                  return (
-                    <span key={id} className="pchip">
-                      <NamePill
-                        member={m}
-                        name={m?.isYou ? flow.state.name : undefined}
-                        size={28}
-                      />
-                      <b className="pp">{pct(id)}%</b>
-                      <span
-                        style={{
-                          color: "var(--c-ink-2)",
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        {fmt((units[id] ?? 0) * item.unitPrice)}
-                      </span>
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {displayMembers.map((m) => {
               const on = sel.includes(m.id);
@@ -161,9 +128,6 @@ export function ShareSheet({ flow, items, members }: ShareSheetProps) {
                     name={m.isYou ? flow.state.name : undefined}
                     size={38}
                   />
-                  <span className="nm">
-                    {memberPillLabel(m, m.isYou ? flow.state.name : undefined)}
-                  </span>
                   <span className="share-pick-status">
                     {on ? "Seleccionado" : "Toca para incluir"}
                   </span>
