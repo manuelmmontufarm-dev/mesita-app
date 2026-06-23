@@ -79,6 +79,16 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-22 — Logo MesitaQR en header sticky del bill
+- **Qué:** `GuestBillFlow.tsx`, `BillStage.tsx`, `customer.css`.
+- **Por qué:** El header superior solo mostraba “En vivo” y mesa; faltaba marca visible arriba.
+- **Qué hace:** Muestra `LogoMark` + nombre del restaurante (y tagline en demo) en la barra fija; quita el logo duplicado dentro de la tarjeta de cuenta.
+
+### 2026-06-22 — Fix build Vercel: `ref` en schema demo pay
+- **Qué:** `src/app/api/demo/table/[token]/route.ts`.
+- **Por qué:** El deploy en Vercel fallaba en `tsc` porque `body.ref` se pasaba a `recordDemoPayment` pero no estaba en el schema Zod del action `pay`.
+- **Qué hace:** Añade `ref` opcional al schema; el build de preview vuelve a compilar.
+
 ### 2026-06-19 — Limpieza instrumentación debug recibo duplicado
 - **Qué:** `drawer-receipts.ts`, `useGuestPaymentFlow.ts`, `demo-table-store.ts`.
 - **Por qué:** El fix del recibo duplicado quedó verificado; los `fetch` de debug ya no hacen falta.

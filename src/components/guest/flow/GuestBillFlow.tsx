@@ -23,7 +23,7 @@ import { PaymentStage } from "./PaymentStage";
 import { ReceiptDrawer } from "./ReceiptDrawer";
 import { ShareSheet } from "./ShareSheet";
 import { WaitingSuccessStage } from "./WaitingSuccessStage";
-import { Ic, useBumpOnChange } from "./_shared";
+import { Ic, LogoMark, useBumpOnChange } from "./_shared";
 import {
   type FlowInit,
   type PaidPayload,
@@ -449,6 +449,15 @@ function BillShellStage({
       {/* minimal sticky header — venue/total live inside bill card */}
       <div className={"cust-head bill-shell-head" + (headCompact ? " compact" : "")}>
         <div className="bill-shell-top">
+          <div className="bill-shell-brand">
+            <LogoMark size={headCompact ? 28 : 32} />
+            <div className="bill-shell-brand-text">
+              <span className="bill-shell-venue">{config.name}</span>
+              {!headCompact && config.tagline ? (
+                <span className="bill-shell-tagline">{config.tagline}</span>
+              ) : null}
+            </div>
+          </div>
           <span className="live-pill glassx">
             <span className="dot" />
             En vivo

@@ -57,7 +57,7 @@ import {
 import { payerAvatarInitials } from "@/lib/guest-billing/bill-shell-scroll";
 import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
 
-import { AvatarStack, AvatarDot, EqualShareVisual, Ic, LogoMark, NamePill, OwnerChip, TableRosterCompact } from "./_shared";
+import { AvatarStack, AvatarDot, EqualShareVisual, Ic, NamePill, OwnerChip, TableRosterCompact } from "./_shared";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
 
@@ -544,13 +544,6 @@ export function BillStage({
       <div className="bill-card-fluid" data-testid="bill-card-fluid">
         {/* Venue + total */}
         <div className="bill-card-top">
-          <div className="bill-card-venue-row">
-            <LogoMark size={24} />
-            <span className="bill-card-venue">{config.name}</span>
-            <span className="live-pill-sm glassx">
-              <span className="dot" /> Mesa {config.table}
-            </span>
-          </div>
           <div className="bill-card-total-block">
             <span className="bill-card-total-label">Total por pagar</span>
             {someonePaid && remainingTotal < mesaTotal - 0.009 && (
