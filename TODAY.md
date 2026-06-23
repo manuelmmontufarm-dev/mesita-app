@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-21 — Rama fix/guest-ux-restore-v2 (UX guest, pendiente merge)
+- **Qué:** Cherry-pick commits `dfd674e`…`8cccdd9` en rama `fix/guest-ux-restore-v2` desde `main` post-revert `8a13d34`.
+- **Por qué:** Re-aplicar los 9 fixes UX tras revert por bugs en producción; 325 tests verdes antes de nuevo merge.
+- **Qué hace:** Restaura lobby, tip Otro, nombre, Todo CTA, split iguales, Pagó {nombre}, pay-again, recibo Pago 1/2, volver a pagar — solo en preview hasta aprobar PR.
+
 ### 2026-06-20 — Fix producción: UX guest aún no en main
 - **Qué:** PR a `main` desde `feat/multi-qr-demo-mesas`; ajustes en `GuestBillFlow.tsx`, `drawer-receipts.ts`, `customer.css`.
 - **Por qué:** Producción (`mesita-demo.vercel.app`) quedó en merge PR #1 sin los 3 commits de UX; el usuario no veía ningún cambio.
