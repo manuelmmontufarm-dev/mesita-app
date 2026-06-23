@@ -72,7 +72,12 @@ function ReceiptSection({ receipt, config, index, total }: {
   );
 }
 
-export function ReceiptDrawer({ receipts, config, peekLabel = "Tu recibo" }: ReceiptDrawerProps) {
+export function ReceiptDrawer({
+  receipts,
+  config,
+  peekLabel = "Tu recibo",
+  openSignal = 0,
+}: ReceiptDrawerProps & { openSignal?: number }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const perfRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ startY: number; base: number; moved: number; active: boolean } | null>(null);
@@ -83,6 +88,10 @@ export function ReceiptDrawer({ receipts, config, peekLabel = "Tu recibo" }: Rec
   const totalAmt = receiptsTotal(receipts);
   const introId = receipts.map((r) => r.ref).join("|");
   const [intro, setIntro] = useState(introId !== lastIntroRef);
+
+  useEffect(() => {
+    if (openSignal > 0) setPos("open");
+  }, [openSignal]);
 
   useEffect(() => {
     if (introId === lastIntroRef) return;

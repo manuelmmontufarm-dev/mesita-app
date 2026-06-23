@@ -747,6 +747,33 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     [guestSessionId, enqueueAction, patchLocalDemo],
   );
 
+  const onSplitItem = useCallback(
+    (billItemId: string, unitsMap: Record<string, number>) => {
+      if (!guestSessionId) return;
+      patchLocalDemo((prev) => {
+        const claimShares = { ...(prev.claimShares ?? {}) };
+        const clean: Record<string, number> = {};
+        for (const [id, u] of Object.entries(unitsMap)) {
+          if (u > 0.001) clean[id] = u;
+        }
+        if (Object.keys(clean).length >= 2) {
+          claimShares[billItemId] = clean;
+          const claims = { ...prev.claims };
+          delete claims[billItemId];
+          return { ...prev, claims, claimShares };
+        }
+        return prev;
+      });
+      void enqueueAction({
+        action: "split",
+        guestId: guestSessionId,
+        itemId: billItemId,
+        units: unitsMap,
+      }).catch(console.error);
+    },
+    [guestSessionId, enqueueAction, patchLocalDemo],
+  );
+
   const onStatus = useCallback(
     (status: GuestSessionStatus) => {
       if (!guestSessionId) return;
@@ -762,9 +789,9 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   const liveSession: LiveSessionActions | null = useMemo(
     () =>
       guestSessionId
-        ? { guestSessionId, onRename, onClaim, onRelease, onStatus }
+        ? { guestSessionId, onRename, onClaim, onRelease, onSplitItem, onStatus }
         : null,
-    [guestSessionId, onRename, onClaim, onRelease, onStatus],
+    [guestSessionId, onRename, onClaim, onRelease, onSplitItem, onStatus],
   );
 
   const resetDemo = useCallback(async () => {

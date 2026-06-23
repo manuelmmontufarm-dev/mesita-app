@@ -60,7 +60,7 @@ export interface DemoPayment {
 }
 
 /** Bump when default demo seed shape changes — migrated in-place, never wipes guests. */
-const DEMO_STATE_VERSION = 6;
+const DEMO_STATE_VERSION = 7;
 
 export class DemoGuestNotFoundError extends Error {
   constructor(public readonly guestId: string) {
@@ -86,6 +86,8 @@ export interface DemoTableState {
   items: DemoFoodItem[];
   guests: DemoGuest[];
   claims: Record<string, string>;
+  /** Multi-guest fractional shares per item (synced across devices). */
+  claimShares?: Record<string, Record<string, number>>;
   paidItemIds: string[];
   /** Cumulative units paid toward each item (supports partial BY_ITEM). */
   itemPaidUnits: Record<string, number>;
@@ -149,6 +151,7 @@ function createState(token: string): DemoTableState {
     items,
     guests: [],
     claims: { ...(seed?.claims ?? {}) },
+    claimShares: {},
     paidItemIds: [...(seed?.paidItemIds ?? [])],
     itemPaidUnits: { ...(seed?.itemPaidUnits ?? {}) },
     payments: [],
@@ -192,6 +195,7 @@ function migrateState(state: DemoTableState): DemoTableState {
   scrubOrphanClaims(state);
 
   if (!state.itemPaidUnits) state.itemPaidUnits = {};
+  if (!state.claimShares) state.claimShares = {};
 
   state.stateVersion = DEMO_STATE_VERSION;
   return touch(state);
@@ -205,6 +209,21 @@ function scrubOrphanClaims(state: DemoTableState): boolean {
     if (!guestIds.has(guestId)) {
       delete state.claims[itemId];
       changed = true;
+    }
+  }
+  if (state.claimShares) {
+    for (const [itemId, unitsMap] of Object.entries(state.claimShares)) {
+      const clean: Record<string, number> = {};
+      for (const [gid, u] of Object.entries(unitsMap)) {
+        if (guestIds.has(gid) && u > 0.001) clean[gid] = u;
+      }
+      if (Object.keys(clean).length < 2) {
+        delete state.claimShares[itemId];
+        changed = true;
+      } else if (Object.keys(clean).length !== Object.keys(unitsMap).length) {
+        state.claimShares[itemId] = clean;
+        changed = true;
+      }
     }
   }
   return changed;
@@ -304,6 +323,11 @@ async function mutateDemoState(
       const draft: DemoTableState = {
         ...state,
         claims: { ...state.claims },
+        claimShares: state.claimShares
+          ? Object.fromEntries(
+              Object.entries(state.claimShares).map(([id, m]) => [id, { ...m }]),
+            )
+          : {},
         guests: state.guests.map((g) => ({ ...g })),
         items: [...state.items],
         paidItemIds: [...state.paidItemIds],
@@ -454,8 +478,42 @@ export async function claimDemoItem(
     const guest = requireGuest(draft, guestId);
     if (draft.paidItemIds.includes(itemId)) return;
     const current = draft.claims[itemId];
-    if (current === guestId) delete draft.claims[itemId];
-    else draft.claims[itemId] = guestId;
+    if (current === guestId) {
+      delete draft.claims[itemId];
+    } else {
+      draft.claims[itemId] = guestId;
+    }
+    if (draft.claimShares) delete draft.claimShares[itemId];
+    guest.status = "reviewing";
+    guest.updatedAt = nowIso();
+  });
+}
+
+export async function splitDemoItem(
+  token: string,
+  guestId: string,
+  itemId: string,
+  unitsMap: Record<string, number>,
+): Promise<DemoTableState> {
+  return mutateDemoState(token, (draft) => {
+    const guest = requireGuest(draft, guestId);
+    if (draft.paidItemIds.includes(itemId)) return;
+    const clean: Record<string, number> = {};
+    for (const [id, u] of Object.entries(unitsMap)) {
+      if (u > 0.001) requireGuest(draft, id);
+      if (u > 0.001) clean[id] = Math.round(u * 100) / 100;
+    }
+    const claimants = Object.keys(clean);
+    if (claimants.length < 2) {
+      const only = claimants[0];
+      if (only) draft.claims[itemId] = only;
+      else delete draft.claims[itemId];
+      if (draft.claimShares) delete draft.claimShares[itemId];
+    } else {
+      if (!draft.claimShares) draft.claimShares = {};
+      draft.claimShares[itemId] = clean;
+      delete draft.claims[itemId];
+    }
     guest.status = "reviewing";
     guest.updatedAt = nowIso();
   });
@@ -470,6 +528,15 @@ export async function releaseDemoItem(
     requireGuest(draft, guestId);
     if (draft.claims[itemId] === guestId) {
       delete draft.claims[itemId];
+    }
+    if (draft.claimShares?.[itemId]) {
+      const map = { ...draft.claimShares[itemId] };
+      delete map[guestId];
+      if (Object.keys(map).filter((id) => (map[id] ?? 0) > 0.001).length < 2) {
+        delete draft.claimShares[itemId];
+      } else {
+        draft.claimShares[itemId] = map;
+      }
     }
   });
 }

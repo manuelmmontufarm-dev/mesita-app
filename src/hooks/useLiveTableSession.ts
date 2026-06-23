@@ -65,6 +65,8 @@ export interface LiveSessionActions {
   onRename: (name: string) => void;
   onClaim: (billItemId: string, units: number) => void;
   onRelease: (billItemId: string) => void;
+  /** Demo only — persist multi-guest item split to the table store. */
+  onSplitItem?: (billItemId: string, unitsMap: Record<string, number>) => void;
   onStatus: (status: GuestSessionStatus) => void;
 }
 

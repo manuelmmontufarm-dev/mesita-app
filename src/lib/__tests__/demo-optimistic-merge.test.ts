@@ -7,6 +7,7 @@ import {
   isDemoTableReset,
   mergeClaimsForDisplay,
   mergeClaimsPreserveLocal,
+  mapClaimsFromDemoRaw,
   mergeDemoStateWithPending,
   pruneResolvedPendingClaims,
 } from "../demo-optimistic-merge";
@@ -134,5 +135,15 @@ describe("mergeClaimsForDisplay", () => {
     const local = { locro: { g1: 0.5, g2: 0.5 } };
     const merged = mergeClaimsForDisplay(server, local, "g1");
     expect(merged.locro).toEqual({ g1: 0.5, g2: 0.5 });
+  });
+});
+
+describe("mapClaimsFromDemoRaw", () => {
+  it("prefers claimShares over single-owner claims", () => {
+    const raw = {
+      claims: { ceviche: "g1" },
+      claimShares: { ceviche: { g1: 0.5, g2: 0.5 } },
+    } as import("@/lib/demo-table-store").DemoTableState;
+    expect(mapClaimsFromDemoRaw(raw).ceviche).toEqual({ g1: 0.5, g2: 0.5 });
   });
 });

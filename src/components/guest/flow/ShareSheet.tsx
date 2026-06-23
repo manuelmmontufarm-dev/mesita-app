@@ -174,7 +174,7 @@ export function ShareSheet({ flow, items, members }: ShareSheetProps) {
         <div className="sheet-foot">
           <button
             className="sheet-btn"
-            disabled={sel.length === 0}
+            disabled={sel.length < 2}
             onClick={save}
             data-testid="share-save"
           >

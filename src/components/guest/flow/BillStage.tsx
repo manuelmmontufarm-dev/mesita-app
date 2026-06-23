@@ -300,20 +300,20 @@ export function BillItemRow({
       )}
 
       {(mode === "item" || mode === "todo") && (
-        <span className="item-fp-emoji" aria-hidden="true">
+        <span
+          className={
+            "item-fp-emoji" +
+            (mine && !paid && mode === "item" ? " item-fp-emoji-mine" : "") +
+            (rejectShake ? " item-fp-emoji-attn" : "")
+          }
+          aria-hidden="true"
+        >
           {item.emoji}
         </span>
       )}
 
       <div className="item-fp-main">
-        <div
-          className={
-            "item-fp-name" +
-            (paid ? " struck" : "") +
-            (mine && !paid && mode === "item" ? " item-fp-name-mine" : "") +
-            (rejectShake ? " item-fp-name-attn" : "")
-          }
-        >
+        <div className={"item-fp-name" + (paid ? " struck" : "")}>
           {displayLabel}
           {paid && (
             <span className="paid-lock" aria-label="Pagado">
@@ -339,6 +339,7 @@ export function BillItemRow({
               roster={members}
               youId={youId}
               youName={state.name}
+              emphasize={rejectShake}
             />
           ) : mode === "item" && claimants.length === 1 ? (
             <OwnerChip
@@ -346,6 +347,7 @@ export function BillItemRow({
               roster={members}
               youId={youId}
               youName={state.name}
+              emphasize={rejectShake}
             />
           ) : mode === "todo" && !paid ? (
             <span className="todo-item-tag">Incluido en tu pago</span>

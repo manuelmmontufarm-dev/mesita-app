@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-23 — Split en servidor + brillo en widget + Ver comprobante
+- **Qué:** `demo-table-store.ts`, API `split`, `useDemoTableSession`, `GuestBillFlow`, `BillStage`, `ShareSheet`, `ReceiptDrawer`, `customer.css`.
+- **Por qué:** Logs mostraron `onClaim` con dueño único al guardar split (quitaba el plato al otro); guardar con 1 persona no repartía; brillo iba al nombre del plato; dock y recibo pegados; sin volver al comprobante tras “Ver mesa”.
+- **Qué hace:** `claimShares` + acción `split` persisten reparto multi-guest; guardar exige 2+ personas; brillo en chip/barra bajo el plato (+ emoji); gap dock/recibo; botón **Ver comprobante** en el dock.
+
 ### 2026-06-23 — Halo verde en nombre + fixes split guest
 - **Qué:** `BillStage.tsx`, `demo-optimistic-merge.ts`, `customer.css`, test merge, `TODAY.md`.
 - **Por qué:** El bloque “Pagas como” tenía tinte verde en todo el contenedor; faltaba guiar al usuario a escribir su nombre sin saturar la UI; y seguían pendientes fixes de split visible, picker sin duplicar y widget “Lo mío”.

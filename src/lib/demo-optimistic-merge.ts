@@ -1,10 +1,18 @@
 import type { DemoTableState } from "@/lib/demo-table-store";
 import type { Claims, MemberId } from "@/lib/guest-billing/types";
 
-/** Demo store: itemId → single owner guestId. */
+/** Demo store: itemId → single owner guestId, or claimShares for splits. */
 export function mapClaimsFromDemoRaw(raw: DemoTableState): Claims {
   const claims: Claims = {};
+  for (const [itemId, unitsMap] of Object.entries(raw.claimShares ?? {})) {
+    const clean: Record<string, number> = {};
+    for (const [guestId, units] of Object.entries(unitsMap)) {
+      if (units > 0.001) clean[guestId] = units;
+    }
+    if (Object.keys(clean).length > 0) claims[itemId] = clean;
+  }
   for (const [itemId, guestId] of Object.entries(raw.claims)) {
+    if (claims[itemId]) continue;
     if (!guestId) continue;
     claims[itemId] = { [guestId]: 1 };
   }

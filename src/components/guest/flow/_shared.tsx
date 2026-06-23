@@ -498,6 +498,7 @@ export function SharedPortionStrip({
   roster,
   youId,
   youName,
+  emphasize = false,
 }: {
   itemId: ItemId;
   itemQty: number;
@@ -506,12 +507,16 @@ export function SharedPortionStrip({
   roster: readonly TableMember[];
   youId?: MemberId;
   youName?: string;
+  emphasize?: boolean;
 }) {
   if (claimants.length < 2) return null;
   const total = Math.max(itemQty, 0.001);
 
   return (
-    <div className="item-share-strip" data-testid="item-share-strip">
+    <div
+      className={"item-share-strip" + (emphasize ? " item-share-strip-attn" : "")}
+      data-testid="item-share-strip"
+    >
       <div className="item-share-bar" aria-hidden="true">
         {claimants.map((id) => {
           const u = unitsOf(claims, itemId, id);

@@ -68,6 +68,8 @@ interface StageProps {
   demoTableProgress?: DemoTableProgress;
   onResetDemo?: () => Promise<void>;
   tableToken?: string;
+  hasReceipt?: boolean;
+  onOpenReceipt?: () => void;
 }
 
 export interface GuestBillFlowProps {
@@ -174,7 +176,12 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
         }
       },
       replaceClaim: (itemId: MemberId, unitsMap: Record<MemberId, number>) => {
+        const claimantCount = Object.values(unitsMap).filter((u) => u > 0.001).length;
         flow.replaceClaim(itemId, unitsMap);
+        if (claimantCount > 1 && liveSession.onSplitItem) {
+          liveSession.onSplitItem(itemId, unitsMap);
+          return;
+        }
         const yours = unitsMap[sid] ?? 0;
         if (yours <= 0) liveSession.onRelease(itemId);
         else liveSession.onClaim(itemId, yours);
@@ -287,19 +294,8 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalLoading, externalError]);
 
-  const stageProps: StageProps = {
-    flow: activeFlow,
-    items,
-    members,
-    config,
-    sessionClaims,
-    pendingClaims,
-    paidSummaries,
-    demoTableProgress,
-    onResetDemo,
-    tableToken,
-  };
   const stage = flow.state.stage;
+  const [receiptOpenSignal, setReceiptOpenSignal] = useState(0);
   const drawerReceipts = useMemo(
     () =>
       mergeDrawerReceipts(
@@ -311,9 +307,28 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
       ),
     [flow.state.receipts, paidSummaries, resolvedYouId, items, config],
   );
+
+  const stageProps: StageProps = {
+    flow: activeFlow,
+    items,
+    members,
+    config,
+    sessionClaims,
+    pendingClaims,
+    paidSummaries,
+    demoTableProgress,
+    onResetDemo,
+    tableToken,
+    hasReceipt: drawerReceipts.length > 0,
+    onOpenReceipt: () => setReceiptOpenSignal((n) => n + 1),
+  };
   const receiptDrawer =
     drawerReceipts.length > 0 ? (
-      <ReceiptDrawer receipts={drawerReceipts} config={config} />
+      <ReceiptDrawer
+        receipts={drawerReceipts}
+        config={config}
+        openSignal={receiptOpenSignal}
+      />
     ) : null;
 
   useEffect(() => {
@@ -379,6 +394,8 @@ function BillShellStage({
   paidSummaries,
   demoTableProgress,
   onResetDemo,
+  hasReceipt,
+  onOpenReceipt,
 }: StageProps) {
   const { state, derived } = flow;
   const [resetting, setResetting] = useState(false);
@@ -527,6 +544,16 @@ function BillShellStage({
           >
             <Ic.lock s={18} /> {dockPayLabel}
           </button>
+          {hasReceipt && onOpenReceipt ? (
+            <button
+              type="button"
+              className="dock-receipt-link"
+              onClick={onOpenReceipt}
+              data-testid="dock-receipt-link"
+            >
+              <Ic.receipt s={14} /> Ver comprobante
+            </button>
+          ) : null}
           <div className="pay-secure">
             <Ic.shield s={13} /> Pago cifrado · Factura electrónica automática
           </div>

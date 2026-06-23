@@ -8,6 +8,7 @@ import {
   renameDemoGuest,
   resetDemoTableState,
   setDemoGuestStatus,
+  splitDemoItem,
   type DemoGuestStatus,
   type DemoSplitMode,
 } from "@/lib/demo-table-store";
@@ -39,6 +40,12 @@ const actionSchema = z.discriminatedUnion("action", [
     action: z.literal("release"),
     guestId: z.string(),
     itemId: z.string(),
+  }),
+  z.object({
+    action: z.literal("split"),
+    guestId: z.string(),
+    itemId: z.string(),
+    units: z.record(z.string(), z.number()),
   }),
   z.object({
     action: z.literal("pay"),
@@ -101,6 +108,12 @@ export async function POST(
     }
     if (body.action === "release") {
       return successResponse(await releaseDemoItem(token, body.guestId, body.itemId), 200);
+    }
+    if (body.action === "split") {
+      return successResponse(
+        await splitDemoItem(token, body.guestId, body.itemId, body.units),
+        200,
+      );
     }
     if (body.action === "pay") {
       return successResponse(
