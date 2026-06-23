@@ -79,6 +79,16 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-23 — Halo verde en nombre + fixes split guest
+- **Qué:** `BillStage.tsx`, `demo-optimistic-merge.ts`, `customer.css`, test merge, `TODAY.md`.
+- **Por qué:** El bloque “Pagas como” tenía tinte verde en todo el contenedor; faltaba guiar al usuario a escribir su nombre sin saturar la UI; y seguían pendientes fixes de split visible, picker sin duplicar y widget “Lo mío”.
+- **Qué hace:** Se quita el fondo/borde verde del contenedor del nombre; el pill del input pulsa un halo verde suave (como “En vivo”) solo mientras el nombre está vacío; `mergeClaimsForDisplay` conserva repartos multi-guest; lista compartida en modo ítem; picker sin pills duplicadas; pulso en el nombre del plato tomado.
+
+### 2026-06-22 — Split visible en lista + nombre iluminado + picker sin duplicar
+- **Qué:** `BillStage.tsx`, `demo-optimistic-merge.ts`, `customer.css`, test merge.
+- **Por qué:** Tras dividir un plato la UI seguía mostrando un solo dueño (session demo = 1 guest/ítem); el picker duplicaba pills (AvatarStack + etiqueta); el feedback iba al emoji en vez del nombre.
+- **Qué hace:** `mergeClaimsForDisplay` conserva repartos locales multi-guest; filas compartidas muestran `SharedPortionStrip`; widget “Lo mío” lista platos compartidos; picker usa un chip o barra sin duplicar; pulso verde en el **nombre** del plato.
+
 ### 2026-06-22 — Compartir plato: sin duplicados + widget en lista + emoji suave
 - **Qué:** `ShareSheet.tsx`, `BillStage.tsx`, `_shared.tsx` (`SharedPortionStrip`), `customer.css`.
 - **Por qué:** Al dividir un plato cada persona salía dos veces; el banner “Quién comparte este plato” sobraba; el feedback de plato tomado era texto + shake de fila; y el reparto no se veía en la lista principal.

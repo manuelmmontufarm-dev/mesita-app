@@ -5,6 +5,7 @@ import {
   createPendingDemoOps,
   deriveVisiblePendingClaims,
   isDemoTableReset,
+  mergeClaimsForDisplay,
   mergeClaimsPreserveLocal,
   mergeDemoStateWithPending,
   pruneResolvedPendingClaims,
@@ -124,5 +125,14 @@ describe("mergeClaimsPreserveLocal", () => {
       trustLocal: false,
     });
     expect(merged.locro).toBeUndefined();
+  });
+});
+
+describe("mergeClaimsForDisplay", () => {
+  it("keeps local multi-guest split when server only has single owner", () => {
+    const server = { locro: { g1: 1 } };
+    const local = { locro: { g1: 0.5, g2: 0.5 } };
+    const merged = mergeClaimsForDisplay(server, local, "g1");
+    expect(merged.locro).toEqual({ g1: 0.5, g2: 0.5 });
   });
 });

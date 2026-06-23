@@ -165,3 +165,21 @@ function serverMapClone(server: Claims): Claims {
   }
   return out;
 }
+
+/** Bill UI: server demo claims are single-owner; keep local multi-guest splits visible. */
+export function mergeClaimsForDisplay(
+  server: Claims,
+  local: Claims,
+  youId: MemberId,
+): Claims {
+  const merged = mergeClaimsPreserveLocal(server, local, youId, {
+    trustLocal: true,
+  });
+  for (const [itemId, localMap] of Object.entries(local)) {
+    const claimants = Object.values(localMap).filter((u) => u > 0.001).length;
+    if (claimants > 1) {
+      merged[itemId] = { ...localMap };
+    }
+  }
+  return merged;
+}

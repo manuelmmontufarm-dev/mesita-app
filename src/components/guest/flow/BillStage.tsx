@@ -36,7 +36,6 @@ import {
   guestLabel,
   isItemPaid,
   lineTotal,
-  memberPillLabel,
   paidSubtotal,
   resolveMemberDisplay,
   resolveRoster,
@@ -55,9 +54,12 @@ import {
   expandRepeatedItems,
 } from "@/lib/guest-billing/bill-display";
 import { payerAvatarInitials } from "@/lib/guest-billing/bill-shell-scroll";
-import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
+import {
+  mergeClaimsForDisplay,
+  type PendingClaimOp,
+} from "@/lib/demo-optimistic-merge";
 
-import { AvatarStack, AvatarDot, EqualShareVisual, Ic, NamePill, OwnerChip, SharedPortionStrip, TableRosterCompact } from "./_shared";
+import { AvatarDot, EqualShareVisual, Ic, NamePill, OwnerChip, SharedPortionStrip, TableRosterCompact } from "./_shared";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
 
@@ -123,7 +125,7 @@ function PayerNameRow({
       </span>
       <div className="payer-name-main">
         <span className="payer-label">Pagas como</span>
-        <div className="payer-name-capsule">
+        <div className={"payer-name-capsule" + (!trimmed && !invalid ? " empty" : "")}>
           <input
             value={value}
             onChange={(e) => onChange(e.target.value)}
@@ -298,20 +300,20 @@ export function BillItemRow({
       )}
 
       {(mode === "item" || mode === "todo") && (
-        <span
-          className={
-            "item-fp-emoji" +
-            (mine && !paid && mode === "item" ? " item-fp-emoji-mine" : "") +
-            (rejectShake ? " item-fp-emoji-attn" : "")
-          }
-          aria-hidden="true"
-        >
+        <span className="item-fp-emoji" aria-hidden="true">
           {item.emoji}
         </span>
       )}
 
       <div className="item-fp-main">
-        <div className={"item-fp-name" + (paid ? " struck" : "")}>
+        <div
+          className={
+            "item-fp-name" +
+            (paid ? " struck" : "") +
+            (mine && !paid && mode === "item" ? " item-fp-name-mine" : "") +
+            (rejectShake ? " item-fp-name-attn" : "")
+          }
+        >
           {displayLabel}
           {paid && (
             <span className="paid-lock" aria-label="Pagado">
@@ -404,10 +406,12 @@ function SharePicker({
   flow,
   items,
   members,
+  displayClaims,
 }: {
   flow: Flow;
   items: readonly BillItem[];
   members: readonly TableMember[];
+  displayClaims: Claims;
 }) {
   const visible = items.filter((it) => !flow.state.paidItemIds.includes(it.id));
   const expandedVisible = useMemo(
@@ -439,7 +443,7 @@ function SharePicker({
         <div className="sheet-body">
           <div className="c-items">
             {visible.map((it) => {
-              const claimants = claimantsOf(flow.state.claims, it.id, members);
+              const claimants = claimantsOf(displayClaims, it.id, members);
               const shared = claimants.length > 1;
               const label = labelById.get(it.id) ?? it.name;
               return (
@@ -455,27 +459,24 @@ function SharePicker({
                     <div className="c-item-name">{label}</div>
                     <div className="c-item-sub">
                       {claimants.length > 0 ? (
-                        <>
-                          <AvatarStack
-                            ids={claimants}
+                        shared ? (
+                          <SharedPortionStrip
+                            itemId={it.id}
+                            itemQty={it.qty}
+                            claimants={claimants}
+                            claims={displayClaims}
                             roster={members}
-                            size={28}
-                            max={4}
                             youId={flow.youId}
                             youName={flow.state.name}
                           />
-                          <span className="shared-tag">
-                            {shared
-                              ? "compartido"
-                              : memberPillLabel(
-                                  members.find((m) => m.id === claimants[0]) ??
-                                    null,
-                                  claimants[0] === flow.youId
-                                    ? flow.state.name
-                                    : undefined,
-                                )}
-                          </span>
-                        </>
+                        ) : (
+                          <OwnerChip
+                            ids={claimants}
+                            roster={members}
+                            youId={flow.youId}
+                            youName={flow.state.name}
+                          />
+                        )
                       ) : (
                         <span>Sin asignar · toca para repartir</span>
                       )}
@@ -529,8 +530,14 @@ export function BillStage({
 }: BillStageProps) {
   const { state, derived } = flow;
   const { mode, tip, people, paidItemIds, claims: localClaims } = state;
-  /** Server is source of truth for item selection UI (no optimistic check flicker). */
-  const displayClaims = sessionClaims ?? localClaims;
+  /** Server is source of truth unless local has a multi-guest split (demo store is single-owner). */
+  const displayClaims = useMemo(
+    () =>
+      sessionClaims
+        ? mergeClaimsForDisplay(sessionClaims, localClaims, flow.youId)
+        : localClaims,
+    [sessionClaims, localClaims, flow.youId],
+  );
   const itemPayerNames = useMemo(
     () => buildItemPayerNames(paidSummaries),
     [paidSummaries],
@@ -586,6 +593,15 @@ export function BillStage({
     () => resolveRoster(members, state.name, flow.youId),
     [members, state.name, flow.youId],
   );
+
+  const sharedItemLabels = useMemo(() => {
+    return items
+      .filter((it) => {
+        if (paidItemIds.includes(it.id)) return false;
+        return claimantsOf(displayClaims, it.id, displayMembers).length > 1;
+      })
+      .map((it) => ({ id: it.id, label: it.displayLabel ?? it.name }));
+  }, [items, displayClaims, displayMembers, paidItemIds]);
 
   const youMember = useMemo(
     () =>
@@ -693,6 +709,15 @@ export function BillStage({
               <span className="owner-chip-label">{payerDisplayName}</span>
             </span>
             <div className="mode-payer-sub">Toca los platos que pediste</div>
+            {sharedItemLabels.length > 0 && (
+              <div className="mode-shared-list" data-testid="mode-shared-list">
+                {sharedItemLabels.map(({ id, label }) => (
+                  <span key={id} className="mode-shared-chip">
+                    <Ic.users s={12} /> {label} · compartido
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {mode === "equal" && (
@@ -921,7 +946,12 @@ export function BillStage({
       </div>
 
       {state.sharePicker && (
-        <SharePicker flow={flow} items={items} members={members} />
+        <SharePicker
+          flow={flow}
+          items={items}
+          members={displayMembers}
+          displayClaims={displayClaims}
+        />
       )}
     </>
   );
