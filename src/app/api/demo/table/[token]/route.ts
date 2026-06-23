@@ -54,6 +54,7 @@ const actionSchema = z.discriminatedUnion("action", [
     itemUnits: z.record(z.string(), z.number()).optional(),
     equalPeople: z.number().int().min(1).optional(),
     method: z.string().min(1),
+    ref: z.string().min(1).optional(),
   }),
   z.object({
     action: z.literal("reset"),
