@@ -22,7 +22,7 @@
  * alguien paga ítems. El dock sigue mostrando "Tu parte".
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
 import {
@@ -38,6 +38,7 @@ import {
   lineTotal,
   memberPillLabel,
   paidSubtotal,
+  resolveClaimantMember,
   resolveMemberDisplay,
   resolveRoster,
   unitsOf,
@@ -177,6 +178,8 @@ export function BillItemRow({
 }) {
   const { state, youId } = flow;
   const [rejectShake, setRejectShake] = useState(false);
+  const rejectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastActivateAt = useRef(0);
   const pendingOp = pendingClaims[item.id];
   const yours = unitsOf(displayClaims, item.id, youId);
   const free = freeUnits(item, displayClaims);
@@ -189,38 +192,60 @@ export function BillItemRow({
   const canToggle = mine || free > 0.001;
   const interactive =
     mode === "item" && !paid && !isLoading && canToggle;
-  const blockedTap =
+  const takenByOthers =
     mode === "item" &&
     !paid &&
     !isLoading &&
     !mine &&
     free <= 0.001 &&
     claimants.length > 0;
+  const rowActivatable =
+    mode === "item" && !paid && !isLoading && (canToggle || takenByOthers);
   const todoCovers = mode === "todo" && !paid;
   const rowSelected = (mode === "item" && mine && !paid) || todoCovers;
 
   const displayLabel = item.displayLabel ?? item.name;
 
-  const handleRowClick = () => {
-    if (interactive) {
-      flow.toggleMine(item);
-      return;
-    }
-    if (!blockedTap) return;
+  const primaryClaimant = useMemo(() => {
+    if (claimants.length !== 1) return null;
+    return resolveClaimantMember(claimants[0]!, members, youId, state.name);
+  }, [claimants, members, youId, state.name]);
+
+  const triggerRejectFeedback = () => {
+    if (rejectTimer.current) clearTimeout(rejectTimer.current);
     setRejectShake(false);
     requestAnimationFrame(() => {
       setRejectShake(true);
-      window.setTimeout(() => setRejectShake(false), 480);
+      rejectTimer.current = setTimeout(() => setRejectShake(false), 620);
     });
+  };
+
+  useEffect(
+    () => () => {
+      if (rejectTimer.current) clearTimeout(rejectTimer.current);
+    },
+    [],
+  );
+
+  const handleRowActivate = () => {
+    const now = Date.now();
+    if (now - lastActivateAt.current < 280) return;
+    lastActivateAt.current = now;
+
+    if (canToggle) {
+      flow.toggleMine(item);
+      return;
+    }
+    if (takenByOthers) triggerRejectFeedback();
   };
 
   const cls =
     "item-row-fp" +
-    (interactive || blockedTap ? " tappable" : "") +
+    (rowActivatable ? " tappable" : "") +
     (rowSelected ? " on" : "") +
     (isLoading ? " syncing" : "") +
     (paid ? " paid" : "") +
-    (blockedTap ? " taken" : "") +
+    (takenByOthers ? " taken" : "") +
     (rejectShake ? " item-row-reject" : "");
 
   const showCheck = mode === "item" || mode === "todo";
@@ -229,18 +254,21 @@ export function BillItemRow({
   return (
     <div
       className={cls}
-      onClick={
-        mode === "item" && !paid && !isLoading ? handleRowClick : undefined
-      }
-      role={
-        mode === "item" && !paid && !isLoading
-          ? "button"
+      onClick={rowActivatable ? () => handleRowActivate() : undefined}
+      onPointerUp={
+        rowActivatable
+          ? (e) => {
+              if (e.pointerType === "mouse") return;
+              handleRowActivate();
+            }
           : undefined
       }
+      role={rowActivatable ? "button" : undefined}
       aria-pressed={interactive ? mine : undefined}
       aria-busy={isLoading || undefined}
       data-testid={`bill-item-${item.id}`}
       data-syncing={isLoading ? "true" : undefined}
+      data-taken={takenByOthers ? "true" : undefined}
     >
       {showCheck ? (
         <span
@@ -299,12 +327,20 @@ export function BillItemRow({
           ) : mode === "item" && isLoading ? (
             <span className="sync-tag">Guardando…</span>
           ) : mode === "item" && claimants.length > 0 ? (
-            <OwnerChip
-              ids={claimants}
-              roster={members}
-              youId={youId}
-              youName={state.name}
-            />
+            <span className="item-fp-claim-row">
+              <OwnerChip
+                ids={claimants}
+                roster={members}
+                youId={youId}
+                youName={state.name}
+                emphasize={rejectShake}
+              />
+              {rejectShake && primaryClaimant ? (
+                <span className="claim-hint-pop" role="status" aria-live="polite">
+                  Lo eligió {memberPillLabel(primaryClaimant, undefined, 14)}
+                </span>
+              ) : null}
+            </span>
           ) : mode === "todo" && !paid ? (
             <span className="todo-item-tag">Incluido en tu pago</span>
           ) : mode === "item" && free > 0.001 && !mine && claimants.length === 0 ? (

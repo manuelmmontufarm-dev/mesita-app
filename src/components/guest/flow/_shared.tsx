@@ -433,18 +433,22 @@ export function OwnerChip({
   roster,
   youId,
   youName,
+  emphasize = false,
 }: {
   ids: readonly MemberId[];
   roster: readonly TableMember[];
   youId?: MemberId;
   youName?: string;
+  /** Pulse when another guest taps a taken dish. */
+  emphasize?: boolean;
 }) {
   if (ids.length === 0) return null;
+  const emphasizeCls = emphasize ? " owner-chip-emphasize" : "";
   if (ids.length === 1 && ids[0] === youId) {
     const member = resolveClaimantMember(ids[0], roster, youId, youName);
     const label = memberPillLabel(member, youName, 10);
     return (
-      <span className="owner-chip owner-chip-you">
+      <span className={"owner-chip owner-chip-you" + emphasizeCls}>
         <span className="owner-chip-avs">
           <AvatarDot member={member} name={youName} size={18} />
         </span>
@@ -465,7 +469,7 @@ export function OwnerChip({
         );
 
   return (
-    <span className="owner-chip">
+    <span className={"owner-chip" + emphasizeCls}>
       <span className="owner-chip-avs">
         {shown.map((id) => {
           const member = resolveClaimantMember(id, roster, youId, youName);

@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-22 — Shake móvil + chip del comensal resaltado
+- **Qué:** `BillStage.tsx`, `_shared.tsx` (`OwnerChip`), `customer.css`.
+- **Por qué:** El shake no respondía en touch; faltaba explicar por qué no se puede reclamar el plato.
+- **Qué hace:** `onPointerUp` + debounce para móvil; shake más suave; el chip de quien eligió el plato crece/brilla y muestra “Lo eligió Persona N”.
+
 ### 2026-06-22 — URL canónica mesitademo-two + QR pack regenerado
 - **Qué:** `qr-utils.ts`, scripts QR, `.env.example`, `docs/demo-qr-pack/*`, `public/demo-pay-qr.png`, `DEMO_TABLES_DEBUG_REPORT.md`.
 - **Por qué:** Había dos proyectos Vercel (`mesitademo` vs `mesita-demo`); los QR del PDF apuntaban a `mesita-demo.vercel.app` y el usuario trabaja en `mesitademo-two.vercel.app`.
