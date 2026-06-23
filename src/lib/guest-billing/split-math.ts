@@ -278,6 +278,12 @@ export const claimantsOf = (
 export const freeUnits = (item: BillItem, claims: Claims): number =>
   round2(item.qty - claimedUnits(claims, item.id));
 
+export const claimantsCount = (claims: Claims, itemId: ItemId): number =>
+  Object.values(claims[itemId] ?? {}).filter((u) => u > 0.001).length;
+
+export const isItemShared = (claims: Claims, itemId: ItemId): boolean =>
+  claimantsCount(claims, itemId) > 1;
+
 export const itemOwed = (
   item: BillItem,
   claims: Claims,

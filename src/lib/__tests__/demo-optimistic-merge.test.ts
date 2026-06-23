@@ -136,6 +136,13 @@ describe("mergeClaimsForDisplay", () => {
     const merged = mergeClaimsForDisplay(server, local, "g1");
     expect(merged.locro).toEqual({ g1: 0.5, g2: 0.5 });
   });
+
+  it("prefers server multi-guest split when local only has your share", () => {
+    const server = { locro: { g1: 0.5, g2: 0.5 } };
+    const local = { locro: { g1: 0.5 } };
+    const merged = mergeClaimsForDisplay(server, local, "g1");
+    expect(merged.locro).toEqual({ g1: 0.5, g2: 0.5 });
+  });
 });
 
 describe("mapClaimsFromDemoRaw", () => {

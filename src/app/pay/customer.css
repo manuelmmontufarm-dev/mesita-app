@@ -3854,6 +3854,19 @@ html.has-sheet-open .flow-foot {
 .completed-dock-btn {
   width: 100%;
 }
+.completed-dock-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pay);
+}
+.c-dock.dock-mini.completed-dock .completed-dock-mark {
+  font-size: 0;
+}
+.c-dock.dock-mini.completed-dock .dock-k::before {
+  content: "✓ ";
+  color: var(--pay);
+}
 .rcpt-peek-payments {
   display: flex;
   flex-wrap: wrap;

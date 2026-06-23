@@ -26,6 +26,7 @@ import {
   paidSubtotal,
   unclaimedItems,
   unitsOf,
+  isItemShared,
 } from "@/lib/guest-billing/split-math";
 import { expandRepeatedItems } from "@/lib/guest-billing/bill-display";
 import type {
@@ -86,7 +87,7 @@ function PersonItemLine({
   paid: boolean;
 }) {
   const u = unitsOf(claims, item.id, memberId);
-  const shared = Object.keys(claims[item.id] ?? {}).filter((id) => (claims[item.id]?.[id] ?? 0) > 0).length > 1;
+  const shared = isItemShared(claims, item.id);
   const pct = item.qty > 0 ? Math.round((u / item.qty) * 100) : 0;
   return (
     <div className={"pi" + (paid ? " pi-paid" : "")}>
@@ -163,8 +164,16 @@ function PersonasEnMesa({
   );
 }
 
-function CardSinReclamar({ items, flow }: { items: readonly BillItem[]; flow: Flow; }) {
-  const { claims, paidItemIds } = flow.state;
+function CardSinReclamar({
+  items,
+  flow,
+  claims,
+}: {
+  items: readonly BillItem[];
+  flow: Flow;
+  claims: Claims;
+}) {
+  const { paidItemIds } = flow.state;
   const freeItems = unclaimedItems(items, claims).filter((it) => !paidItemIds.includes(it.id));
   if (freeItems.length === 0) return null;
   const expandedFree = useMemo(() => expandRepeatedItems(freeItems), [freeItems.map((i) => i.id).join(",")]);
@@ -224,10 +233,7 @@ function ConfirmYoursCard({
         <div className="confirm-my-items">
           {myItems.map((it) => {
             const u = unitsOf(claims, it.id, youId);
-            const shared =
-              Object.keys(claims[it.id] ?? {}).filter(
-                (id) => (claims[it.id]?.[id] ?? 0) > 0,
-              ).length > 1;
+            const shared = isItemShared(claims, it.id);
             const pct = it.qty > 0 ? Math.round((u / it.qty) * 100) : 0;
             return (
               <div key={it.id} className="confirm-my-row">
@@ -369,7 +375,7 @@ export function ConfirmStage({
           {mode === "item" && (
             <PersonasEnMesa flow={flow} items={items} members={members} config={config} claims={claims} />
           )}
-          {mode === "item" && <CardSinReclamar items={items} flow={flow} />}
+          {mode === "item" && <CardSinReclamar items={items} flow={flow} claims={claims} />}
 
           {/* ── Checkbox acknowledgement ───────────────────────── */}
           {needsAck && (

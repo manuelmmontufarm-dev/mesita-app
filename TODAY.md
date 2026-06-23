@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-23 — Split math + dock cuenta cerrada smooth + escenario [22]
+- **Qué:** `GuestBillFlow.tsx`, `demo-optimistic-merge.ts`, `ConfirmStage.tsx`, `split-math.ts`, `customer.css`, `demo-scenarios.ts` (escenario 22), tests.
+- **Por qué:** Totales del dock/precuenta ignoraban el reparto 50/50 (`derived` usaba claims sin merge); badge `%` no salía si el servidor tenía el split pero local solo tu mitad; dock “Ver ¡Cuenta completada!” fijo sin animación mini/full.
+- **Qué hace:** `derived` y sync usan `mergeClaimsForDisplay` (servidor multi-guest gana); precuenta muestra `50%` en ambas personas; dock cerrado usa misma lógica scroll `dock-full`/`dock-mini` con recibo peek; escenario [22] verifica `claimShares` 50/50. **67 tests** verdes.
+
 ### 2026-06-23 — Compartir plato, 50% en confirm y dock cuenta cerrada
 - **Qué:** `BillStage.tsx`, `GuestBillFlow.tsx`, `useGuestPaymentFlow.ts`, `ConfirmStage.tsx`, `customer.css`.
 - **Por qué:** Tocar un plato compartido lo sacaba del reparto; Persona 1 no mostraba `50%` en el recibo de confirmación; tras pagar toda la mesa y “Ver mesa” no había forma de volver a ¡Cuenta completada!.

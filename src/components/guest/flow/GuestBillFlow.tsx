@@ -25,6 +25,7 @@ import { ShareSheet } from "./ShareSheet";
 import { WaitingSuccessStage } from "./WaitingSuccessStage";
 import { Ic, LogoMark, useBumpOnChange } from "./_shared";
 import {
+  deriveTotals,
   type FlowInit,
   type PaidPayload,
   useGuestPaymentFlow,
@@ -42,7 +43,7 @@ import {
 } from "@/lib/guest-billing/receipt-peek-layout";
 import { freeUnits, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
 import { computeBillShellScrollMetrics } from "@/lib/guest-billing/bill-shell-scroll";
-import { mergeClaimsForDisplay, mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
+import { mergeClaimsForDisplay } from "@/lib/demo-optimistic-merge";
 import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
 import type {
   BillItem,
@@ -203,7 +204,29 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     };
   }, [flow, liveSession]);
 
-  const activeFlow = liveSession ? liveFlow : flow;
+  const displayClaimsForStages = useMemo(
+    () =>
+      sessionClaims
+        ? mergeClaimsForDisplay(sessionClaims, flow.state.claims, resolvedYouId)
+        : flow.state.claims,
+    [sessionClaims, flow.state.claims, resolvedYouId],
+  );
+
+  const derivedFromDisplayClaims = useMemo(
+    () =>
+      deriveTotals(
+        { ...flow.state, claims: displayClaimsForStages },
+        items,
+        config,
+        resolvedYouId,
+      ),
+    [flow.state, displayClaimsForStages, items, config, resolvedYouId],
+  );
+
+  const activeFlow = useMemo(() => {
+    const base = liveSession ? liveFlow : flow;
+    return { ...base, derived: derivedFromDisplayClaims };
+  }, [liveSession, liveFlow, flow, derivedFromDisplayClaims]);
 
   const youMember = members.find((m) => m.isYou);
   const seededName = useRef(false);
@@ -213,11 +236,10 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
   useLayoutEffect(() => {
     if (!serverSync) return;
     flow.syncFromServer({
-      claims: mergeClaimsPreserveLocal(
+      claims: mergeClaimsForDisplay(
         serverSync.claims,
         flow.state.claims,
         resolvedYouId,
-        { trustLocal: trustLocalClaims.current },
       ),
       paidItemIds: serverSync.paidItemIds,
       paidIds: serverSync.paidIds,
@@ -307,14 +329,6 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
         config,
       ),
     [flow.state.receipts, paidSummaries, resolvedYouId, items, config],
-  );
-
-  const displayClaimsForStages = useMemo(
-    () =>
-      sessionClaims
-        ? mergeClaimsForDisplay(sessionClaims, flow.state.claims, resolvedYouId)
-        : flow.state.claims,
-    [sessionClaims, flow.state.claims, resolvedYouId],
   );
 
   const stageProps: StageProps = {
@@ -552,14 +566,31 @@ function BillShellStage({
           </div>
         </div>
       ) : demoTableProgress?.tableClosed ? (
-        <div className="c-dock glass-dock pay-dock-return dock-full completed-dock">
+        <div
+          className={
+            "c-dock glass-dock pay-dock-return completed-dock " +
+            (dockExpanded ? "dock-full" : "dock-mini")
+          }
+        >
+          <div className="dock-top">
+            <div className="dock-k">
+              Mesa cerrada
+              <small>
+                {config.name} · Mesa {config.table}
+              </small>
+            </div>
+            <div className="dock-total completed-dock-mark" aria-hidden="true">
+              <Ic.check s={22} />
+            </div>
+          </div>
           <button
             type="button"
             className="c-pay-btn completed-dock-btn"
             onClick={() => flow.finishWaiting()}
             data-testid="dock-completed-btn"
           >
-            <Ic.check s={18} /> Ver ¡Cuenta completada!
+            <Ic.check s={18} />{" "}
+            {dockExpanded ? "Ver ¡Cuenta completada!" : "¡Cuenta completada!"}
           </button>
         </div>
       ) : null}

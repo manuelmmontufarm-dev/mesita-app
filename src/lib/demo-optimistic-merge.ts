@@ -189,5 +189,11 @@ export function mergeClaimsForDisplay(
       merged[itemId] = { ...localMap };
     }
   }
+  for (const [itemId, serverMap] of Object.entries(server)) {
+    const claimants = Object.values(serverMap).filter((u) => u > 0.001).length;
+    if (claimants > 1) {
+      merged[itemId] = { ...serverMap };
+    }
+  }
   return merged;
 }

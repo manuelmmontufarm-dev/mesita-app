@@ -17,6 +17,7 @@ import {
   renameDemoGuest,
   resetDemoTableState,
   setDemoGuestStatus,
+  splitDemoItem,
   type DemoGuest,
   type DemoSplitMode,
   type DemoTableState,
@@ -90,6 +91,15 @@ export class SimulatedDevice {
     if (!this.guestId) await this.join();
     await jitter();
     return releaseDemoItem(this.token, this.guestId!, itemId);
+  }
+
+  async split(
+    itemId: string,
+    unitsMap: Record<string, number>,
+  ): Promise<DemoTableState> {
+    if (!this.guestId) await this.join();
+    await jitter();
+    return splitDemoItem(this.token, this.guestId!, itemId, unitsMap);
   }
 
   async rename(name: string): Promise<DemoTableState> {
@@ -521,6 +531,37 @@ export const SCENARIOS: Scenario[] = [
           `${itemIds[i]} owned by device ${i}`,
         );
       }
+    },
+  },
+  {
+    id: "22",
+    category: "claim",
+    name: "50/50 split persists in claimShares for both guests",
+    storeOnly: true,
+    run: async (token) => {
+      await resetDemoTableState(token);
+      const a = new SimulatedDevice(token);
+      const b = new SimulatedDevice(token);
+      await a.join();
+      await b.join();
+      await a.split("locro", { [a.guestId!]: 0.5, [b.guestId!]: 0.5 });
+      const state = await getDemoTableState(token);
+      expectEq(state.claims.locro, undefined, "single-owner claim cleared");
+      expectEq(
+        state.claimShares?.locro?.[a.guestId!],
+        0.5,
+        "guest A half unit",
+      );
+      expectEq(
+        state.claimShares?.locro?.[b.guestId!],
+        0.5,
+        "guest B half unit",
+      );
+      const mapped = (
+        await import("@/lib/demo-optimistic-merge")
+      ).mapClaimsFromDemoRaw(state);
+      expectEq(mapped.locro?.[a.guestId!], 0.5, "mapped A");
+      expectEq(mapped.locro?.[b.guestId!], 0.5, "mapped B");
     },
   },
 ];
