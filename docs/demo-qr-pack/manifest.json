@@ -2,7 +2,7 @@
   {
     "token": "demo",
     "slug": "default",
-    "url": "https://mesita-demo.vercel.app/pay/demo",
+    "url": "https://mesitademo-two.vercel.app/pay/demo",
     "restaurant": "La Doña Pepa",
     "table": "12",
     "itemCount": 8,
@@ -13,7 +13,7 @@
   {
     "token": "demo-mesa-1",
     "slug": "mesa-1",
-    "url": "https://mesita-demo.vercel.app/pay/demo/mesa-1",
+    "url": "https://mesitademo-two.vercel.app/pay/demo/mesa-1",
     "restaurant": "La Doña Pepa",
     "table": "1",
     "itemCount": 6,
@@ -24,7 +24,7 @@
   {
     "token": "demo-mesa-2",
     "slug": "mesa-2",
-    "url": "https://mesita-demo.vercel.app/pay/demo/mesa-2",
+    "url": "https://mesitademo-two.vercel.app/pay/demo/mesa-2",
     "restaurant": "La Doña Pepa",
     "table": "2",
     "itemCount": 6,
@@ -35,7 +35,7 @@
   {
     "token": "demo-mesa-3",
     "slug": "mesa-3",
-    "url": "https://mesita-demo.vercel.app/pay/demo/mesa-3",
+    "url": "https://mesitademo-two.vercel.app/pay/demo/mesa-3",
     "restaurant": "La Doña Pepa",
     "table": "3",
     "itemCount": 9,
@@ -46,7 +46,7 @@
   {
     "token": "demo-mesa-4",
     "slug": "mesa-4",
-    "url": "https://mesita-demo.vercel.app/pay/demo/mesa-4",
+    "url": "https://mesitademo-two.vercel.app/pay/demo/mesa-4",
     "restaurant": "La Doña Pepa",
     "table": "4",
     "itemCount": 6,

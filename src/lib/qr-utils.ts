@@ -16,10 +16,11 @@ export const QR_BRAND = {
 } as const;
 
 export const DEMO_PAY_URL =
-  process.env.NEXT_PUBLIC_DEMO_PAY_URL ?? "https://mesita-demo.vercel.app/pay/demo";
+  process.env.NEXT_PUBLIC_DEMO_PAY_URL ??
+  "https://mesitademo-two.vercel.app/pay/demo";
 
 const DEMO_BASE_URL =
-  process.env.NEXT_PUBLIC_APP_URL ?? "https://mesita-demo.vercel.app";
+  process.env.NEXT_PUBLIC_APP_URL ?? "https://mesitademo-two.vercel.app";
 
 /** Build the public `/pay/...` URL for a demo token (`demo` or `demo-{slug}`). */
 export function buildDemoPayUrl(token: string): string {

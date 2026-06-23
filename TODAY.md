@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-22 — URL canónica mesitademo-two + QR pack regenerado
+- **Qué:** `qr-utils.ts`, scripts QR, `.env.example`, `docs/demo-qr-pack/*`, `public/demo-pay-qr.png`, `DEMO_TABLES_DEBUG_REPORT.md`.
+- **Por qué:** Había dos proyectos Vercel (`mesitademo` vs `mesita-demo`); los QR del PDF apuntaban a `mesita-demo.vercel.app` y el usuario trabaja en `mesitademo-two.vercel.app`.
+- **Qué hace:** Todos los QR y defaults usan `https://mesitademo-two.vercel.app`; PDF de 5 mesas regenerado con URLs correctas.
+
 ### 2026-06-22 — Fix shake en plato tomado (interactive mal definido)
 - **Qué:** `BillStage.tsx`, `customer.css`.
 - **Por qué:** `interactive` era true en filas ya reclamadas → `toggleMine` no-op y el shake nunca corría.

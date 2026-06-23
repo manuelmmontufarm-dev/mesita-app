@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import QRCode from "qrcode";
 
-const DEMO_URL = "https://mesita-demo.vercel.app/pay/demo";
+const DEMO_URL = "https://mesitademo-two.vercel.app/pay/demo";
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "../public/demo-pay-qr.png");
 
 const buffer = await QRCode.toBuffer(DEMO_URL, {

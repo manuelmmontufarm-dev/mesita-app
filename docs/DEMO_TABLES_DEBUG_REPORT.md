@@ -6,11 +6,11 @@ legacy default (byte-identical to the prior single-table flow). Tokens
 
 | Slug      | Token         | Mesa | URL                                                         |
 | --------- | ------------- | ---- | ----------------------------------------------------------- |
-| `default` | `demo`        | 12   | `https://mesita-demo.vercel.app/pay/demo`                   |
-| `mesa-1`  | `demo-mesa-1` | 1    | `https://mesita-demo.vercel.app/pay/demo/mesa-1`            |
-| `mesa-2`  | `demo-mesa-2` | 2    | `https://mesita-demo.vercel.app/pay/demo/mesa-2`            |
-| `mesa-3`  | `demo-mesa-3` | 3    | `https://mesita-demo.vercel.app/pay/demo/mesa-3`            |
-| `mesa-4`  | `demo-mesa-4` | 4    | `https://mesita-demo.vercel.app/pay/demo/mesa-4`            |
+| `default` | `demo`        | 12   | `https://mesitademo-two.vercel.app/pay/demo`                   |
+| `mesa-1`  | `demo-mesa-1` | 1    | `https://mesitademo-two.vercel.app/pay/demo/mesa-1`            |
+| `mesa-2`  | `demo-mesa-2` | 2    | `https://mesitademo-two.vercel.app/pay/demo/mesa-2`            |
+| `mesa-3`  | `demo-mesa-3` | 3    | `https://mesitademo-two.vercel.app/pay/demo/mesa-3`            |
+| `mesa-4`  | `demo-mesa-4` | 4    | `https://mesitademo-two.vercel.app/pay/demo/mesa-4`            |
 
 > URLs use `NEXT_PUBLIC_APP_URL` at build time. Override with
 > `NEXT_PUBLIC_APP_URL=https://your-host npm run demo:qr-pack`.
@@ -20,7 +20,7 @@ legacy default (byte-identical to the prior single-table flow). Tokens
 ## `default` — Baseline
 
 - **Token**: `demo`
-- **URL**: `https://mesita-demo.vercel.app/pay/demo`
+- **URL**: `https://mesitademo-two.vercel.app/pay/demo`
 - **Restaurant**: La Doña Pepa · Mesa 12 · Quito
 
 | qty | item                 | $    |
@@ -41,7 +41,7 @@ legacy default (byte-identical to the prior single-table flow). Tokens
 ## `mesa-1` — Almuerzo clásico
 
 - **Token**: `demo-mesa-1`
-- **URL**: `https://mesita-demo.vercel.app/pay/demo/mesa-1`
+- **URL**: `https://mesitademo-two.vercel.app/pay/demo/mesa-1`
 - **Restaurant**: La Doña Pepa · Mesa 1 · Quito
 
 | qty | item                 | $    |
@@ -60,7 +60,7 @@ legacy default (byte-identical to the prior single-table flow). Tokens
 ## `mesa-2` — Pagos parciales
 
 - **Token**: `demo-mesa-2`
-- **URL**: `https://mesita-demo.vercel.app/pay/demo/mesa-2`
+- **URL**: `https://mesitademo-two.vercel.app/pay/demo/mesa-2`
 - **Restaurant**: La Doña Pepa · Mesa 2 · Quito
 
 | qty | item                  | $    |
@@ -81,7 +81,7 @@ legacy default (byte-identical to the prior single-table flow). Tokens
 ## `mesa-3` — Grupo grande
 
 - **Token**: `demo-mesa-3`
-- **URL**: `https://mesita-demo.vercel.app/pay/demo/mesa-3`
+- **URL**: `https://mesitademo-two.vercel.app/pay/demo/mesa-3`
 - **Restaurant**: La Doña Pepa · Mesa 3 · Quito
 
 | qty | item                       | $     |
@@ -103,7 +103,7 @@ legacy default (byte-identical to the prior single-table flow). Tokens
 ## `mesa-4` — Cierre total (≥$50)
 
 - **Token**: `demo-mesa-4`
-- **URL**: `https://mesita-demo.vercel.app/pay/demo/mesa-4`
+- **URL**: `https://mesitademo-two.vercel.app/pay/demo/mesa-4`
 - **Restaurant**: La Doña Pepa · Mesa 4 · Quito
 
 | qty | item                       | $     |
