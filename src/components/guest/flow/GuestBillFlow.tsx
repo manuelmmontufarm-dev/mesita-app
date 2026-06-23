@@ -358,6 +358,66 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     return () => document.documentElement.classList.remove("has-receipt-peek");
   }, [drawerReceipts.length]);
 
+  const hasReceiptPeek = drawerReceipts.length > 0;
+
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const payStackSelector = [
+      '.cust-app[data-stage="bill"] .c-dock.pay-dock-return',
+      '.cust-app[data-stage="confirm"] .flow-foot',
+      '.cust-app[data-stage="payment"] .flow-foot',
+    ].join(", ");
+
+    if (!hasReceiptPeek) {
+      root.style.removeProperty("--pay-stack-height");
+      root.classList.remove("has-pay-stack-above");
+      return;
+    }
+
+    let ro: ResizeObserver | null = null;
+
+    const measure = () => {
+      const peekHd = document.querySelector<HTMLElement>(
+        ".receipt-drawer.peek .rcpt-perf",
+      );
+      const payEl = document.querySelector<HTMLElement>(payStackSelector);
+      if (peekHd) {
+        root.style.setProperty("--receipt-peek", `${peekHd.offsetHeight}px`);
+      }
+      if (payEl) {
+        root.style.setProperty("--pay-stack-height", `${payEl.offsetHeight}px`);
+        root.classList.add("has-pay-stack-above");
+      } else {
+        root.style.removeProperty("--pay-stack-height");
+        root.classList.remove("has-pay-stack-above");
+      }
+    };
+
+    measure();
+    const raf = requestAnimationFrame(measure);
+    const t0 = window.setTimeout(measure, 0);
+    const t1 = window.setTimeout(measure, 120);
+
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(measure);
+      const peekHd = document.querySelector(".receipt-drawer.peek .rcpt-perf");
+      const payEl = document.querySelector(payStackSelector);
+      if (peekHd) ro.observe(peekHd);
+      if (payEl) ro.observe(payEl);
+    }
+
+    window.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t0);
+      window.clearTimeout(t1);
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
+      root.style.removeProperty("--pay-stack-height");
+      root.classList.remove("has-pay-stack-above");
+    };
+  }, [hasReceiptPeek, stage, flow.state.mode]);
+
   useEffect(() => {
     document.documentElement.classList.toggle(
       "has-sheet-open",

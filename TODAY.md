@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-23 — Esquinas del stack pay+recibo y scroll en todas las fases
+- **Qué:** `GuestBillFlow.tsx`, `customer.css`.
+- **Por qué:** Al hacer scroll el contenido quedaba tapado bajo el stack (bill/confirm/payment); en la unión pay dock ↔ “Tu recibo” se veían triángulos de fondo por `border-radius` en ambos widgets.
+- **Qué hace:** `ResizeObserver` mide `--pay-stack-height` real del dock/foot activo; `padding-bottom`/`scroll-padding-bottom` usan pay stack + peek + buffer en bill, confirm, payment y éxito; con pay stack arriba el peek pierde radio superior y el tear; `::after` blanco sella el seam. Clase `has-pay-stack-above` en `<html>`.
+
 ### 2026-06-23 — Pay stack pegado al recibo (sin hueco)
 - **Qué:** `customer.css`.
 - **Por qué:** Con “Tu recibo” visible, el dock de bill / foot de confirm / payment flotaban con gap gris entre el widget y el peek.

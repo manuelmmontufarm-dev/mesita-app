@@ -3827,9 +3827,10 @@
 .rcpt-pdf-all { width: 100%; margin-top: 8px; }
 html.has-receipt-peek {
   --receipt-peek: 58px;
+  --pay-stack-height: 188px;
+  --pay-stack-buffer: 28px;
   --receipt-dock-gap: 0;
-  /* confirm/payment: pay CTA + secondary row, stacked flush on peek */
-  --flow-foot-above-peek: 132px;
+  --flow-foot-above-peek: var(--pay-stack-height);
 }
 .receipt-drawer.peek .rcpt-perf {
   padding: 8px 0 calc(10px + env(safe-area-inset-bottom, 0px));
@@ -3892,6 +3893,34 @@ html.has-receipt-peek .cust-app[data-stage="bill"] .c-dock.dock-mini {
 html.has-receipt-peek .receipt-drawer.peek .rcpt-perf {
   border-top: none;
   box-shadow: none;
+}
+/* Receipt flush under pay chrome — square top kills corner wedges */
+html.has-receipt-peek.has-pay-stack-above .receipt-drawer.peek {
+  border-radius: 0;
+  box-shadow: none;
+}
+html.has-receipt-peek.has-pay-stack-above .receipt-drawer.peek .rcpt-tear {
+  display: none;
+}
+html.has-receipt-peek.has-pay-stack-above .cust-app[data-stage="bill"] .c-dock.pay-dock-return,
+html.has-receipt-peek.has-pay-stack-above .cust-app[data-stage="bill"] .c-dock.completed-dock,
+html.has-receipt-peek.has-pay-stack-above .cust-app[data-stage="confirm"] .flow-foot,
+html.has-receipt-peek.has-pay-stack-above .cust-app[data-stage="payment"] .flow-foot {
+  overflow: visible;
+}
+html.has-receipt-peek.has-pay-stack-above .cust-app[data-stage="bill"] .c-dock.pay-dock-return::after,
+html.has-receipt-peek.has-pay-stack-above .cust-app[data-stage="bill"] .c-dock.completed-dock::after,
+html.has-receipt-peek.has-pay-stack-above .cust-app[data-stage="confirm"] .flow-foot::after,
+html.has-receipt-peek.has-pay-stack-above .cust-app[data-stage="payment"] .flow-foot::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 4px;
+  background: #fff;
+  pointer-events: none;
+  z-index: 2;
 }
 /* Overlays take focus — hide pay chrome (receipt open, share sheets) */
 html.has-receipt-open .c-dock,
@@ -3959,15 +3988,23 @@ html.has-receipt-open::before {
   z-index: 91;
   pointer-events: auto;
 }
-html.has-receipt-peek .cust-scroll {
-  padding-bottom: calc(176px + var(--receipt-peek, 58px) + env(safe-area-inset-bottom, 0px)) !important;
-  scroll-padding-bottom: calc(176px + var(--receipt-peek, 58px) + env(safe-area-inset-bottom, 0px));
+html.has-receipt-peek .cust-scroll,
+html.has-receipt-peek .cust-scroll.bill-first-page {
+  padding-bottom: calc(var(--pay-stack-height, 188px) + var(--receipt-peek, 58px) + var(--pay-stack-buffer, 28px) + env(safe-area-inset-bottom, 0px)) !important;
+  scroll-padding-bottom: calc(var(--pay-stack-height, 188px) + var(--receipt-peek, 58px) + var(--pay-stack-buffer, 28px) + env(safe-area-inset-bottom, 0px));
 }
 html.has-receipt-peek .flow-scroll,
-html.has-receipt-peek .wait-scroll,
+html.has-receipt-peek .wait-scroll {
+  padding-bottom: calc(var(--pay-stack-height, 188px) + var(--receipt-peek, 58px) + var(--pay-stack-buffer, 28px) + env(safe-area-inset-bottom, 0px)) !important;
+  scroll-padding-bottom: calc(var(--pay-stack-height, 188px) + var(--receipt-peek, 58px) + var(--pay-stack-buffer, 28px) + env(safe-area-inset-bottom, 0px));
+}
 html.has-receipt-peek .ws-success-scroll {
-  padding-bottom: calc(var(--flow-foot-above-peek, 132px) + var(--receipt-peek, 58px) + env(safe-area-inset-bottom, 0px)) !important;
-  scroll-padding-bottom: calc(var(--flow-foot-above-peek, 132px) + var(--receipt-peek, 58px) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--receipt-peek, 58px) + 32px + env(safe-area-inset-bottom, 0px)) !important;
+  scroll-padding-bottom: calc(var(--receipt-peek, 58px) + 32px + env(safe-area-inset-bottom, 0px));
+}
+html.has-receipt-peek.has-pay-stack-above .ws-success-scroll {
+  padding-bottom: calc(var(--pay-stack-height, 188px) + var(--receipt-peek, 58px) + var(--pay-stack-buffer, 28px) + env(safe-area-inset-bottom, 0px)) !important;
+  scroll-padding-bottom: calc(var(--pay-stack-height, 188px) + var(--receipt-peek, 58px) + var(--pay-stack-buffer, 28px) + env(safe-area-inset-bottom, 0px));
 }
 .ws-success-wrap {
   flex: 1;
@@ -3980,9 +4017,6 @@ html.has-receipt-peek .ws-success-scroll {
   min-height: 0;
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
-}
-html.has-receipt-peek .ws-success-scroll {
-  padding-bottom: calc(32px + var(--receipt-peek, 84px) + env(safe-area-inset-bottom, 0px)) !important;
 }
 html.has-receipt-peek .completed-actions {
   margin-bottom: calc(var(--receipt-peek, 58px) + 4px);
