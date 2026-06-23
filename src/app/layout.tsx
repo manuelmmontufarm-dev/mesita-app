@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   description:
     "Mesita QR — La capa operativa para la hospitalidad moderna. Tus clientes escanean, dividen la cuenta y pagan en segundos. Sin esperar al mesero, sin apps.",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/icon", type: "image/png", sizes: "32x32" }],
+    apple: [{ url: "/apple-icon", type: "image/png", sizes: "180x180" }],
+  },
   appleWebApp: {
     capable: true,
     title: "MesitaQR",

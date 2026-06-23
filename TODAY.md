@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-22 — Favicon MesitaQR + shake en plato ya tomado
+- **Qué:** `src/app/icon.tsx`, `apple-icon.tsx`, `layout.tsx`, `manifest.ts`, `BillStage.tsx`, `customer.css`.
+- **Por qué:** La pestaña del browser mostraba icono genérico; al tocar un ítem ya reclamado no había feedback.
+- **Qué hace:** Favicon con el LogoMark (cuadrícula verde/negro); fila del plato hace shake horizontal si otro comensal ya lo tiene.
+
 ### 2026-06-22 — Logo MesitaQR en header sticky del bill
 - **Qué:** `GuestBillFlow.tsx`, `BillStage.tsx`, `customer.css`.
 - **Por qué:** El header superior solo mostraba “En vivo” y mesa; faltaba marca visible arriba.

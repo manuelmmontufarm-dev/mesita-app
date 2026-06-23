@@ -3059,6 +3059,23 @@
 .item-row-fp.paid {
   opacity: 0.72;
 }
+.item-row-fp.taken {
+  cursor: default;
+}
+.item-row-fp.item-row-reject {
+  animation: itemRejectShake 0.42s var(--ease);
+}
+@keyframes itemRejectShake {
+  0%, 100% { transform: translateX(0); }
+  18% { transform: translateX(-6px); }
+  36% { transform: translateX(5px); }
+  54% { transform: translateX(-4px); }
+  72% { transform: translateX(3px); }
+  90% { transform: translateX(-1px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .item-row-fp.item-row-reject { animation: none; }
+}
 
 .item-fp-check {
   flex-shrink: 0;

@@ -176,6 +176,7 @@ export function BillItemRow({
   paidByName?: string;
 }) {
   const { state, youId } = flow;
+  const [rejectShake, setRejectShake] = useState(false);
   const pendingOp = pendingClaims[item.id];
   const yours = unitsOf(displayClaims, item.id, youId);
   const free = freeUnits(item, displayClaims);
@@ -186,17 +187,36 @@ export function BillItemRow({
     (pendingOp === "release" && serverMine);
   const mine = serverMine && !isLoading;
   const interactive = mode === "item" && !paid && !isLoading;
+  const blockedTap =
+    mode === "item" &&
+    !paid &&
+    !isLoading &&
+    !mine &&
+    free <= 0.001 &&
+    claimants.length > 0;
   const todoCovers = mode === "todo" && !paid;
   const rowSelected = (mode === "item" && mine && !paid) || todoCovers;
 
   const displayLabel = item.displayLabel ?? item.name;
 
+  const handleRowClick = () => {
+    if (interactive) {
+      flow.toggleMine(item);
+      return;
+    }
+    if (!blockedTap) return;
+    setRejectShake(true);
+    window.setTimeout(() => setRejectShake(false), 420);
+  };
+
   const cls =
     "item-row-fp" +
-    (interactive ? " tappable" : "") +
+    (interactive || blockedTap ? " tappable" : "") +
     (rowSelected ? " on" : "") +
     (isLoading ? " syncing" : "") +
-    (paid ? " paid" : "");
+    (paid ? " paid" : "") +
+    (blockedTap ? " taken" : "") +
+    (rejectShake ? " item-row-reject" : "");
 
   const showCheck = mode === "item" || mode === "todo";
   const checkOn = paid || (mode === "item" && mine) || todoCovers;
@@ -204,8 +224,14 @@ export function BillItemRow({
   return (
     <div
       className={cls}
-      onClick={interactive ? () => flow.toggleMine(item) : undefined}
-      role={interactive ? "button" : undefined}
+      onClick={
+        mode === "item" && !paid && !isLoading ? handleRowClick : undefined
+      }
+      role={
+        mode === "item" && !paid && !isLoading
+          ? "button"
+          : undefined
+      }
       aria-pressed={interactive ? mine : undefined}
       aria-busy={isLoading || undefined}
       data-testid={`bill-item-${item.id}`}
