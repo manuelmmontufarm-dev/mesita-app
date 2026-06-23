@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-23 — Pay stack pegado al recibo (sin hueco)
+- **Qué:** `customer.css`.
+- **Por qué:** Con “Tu recibo” visible, el dock de bill / foot de confirm / payment flotaban con gap gris entre el widget y el peek.
+- **Qué hace:** `--receipt-dock-gap: 0`; pay chrome ancho completo, `bottom: var(--receipt-peek)`, esquinas redondeadas solo arriba — stack sólido bill → confirm → payment → recibo.
+
 ### 2026-06-23 — Dock resumen, recibo compacto, confirm foot fijo
 - **Qué:** `GuestBillFlow.tsx`, `ReceiptDrawer.tsx`, `drawer-receipts.ts`, `customer.css`, `_shared.tsx` (share chip).
 - **Por qué:** Dock “cuenta completada” partido se veía raro; recibo peek muy alto; en confirm el botón pagar dejaba ver scroll por debajo; recibo a veces desaparecía tras cerrar mesa.
