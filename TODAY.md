@@ -79,6 +79,26 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-19 — Limpieza instrumentación debug recibo duplicado
+- **Qué:** `drawer-receipts.ts`, `useGuestPaymentFlow.ts`, `demo-table-store.ts`.
+- **Por qué:** El fix del recibo duplicado quedó verificado; los `fetch` de debug ya no hacen falta.
+- **Qué hace:** Quita logs temporales de la sesión debug; el merge server-first y `receiptRef` siguen activos.
+
+### 2026-06-19 — Fix recibo duplicado (4 pagos / $110) + medallas inline
+- **Qué:** `drawer-receipts.ts`, `useGuestPaymentFlow.ts`, `demo-table-store.ts`, `api/demo/table/[token]/route.ts`, `useDemoTableSession.ts`, `GuestPayPage.tsx`, `payer-badges.ts`, `WaitingSuccessStage.tsx`, `customer.css`, tests.
+- **Por qué:** El recibo sumaba pagos locales y del servidor con refs distintos (cliente generaba `MQR-…8362`, servidor `MQR-…1822`) → 2 pagos reales aparecían como 4 / $110. Las "Medallas de la mesa" eran un widget verde separado y siempre "más rápido" en mesa solo.
+- **Qué hace:** `mergeDrawerReceipts` prioriza pagos del servidor; el mismo `receiptRef` viaja al demo store. Medallas pasan a quip conversacional inline por fila; mesa solo recibe badges contextuales (rey de la mesa, cerraste la cuenta, etc.).
+
+### 2026-06-21 — Overlays ocultan dock + ShareSheet muestra selección
+- **Qué:** `customer.css`, `receipt-peek-layout.ts`, `GuestBillFlow.tsx`, `ShareSheet.tsx`, `BillStage.tsx`, tests unit/e2e.
+- **Por qué:** El botón de pago aparecía encima al abrir recibo o "Dividir plato"; ShareSheet no mostraba quién tenía el plato seleccionado.
+- **Qué hace:** Oculta dock/flow-foot con `has-receipt-open` y `has-sheet-open`; sheets z-index 100+; banner "Quién comparte" + filas con nombre/estado; picker lista dueños y Club Verde 1/2.
+
+### 2026-06-21 — Fix botón pago en confirm con recibo peek + tests
+- **Qué:** `customer.css`, `receipt-peek-layout.ts`, `GuestBillFlow.tsx`, `bill-display.test.ts` (syntax), `receipt-peek-layout.test.ts`, `tests/e2e/confirm-pay-again.spec.ts`.
+- **Por qué:** En "Revisa y paga lo tuyo" el CTA desaparecía al pagar otra vez porque `html.has-receipt-peek` ocultaba `.flow-foot` globalmente.
+- **Qué hace:** Confirm/payment mantienen el botón fijo sobre el recibo peek; scroll con padding correcto; contrato CSS + e2e contra regresión.
+
 ### 2026-06-21 — Dock original mini/full + copy "Pagar tu parte"
 - **Qué:** `GuestBillFlow.tsx`, `ConfirmStage.tsx`, `customer.css`.
 - **Por qué:** El dock quedó siempre expandido y decía "Pagar otra vez — elige platos"; rompía el pill chico al scrollear.

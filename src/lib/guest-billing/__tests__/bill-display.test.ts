@@ -94,7 +94,15 @@ describe("expandRepeatedItems", () => {
     const result = expandRepeatedItems(items);
     expect(result.find((i) => i.id === "club-1")?.displayLabel).toBe("Club Verde 1");
     expect(result.find((i) => i.id === "club-2")?.displayLabel).toBe("Club Verde 2");
+    expect(result.find((i) => i.id === "jugo-1")?.displayLabel).toBe(
+      "Jugo de naranjilla 1",
+    );
+    expect(result.find((i) => i.id === "jugo-2")?.displayLabel).toBe(
+      "Jugo de naranjilla 2",
+    );
   });
+
+  it("preserves original item ids when numbering duplicates", () => {
     const input = [
       makeItem("id-abc-123", "Club Verde"),
       makeItem("id-def-456", "Club Verde"),

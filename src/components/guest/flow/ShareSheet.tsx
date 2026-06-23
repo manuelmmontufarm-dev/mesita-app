@@ -5,10 +5,17 @@
  * Ported from `design_handoff_customer/customer/sheets.jsx`.
  */
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
-import { fmt, lineTotal, resolveRoster, round2 } from "@/lib/guest-billing/split-math";
+import { expandRepeatedItems } from "@/lib/guest-billing/bill-display";
+import {
+  fmt,
+  lineTotal,
+  memberPillLabel,
+  resolveRoster,
+  round2,
+} from "@/lib/guest-billing/split-math";
 import type {
   BillItem,
   MemberId,
@@ -25,18 +32,38 @@ export interface ShareSheetProps {
   members: readonly TableMember[];
 }
 
+function selectedFromClaims(
+  claims: Flow["state"]["claims"],
+  itemId: string,
+  youId: MemberId,
+): MemberId[] {
+  const existing = claims[itemId] ?? {};
+  const ids = Object.entries(existing)
+    .filter(([, units]) => (units ?? 0) > 0.001)
+    .map(([id]) => id);
+  return ids.length ? ids : [youId];
+}
+
 export function ShareSheet({ flow, items, members }: ShareSheetProps) {
   const itemId = flow.state.shareItem;
   const item = itemId ? items.find((i) => i.id === itemId) ?? null : null;
+  const displayItem = useMemo(() => {
+    if (!item) return null;
+    return expandRepeatedItems([item])[0] ?? item;
+  }, [item]);
 
-  const existing = item ? flow.state.claims[item.id] ?? {} : {};
-  const initial: MemberId[] = Object.keys(existing).length
-    ? Object.keys(existing)
-    : [flow.youId];
+  const [sel, setSel] = useState<MemberId[]>(() =>
+    itemId
+      ? selectedFromClaims(flow.state.claims, itemId, flow.youId)
+      : [flow.youId],
+  );
 
-  const [sel, setSel] = useState<MemberId[]>(initial);
+  useEffect(() => {
+    if (!itemId) return;
+    setSel(selectedFromClaims(flow.state.claims, itemId, flow.youId));
+  }, [itemId, flow.state.claims, flow.youId]);
 
-  if (!item) return null;
+  if (!item || !displayItem) return null;
   const qty = item.qty;
   const displayMembers = resolveRoster(
     members,
@@ -80,12 +107,44 @@ export function ShareSheet({ flow, items, members }: ShareSheetProps) {
             <span style={{ fontSize: 24 }}>{item.emoji}</span> Compartir plato
           </div>
           <div className="sheet-sub">
-            {item.name} · {fmt(lineTotal(item))} · se reparte en partes
-            iguales entre quienes elijas
+            {displayItem.displayLabel ?? displayItem.name} · {fmt(lineTotal(item))}{" "}
+            · se reparte en partes iguales entre quienes elijas
           </div>
         </div>
 
         <div className="sheet-body">
+          {sel.length > 0 && (
+            <div
+              className="share-selected-banner"
+              data-testid="share-selected-summary"
+            >
+              <div className="sec-label">Quién comparte este plato</div>
+              <div className="portion-chips">
+                {sel.map((id) => {
+                  const m = displayMembers.find((mm) => mm.id === id) ?? null;
+                  return (
+                    <span key={id} className="pchip">
+                      <NamePill
+                        member={m}
+                        name={m?.isYou ? flow.state.name : undefined}
+                        size={28}
+                      />
+                      <b className="pp">{pct(id)}%</b>
+                      <span
+                        style={{
+                          color: "var(--c-ink-2)",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {fmt((units[id] ?? 0) * item.unitPrice)}
+                      </span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {displayMembers.map((m) => {
               const on = sel.includes(m.id);
@@ -97,7 +156,17 @@ export function ShareSheet({ flow, items, members }: ShareSheetProps) {
                   role="button"
                   data-testid={`share-pick-${m.id}`}
                 >
-            <NamePill member={m} name={m.isYou ? flow.state.name : undefined} size={38} />
+                  <NamePill
+                    member={m}
+                    name={m.isYou ? flow.state.name : undefined}
+                    size={38}
+                  />
+                  <span className="nm">
+                    {memberPillLabel(m, m.isYou ? flow.state.name : undefined)}
+                  </span>
+                  <span className="share-pick-status">
+                    {on ? "Seleccionado" : "Toca para incluir"}
+                  </span>
                   <span className="c-tick tick">
                     {on && <Ic.check s={14} w={2.6} />}
                   </span>
@@ -106,18 +175,21 @@ export function ShareSheet({ flow, items, members }: ShareSheetProps) {
             })}
           </div>
 
-          {sel.length > 0 && (
+          {sel.length > 1 && (
             <div>
               <div className="sec-label" style={{ marginBottom: 9 }}>
-                Así queda ·{" "}
-                {sel.length === 1 ? "para 1" : `entre ${sel.length}`}
+                Así queda · entre {sel.length}
               </div>
               <div className="portion-chips">
                 {sel.map((id) => {
                   const m = displayMembers.find((mm) => mm.id === id) ?? null;
                   return (
                     <span key={id} className="pchip">
-                      <NamePill member={m} name={m?.isYou ? flow.state.name : undefined} size={28} />
+                      <NamePill
+                        member={m}
+                        name={m?.isYou ? flow.state.name : undefined}
+                        size={28}
+                      />
                       <b className="pp">{pct(id)}%</b>
                       <span
                         style={{

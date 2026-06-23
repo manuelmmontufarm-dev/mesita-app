@@ -88,4 +88,68 @@ describe("mergeDrawerReceipts", () => {
 
     expect(mergeDrawerReceipts(local, summaries, "you", items, config)).toHaveLength(1);
   });
+
+  it("does not double-count when local refs differ from server refs", () => {
+    const local: Receipt[] = [
+      {
+        name: "Ana",
+        amount: 18.76,
+        subtotal: 15,
+        iva: 2,
+        propina: 0,
+        servicio: 1,
+        ivaRate: 0.15,
+        mode: "item",
+        items: [],
+        how: "1 plato",
+        method: "card",
+        methodLabel: "Tarjeta",
+        eInvoice: null,
+        ref: "MQR-LOCAL-1",
+        date: "2026-06-20",
+      },
+      {
+        name: "Ana",
+        amount: 36.4,
+        subtotal: 30,
+        iva: 4,
+        propina: 0,
+        servicio: 2,
+        ivaRate: 0.15,
+        mode: "todo",
+        items: [],
+        how: "todo",
+        method: "card",
+        methodLabel: "Tarjeta",
+        eInvoice: null,
+        ref: "MQR-LOCAL-2",
+        date: "2026-06-20",
+      },
+    ];
+    const summaries: TablePaymentSummary[] = [
+      {
+        guestId: "you",
+        guestName: "Ana",
+        amount: 18.76,
+        method: "card",
+        ref: "MQR-SERVER-1",
+        subtotal: 15,
+        mode: "item",
+      },
+      {
+        guestId: "you",
+        guestName: "Ana",
+        amount: 36.4,
+        method: "card",
+        ref: "MQR-SERVER-2",
+        subtotal: 30,
+        mode: "todo",
+      },
+    ];
+
+    const merged = mergeDrawerReceipts(local, summaries, "you", items, config);
+    expect(merged).toHaveLength(2);
+    expect(merged.reduce((s, r) => s + r.amount, 0)).toBeCloseTo(55.16, 2);
+    expect(merged.map((r) => r.ref).sort()).toEqual(["MQR-SERVER-1", "MQR-SERVER-2"]);
+  });
 });

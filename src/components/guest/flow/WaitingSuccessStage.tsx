@@ -87,35 +87,12 @@ function toBadgePayments(
 
 function PayerBadgeChip({ badge }: { badge: PayerBadge }) {
   return (
-    <span className="ws-payer-badge" title={badge.subtitle}>
-      <span className="ws-payer-badge-emoji" aria-hidden="true">
+    <p className="ws-payer-quip" title={badge.title}>
+      <span className="ws-payer-quip-emoji" aria-hidden="true">
         {badge.emoji}
       </span>
-      <span className="ws-payer-badge-title">{badge.title}</span>
-    </span>
-  );
-}
-
-function MesaBadgesSection({
-  awards,
-}: {
-  awards: ReturnType<typeof assignPayerBadges>;
-}) {
-  if (!awards.length) return null;
-  return (
-    <div className="ws-mesa-badges surfx" data-testid="ws-mesa-badges">
-      <div className="ws-paid-sofar-title">Medallas de la mesa 🏆</div>
-      {awards.map((row) => {
-        const top = row.badges[0];
-        if (!top) return null;
-        return (
-          <div key={row.guestId} className="ws-mesa-badge-row">
-            <span className="ws-mesa-badge-name">{row.guestName}</span>
-            <PayerBadgeChip badge={top} />
-          </div>
-        );
-      })}
-    </div>
+      {badge.subtitle}
+    </p>
   );
 }
 
@@ -726,11 +703,7 @@ export function WaitingSuccessStage({
               <div className="ws-paid-sofar-left">
                 <NamePill member={member} size={36} />
                 {badges.length > 0 && (
-                  <div className="ws-payer-badge-row ws-payer-badge-row-inline">
-                    {badges.map((b) => (
-                      <PayerBadgeChip key={b.id} badge={b} />
-                    ))}
-                  </div>
+                  <PayerBadgeChip badge={badges[0]!} />
                 )}
               </div>
               <span className="ws-paid-sofar-amt">{amount}</span>
@@ -738,8 +711,6 @@ export function WaitingSuccessStage({
           ))}
         </div>
       )}
-
-      <MesaBadgesSection awards={badgeAwards} />
 
       <div className="completed-brand">
         <LogoMark size={30} />

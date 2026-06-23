@@ -7,7 +7,7 @@ const t1 = "2026-06-19T20:01:00.000Z";
 const t2 = "2026-06-19T20:08:00.000Z";
 
 describe("assignPayerBadges", () => {
-  it("gives exactly one badge to solo payer", () => {
+  it("gives a solo-table quip instead of fastest when alone", () => {
     const awards = assignPayerBadges(
       [
         {
@@ -18,12 +18,21 @@ describe("assignPayerBadges", () => {
           mode: "item",
           createdAt: t0,
         },
+        {
+          guestId: "a",
+          guestName: "Ana",
+          amount: 43,
+          tip: 3,
+          mode: "todo",
+          createdAt: t1,
+        },
       ],
       { final: true },
     );
     const ana = badgesForGuest(awards, "a");
     expect(ana).toHaveLength(1);
-    expect(ana[0]?.id).toBe("fastest");
+    expect(ana[0]?.id).not.toBe("fastest");
+    expect(ana[0]?.id).toBe("todo-king");
   });
 
   it("picks one primary badge per guest when table closes", () => {

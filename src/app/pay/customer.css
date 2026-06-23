@@ -842,13 +842,13 @@
   background:var(--accent-soft); border:1px solid rgba(47,179,126,.18);
 }
 
-/* Share picker bottom sheet */
+/* Share picker bottom sheet — above receipt peek dock, below nothing else when open */
 .sheet-scrim {
-  position:fixed; inset:0; z-index:90;
+  position:fixed; inset:0; z-index:100;
   background:rgba(27,23,20,.34);
 }
 .sheet {
-  position:fixed; left:0; right:0; bottom:0; z-index:91;
+  position:fixed; left:0; right:0; bottom:0; z-index:101;
   max-height:calc(100dvh - 34px); overflow:auto;
   border-radius:28px 28px 0 0;
   padding:10px 18px calc(20px + env(safe-area-inset-bottom,0px));
@@ -1504,6 +1504,29 @@
 }
 .pchip .pp { color: var(--accent-strong); font-variant-numeric: tabular-nums; }
 
+.share-selected-banner {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--c-fill);
+  border: 1px solid var(--c-sep);
+}
+.share-selected-banner .sec-label {
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-ink-3);
+}
+.share-pick-status {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--accent-strong);
+  flex-shrink: 0;
+}
+.pick.on .share-pick-status { color: var(--pay-dark); }
+
 /* ── ReceiptDrawer (drag-up paper drawer; overrides earlier rule) ── */
 .receipt-drawer {
   --paper: #fdfaf2;
@@ -1980,6 +2003,29 @@
   font-size: 14px; font-weight: 600; color: var(--c-ink);
 }
 .pchip .pp { color: var(--accent-strong); font-variant-numeric: tabular-nums; }
+
+.share-selected-banner {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--c-fill);
+  border: 1px solid var(--c-sep);
+}
+.share-selected-banner .sec-label {
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-ink-3);
+}
+.share-pick-status {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--accent-strong);
+  flex-shrink: 0;
+}
+.pick.on .share-pick-status { color: var(--pay-dark); }
 
 /* ── ReceiptDrawer (drag-up paper drawer; overrides earlier rule) ── */
 .receipt-drawer {
@@ -3613,6 +3659,8 @@
 .rcpt-pdf-all { width: 100%; margin-top: 8px; }
 html.has-receipt-peek {
   --receipt-peek: 84px;
+  /* confirm/payment stack: pay CTA + secondary row */
+  --flow-foot-above-peek: 148px;
 }
 html.has-receipt-peek .c-dock.has-receipt-dock {
   visibility: hidden;
@@ -3623,8 +3671,18 @@ html.has-receipt-peek .cust-app[data-stage="bill"] .c-dock.pay-dock-return {
   visibility: visible;
   pointer-events: auto;
   opacity: 1;
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px) + var(--receipt-peek, 96px));
-  z-index: 97;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px) + var(--receipt-peek, 96px));
+  z-index: 60;
+}
+/* Overlays take focus — hide pay chrome (receipt open, share sheets) */
+html.has-receipt-open .c-dock,
+html.has-sheet-open .c-dock,
+html.has-receipt-open .cust-app[data-stage="confirm"] .flow-foot,
+html.has-receipt-open .cust-app[data-stage="payment"] .flow-foot,
+html.has-sheet-open .flow-foot {
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
 }
 .c-dock.pay-dock-return {
   box-shadow:
@@ -3683,8 +3741,8 @@ html.has-receipt-peek .cust-scroll {
 html.has-receipt-peek .flow-scroll,
 html.has-receipt-peek .wait-scroll,
 html.has-receipt-peek .ws-success-scroll {
-  padding-bottom: calc(96px + var(--receipt-peek, 84px) + env(safe-area-inset-bottom, 0px)) !important;
-  scroll-padding-bottom: calc(96px + var(--receipt-peek, 84px) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--flow-foot-above-peek, 148px) + var(--receipt-peek, 84px) + env(safe-area-inset-bottom, 0px)) !important;
+  scroll-padding-bottom: calc(var(--flow-foot-above-peek, 148px) + var(--receipt-peek, 84px) + env(safe-area-inset-bottom, 0px));
 }
 .ws-success-wrap {
   flex: 1;
@@ -3704,9 +3762,25 @@ html.has-receipt-peek .ws-success-scroll {
 html.has-receipt-peek .completed-actions {
   margin-bottom: calc(var(--receipt-peek, 84px) + 12px);
 }
-html.has-receipt-peek .flow-foot,
 html.has-receipt-peek .ws-wait-foot {
   display: none;
+}
+/* Pay-again: confirm/payment CTA must sit above receipt peek (not hidden like bill dock) */
+html.has-receipt-peek .cust-app[data-stage="confirm"] .flow-foot,
+html.has-receipt-peek .cust-app[data-stage="payment"] .flow-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--receipt-peek, 84px) + env(safe-area-inset-bottom, 0px) + 8px);
+  z-index: 60;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 16px 20px calc(18px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -10px 36px -14px rgba(40, 34, 28, 0.18);
 }
 @media (prefers-reduced-motion: reduce) {
   .rcpt-proof-pill { animation: none; }
@@ -4038,6 +4112,17 @@ html.has-receipt-peek .ws-wait-foot {
   border-radius: 18px;
   padding: 10px 12px;
   margin-top: 8px;
+}
+.ws-payer-quip {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--c-ink-2);
+  font-weight: 500;
+  text-wrap: pretty;
+}
+.ws-payer-quip-emoji {
+  margin-right: 5px;
 }
 .ws-payer-badge-row {
   display: flex;

@@ -83,6 +83,7 @@ export interface UseDemoTableSessionResult {
     itemUnits?: Record<string, number>;
     equalPeople?: number;
     method: string;
+    ref?: string;
   }) => Promise<void>;
   retry: () => void;
   resetSeq: number;
@@ -790,6 +791,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       itemUnits?: Record<string, number>;
       equalPeople?: number;
       method: string;
+      ref?: string;
     }) => {
       if (!guestSessionId) return;
       // Flush any pending rename FIRST so the server has the typed name before pay.

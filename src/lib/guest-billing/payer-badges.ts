@@ -1,6 +1,6 @@
 /**
  * Playful post-pay badges for shared-table checkout.
- * One badge per guest — the most fun relevant title wins.
+ * One badge per guest — conversational quip, not a leaderboard widget.
  */
 
 export interface PaymentForBadges {
@@ -81,19 +81,58 @@ const BADGE = {
     title: "Correo marino",
     subtitle: "Tu pago llegó cuando ya casi no quedaba mesa.",
   },
+  soloCloser: {
+    id: "solo-closer",
+    emoji: "🎯",
+    title: "Cerraste la cuenta",
+    subtitle: "Pagaste tú solo toda la mesa. Nadie más se animó.",
+  },
+  soloSnacc: {
+    id: "solo-snacc",
+    emoji: "🥟",
+    title: "Modo antojo",
+    subtitle: "Fuiste plato por plato. Cero prisa, cero drama.",
+  },
+  soloTipper: {
+    id: "solo-tipper",
+    emoji: "✨",
+    title: "Buena vibra",
+    subtitle: "Dejaste propina con ganas. El mesero sonríe.",
+  },
+  soloEqual: {
+    id: "solo-equal",
+    emoji: "⚖️",
+    title: "Partes iguales, solo tú",
+    subtitle: "Dividiste la cuenta… contigo mismo. Matemáticas impecables.",
+  },
 } as const satisfies Record<string, PayerBadge>;
 
 /** Highest-priority badge id wins when multiple apply. */
 const BADGE_PRIORITY = [
   "slowest",
   "fastest",
-  "mr-money",
   "todo-king",
+  "solo-closer",
+  "mr-money",
   "generous",
+  "solo-tipper",
   "picky",
+  "solo-snacc",
   "splitter",
+  "solo-equal",
   "saver",
   "snail-mail",
+] as const;
+
+const SOLO_BADGE_PRIORITY = [
+  "todo-king",
+  "solo-closer",
+  "generous",
+  "solo-tipper",
+  "picky",
+  "solo-snacc",
+  "solo-equal",
+  "mr-money",
 ] as const;
 
 function byTime(a: PaymentForBadges, b: PaymentForBadges): number {
@@ -106,13 +145,50 @@ function pushBadge(map: Map<string, PayerBadge[]>, guestId: string, badge: Payer
   map.set(guestId, [...list, badge]);
 }
 
-function pickPrimaryBadge(candidates: readonly PayerBadge[]): PayerBadge[] {
+function pickPrimaryBadge(
+  candidates: readonly PayerBadge[],
+  soloTable: boolean,
+): PayerBadge[] {
   if (!candidates.length) return [];
-  for (const id of BADGE_PRIORITY) {
+  const order = soloTable ? SOLO_BADGE_PRIORITY : BADGE_PRIORITY;
+  for (const id of order) {
     const hit = candidates.find((b) => b.id === id);
     if (hit) return [hit];
   }
   return [candidates[0]!];
+}
+
+function assignSoloBadges(
+  sorted: readonly PaymentForBadges[],
+  byGuest: Map<string, PayerBadge[]>,
+) {
+  const guestId = sorted[0]?.guestId;
+  if (!guestId) return;
+
+  const totalPaid = sorted.reduce((s, p) => s + p.amount, 0);
+  const totalTip = sorted.reduce((s, p) => s + p.tip, 0);
+  const last = sorted[sorted.length - 1]!;
+  const modes = new Set(sorted.map((p) => p.mode));
+
+  if (modes.has("todo") || last.mode === "todo") {
+    pushBadge(byGuest, guestId, BADGE.todoKing);
+  }
+  if (sorted.length >= 2) {
+    pushBadge(byGuest, guestId, BADGE.soloCloser);
+  }
+  if (totalTip > 0.5) {
+    pushBadge(byGuest, guestId, BADGE.soloTipper);
+  }
+  if (last.mode === "item" || modes.has("item")) {
+    pushBadge(byGuest, guestId, BADGE.soloSnacc);
+    pushBadge(byGuest, guestId, BADGE.picky);
+  }
+  if (last.mode === "equal" || modes.has("equal")) {
+    pushBadge(byGuest, guestId, BADGE.soloEqual);
+  }
+  if (totalPaid > 0.01) {
+    pushBadge(byGuest, guestId, BADGE.mrMoney);
+  }
 }
 
 /** Assign one fun badge per guest. `final` = table closed — unlocks "el más lento". */
@@ -125,56 +201,56 @@ export function assignPayerBadges(
   const sorted = [...payments].sort(byTime);
   const byGuest = new Map<string, PayerBadge[]>();
   const nameByGuest = new Map(sorted.map((p) => [p.guestId, p.guestName]));
+  const uniqueGuests = new Set(sorted.map((p) => p.guestId));
+  const soloTable = uniqueGuests.size === 1;
 
-  const first = sorted[0];
-  const last = sorted[sorted.length - 1];
-  pushBadge(byGuest, first.guestId, BADGE.fastest);
+  if (soloTable) {
+    assignSoloBadges(sorted, byGuest);
+  } else {
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    pushBadge(byGuest, first.guestId, BADGE.fastest);
 
-  if (opts?.final && sorted.length >= 2 && last.guestId !== first.guestId) {
-    pushBadge(byGuest, last.guestId, BADGE.slowest);
-    const t0 = new Date(first.createdAt).getTime();
-    const delta = new Date(last.createdAt).getTime() - t0;
-    if (delta >= 5 * 60 * 1000) {
-      pushBadge(byGuest, last.guestId, BADGE.snailMail);
-    }
-  }
-
-  if (sorted.length >= 2) {
-    const maxAmt = Math.max(...sorted.map((p) => p.amount));
-    const minAmt = Math.min(...sorted.map((p) => p.amount));
-    for (const p of sorted) {
-      if (p.amount >= maxAmt - 0.001) pushBadge(byGuest, p.guestId, BADGE.mrMoney);
-      if (p.amount <= minAmt + 0.001 && maxAmt - minAmt > 0.5) {
-        pushBadge(byGuest, p.guestId, BADGE.saver);
+    if (opts?.final && sorted.length >= 2 && last.guestId !== first.guestId) {
+      pushBadge(byGuest, last.guestId, BADGE.slowest);
+      const t0 = new Date(first.createdAt).getTime();
+      const delta = new Date(last.createdAt).getTime() - t0;
+      if (delta >= 5 * 60 * 1000) {
+        pushBadge(byGuest, last.guestId, BADGE.snailMail);
       }
     }
-  } else if (sorted.length === 1) {
-    pushBadge(byGuest, first.guestId, BADGE.mrMoney);
-  }
 
-  const withTip = sorted.filter((p) => p.tip > 0.001);
-  if (withTip.length) {
-    const maxTip = Math.max(...withTip.map((p) => p.tip));
-    for (const p of withTip) {
-      if (p.tip >= maxTip - 0.001) pushBadge(byGuest, p.guestId, BADGE.generous);
+    if (sorted.length >= 2) {
+      const maxAmt = Math.max(...sorted.map((p) => p.amount));
+      const minAmt = Math.min(...sorted.map((p) => p.amount));
+      for (const p of sorted) {
+        if (p.amount >= maxAmt - 0.001) pushBadge(byGuest, p.guestId, BADGE.mrMoney);
+        if (p.amount <= minAmt + 0.001 && maxAmt - minAmt > 0.5) {
+          pushBadge(byGuest, p.guestId, BADGE.saver);
+        }
+      }
+    }
+
+    const withTip = sorted.filter((p) => p.tip > 0.001);
+    if (withTip.length) {
+      const maxTip = Math.max(...withTip.map((p) => p.tip));
+      for (const p of withTip) {
+        if (p.tip >= maxTip - 0.001) pushBadge(byGuest, p.guestId, BADGE.generous);
+      }
+    }
+
+    for (const p of sorted) {
+      if (p.mode === "todo") pushBadge(byGuest, p.guestId, BADGE.todoKing);
+      if (p.mode === "equal") pushBadge(byGuest, p.guestId, BADGE.splitter);
+      if (p.mode === "item") pushBadge(byGuest, p.guestId, BADGE.picky);
     }
   }
 
-  for (const p of sorted) {
-    if (p.mode === "todo") pushBadge(byGuest, p.guestId, BADGE.todoKing);
-    if (p.mode === "equal") pushBadge(byGuest, p.guestId, BADGE.splitter);
-    if (p.mode === "item") pushBadge(byGuest, p.guestId, BADGE.picky);
-  }
-
-  return sorted
-    .map((p) => p.guestId)
-    .filter((id, i, arr) => arr.indexOf(id) === i)
-    .map((guestId) => ({
-      guestId,
-      guestName: nameByGuest.get(guestId) ?? "Persona",
-      badges: pickPrimaryBadge(byGuest.get(guestId) ?? []),
-    }))
-    .filter((row) => row.badges.length > 0);
+  return [...uniqueGuests].map((guestId) => ({
+    guestId,
+    guestName: nameByGuest.get(guestId) ?? "Persona",
+    badges: pickPrimaryBadge(byGuest.get(guestId) ?? [], soloTable),
+  })).filter((row) => row.badges.length > 0);
 }
 
 export function badgesForGuest(

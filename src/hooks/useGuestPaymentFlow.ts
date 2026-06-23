@@ -71,6 +71,8 @@ export interface PaidPayload {
   typedName?: string;
   /** Food subtotal for this payment (excludes IVA/servicio/propina). */
   foodSubtotal?: number;
+  /** Client receipt ref — demo store should reuse this instead of generating a new one. */
+  receiptRef?: string;
   /** Item → units settled in this payment (BY_ITEM partial shares). */
   itemUnits?: Record<string, number>;
 }
@@ -639,6 +641,17 @@ export function useGuestPaymentFlow(opts: UseGuestPaymentFlowOptions) {
             : "FULL";
       const selectedItemIds = itemsToMarkPaid(state, opts.items, youId);
       const itemUnits = itemUnitsForPayment(state, opts.items, youId);
+      const now = opts.now ? opts.now() : new Date();
+      const receipt = buildReceipt({
+        state,
+        items: opts.items,
+        totals: derived.totals,
+        ivaRate: opts.config.ivaRate,
+        method: payload.method,
+        eInvoice: payload.eInvoice,
+        youId,
+        now,
+      });
       const enriched: PaidPayload = {
         ...payload,
         splitMode,
@@ -655,21 +668,11 @@ export function useGuestPaymentFlow(opts: UseGuestPaymentFlowOptions) {
         voluntaryTipAmount: derived.totals.propina,
         typedName: state.name.trim() || undefined,
         foodSubtotal: derived.subtotal,
+        receiptRef: receipt.ref,
       };
       if (opts.onPaid) {
         await opts.onPaid(enriched);
       }
-      const now = opts.now ? opts.now() : new Date();
-      const receipt = buildReceipt({
-        state,
-        items: opts.items,
-        totals: derived.totals,
-        ivaRate: opts.config.ivaRate,
-        method: payload.method,
-        eInvoice: payload.eInvoice,
-        youId,
-        now,
-      });
       const markedItems = itemsToMarkPaid(state, opts.items, youId);
       const partialItemIds = itemsPartiallyPaid(state, opts.items, youId);
       dispatch({

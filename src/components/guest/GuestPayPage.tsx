@@ -114,6 +114,7 @@ function GuestPayShell({
         itemUnits: payload.itemUnits,
         equalPeople: payload.equalSplitPeople,
         method: "Tarjeta demo",
+        ref: payload.receiptRef,
       });
       return;
     }

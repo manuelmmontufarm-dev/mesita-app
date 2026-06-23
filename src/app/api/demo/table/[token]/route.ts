@@ -116,6 +116,7 @@ export async function POST(
           itemUnits: body.itemUnits,
           equalPeople: body.equalPeople,
           method: body.method,
+          ref: body.ref,
         }),
         200
       );

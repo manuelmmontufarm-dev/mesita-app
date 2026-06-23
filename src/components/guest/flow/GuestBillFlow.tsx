@@ -36,6 +36,10 @@ import {
   payButtonLabel,
 } from "@/lib/guest-billing/bill-display";
 import { mergeDrawerReceipts } from "@/lib/guest-billing/drawer-receipts";
+import {
+  shouldEnableReceiptPeekClass,
+  shouldEnableSheetOpenClass,
+} from "@/lib/guest-billing/receipt-peek-layout";
 import { freeUnits, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
 import { computeBillShellScrollMetrics } from "@/lib/guest-billing/bill-shell-scroll";
 import { mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
@@ -315,10 +319,21 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
   useEffect(() => {
     document.documentElement.classList.toggle(
       "has-receipt-peek",
-      drawerReceipts.length > 0,
+      shouldEnableReceiptPeekClass(drawerReceipts.length),
     );
     return () => document.documentElement.classList.remove("has-receipt-peek");
   }, [drawerReceipts.length]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle(
+      "has-sheet-open",
+      shouldEnableSheetOpenClass({
+        shareItem: flow.state.shareItem,
+        sharePicker: flow.state.sharePicker,
+      }),
+    );
+    return () => document.documentElement.classList.remove("has-sheet-open");
+  }, [flow.state.shareItem, flow.state.sharePicker]);
 
   // Waiting and Success share a single WaitingSuccessStage so the component
   // root never unmounts during the transition. ReceiptDrawer is also kept

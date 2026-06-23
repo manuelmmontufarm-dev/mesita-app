@@ -36,6 +36,7 @@ import {
   guestLabel,
   isItemPaid,
   lineTotal,
+  memberPillLabel,
   paidSubtotal,
   resolveMemberDisplay,
   resolveRoster,
@@ -338,6 +339,14 @@ function SharePicker({
   members: readonly TableMember[];
 }) {
   const visible = items.filter((it) => !flow.state.paidItemIds.includes(it.id));
+  const expandedVisible = useMemo(
+    () => expandRepeatedItems(visible),
+    [visible],
+  );
+  const labelById = useMemo(
+    () => new Map(expandedVisible.map((it) => [it.id, it.displayLabel ?? it.name])),
+    [expandedVisible],
+  );
   return (
     <>
       <div className="sheet-scrim" onClick={() => flow.closeSharePicker()} />
@@ -361,18 +370,20 @@ function SharePicker({
             {visible.map((it) => {
               const claimants = claimantsOf(flow.state.claims, it.id, members);
               const shared = claimants.length > 1;
+              const label = labelById.get(it.id) ?? it.name;
               return (
                 <div
                   key={it.id}
                   className="c-item tappable"
                   role="button"
                   onClick={() => flow.openShareItem(it.id)}
+                  data-testid={`share-picker-item-${it.id}`}
                 >
                   <span className="c-item-emoji">{it.emoji}</span>
                   <div className="c-item-main">
-                    <div className="c-item-name">{it.name}</div>
+                    <div className="c-item-name">{label}</div>
                     <div className="c-item-sub">
-                      {shared ? (
+                      {claimants.length > 0 ? (
                         <>
                           <AvatarStack
                             ids={claimants}
@@ -382,10 +393,20 @@ function SharePicker({
                             youId={flow.youId}
                             youName={flow.state.name}
                           />
-                          <span className="shared-tag">compartido</span>
+                          <span className="shared-tag">
+                            {shared
+                              ? "compartido"
+                              : memberPillLabel(
+                                  members.find((m) => m.id === claimants[0]) ??
+                                    null,
+                                  claimants[0] === flow.youId
+                                    ? flow.state.name
+                                    : undefined,
+                                )}
+                          </span>
                         </>
                       ) : (
-                        <span>{it.note}</span>
+                        <span>Sin asignar · toca para repartir</span>
                       )}
                     </div>
                   </div>

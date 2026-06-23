@@ -476,14 +476,16 @@ export async function releaseDemoItem(
 
 export async function recordDemoPayment(
   token: string,
-  input: Omit<DemoPayment, "id" | "createdAt" | "ref">,
+  input: Omit<DemoPayment, "id" | "createdAt" | "ref"> & { ref?: string },
 ): Promise<DemoTableState> {
   return mutateDemoState(token, (draft) => {
     const ts = nowIso();
     const payment: DemoPayment = {
       ...input,
       id: crypto.randomUUID(),
-      ref: `MQR-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}`,
+      ref:
+        input.ref ??
+        `MQR-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}`,
       createdAt: ts,
     };
     draft.payments.unshift(payment);
