@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-22 — Fix shake en plato tomado (interactive mal definido)
+- **Qué:** `BillStage.tsx`, `customer.css`.
+- **Por qué:** `interactive` era true en filas ya reclamadas → `toggleMine` no-op y el shake nunca corría.
+- **Qué hace:** Solo filas reclamables son interactivas; tap en plato ajeno dispara shake + tinte rojo suave.
+
 ### 2026-06-22 — Favicon MesitaQR + shake en plato ya tomado
 - **Qué:** `src/app/icon.tsx`, `apple-icon.tsx`, `layout.tsx`, `manifest.ts`, `BillStage.tsx`, `customer.css`.
 - **Por qué:** La pestaña del browser mostraba icono genérico; al tocar un ítem ya reclamado no había feedback.

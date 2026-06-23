@@ -186,7 +186,9 @@ export function BillItemRow({
     (pendingOp === "claim" && !serverMine) ||
     (pendingOp === "release" && serverMine);
   const mine = serverMine && !isLoading;
-  const interactive = mode === "item" && !paid && !isLoading;
+  const canToggle = mine || free > 0.001;
+  const interactive =
+    mode === "item" && !paid && !isLoading && canToggle;
   const blockedTap =
     mode === "item" &&
     !paid &&
@@ -205,8 +207,11 @@ export function BillItemRow({
       return;
     }
     if (!blockedTap) return;
-    setRejectShake(true);
-    window.setTimeout(() => setRejectShake(false), 420);
+    setRejectShake(false);
+    requestAnimationFrame(() => {
+      setRejectShake(true);
+      window.setTimeout(() => setRejectShake(false), 480);
+    });
   };
 
   const cls =

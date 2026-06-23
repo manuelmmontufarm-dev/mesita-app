@@ -3063,15 +3063,17 @@
   cursor: default;
 }
 .item-row-fp.item-row-reject {
-  animation: itemRejectShake 0.42s var(--ease);
+  animation: itemRejectShake 0.48s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+  background: rgba(214, 69, 69, 0.06);
 }
 @keyframes itemRejectShake {
   0%, 100% { transform: translateX(0); }
-  18% { transform: translateX(-6px); }
-  36% { transform: translateX(5px); }
-  54% { transform: translateX(-4px); }
-  72% { transform: translateX(3px); }
-  90% { transform: translateX(-1px); }
+  15% { transform: translateX(-8px); }
+  30% { transform: translateX(7px); }
+  45% { transform: translateX(-6px); }
+  60% { transform: translateX(5px); }
+  75% { transform: translateX(-3px); }
+  90% { transform: translateX(2px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .item-row-fp.item-row-reject { animation: none; }
