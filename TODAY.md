@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-21 — Dock original mini/full + copy "Pagar tu parte"
+- **Qué:** `GuestBillFlow.tsx`, `ConfirmStage.tsx`, `customer.css`.
+- **Por qué:** El dock quedó siempre expandido y decía "Pagar otra vez — elige platos"; rompía el pill chico al scrollear.
+- **Qué hace:** Restaura dock-mini al subir y dock-full al bajar; CTA siempre "Pagar tu parte · $X" como antes; mantiene pay-dock-return visible sobre recibo.
+
 ### 2026-06-21 — Rama fix/guest-ux-restore-v2 (UX guest, pendiente merge)
 - **Qué:** Cherry-pick commits `dfd674e`…`8cccdd9` en rama `fix/guest-ux-restore-v2` desde `main` post-revert `8a13d34`.
 - **Por qué:** Re-aplicar los 9 fixes UX tras revert por bugs en producción; 325 tests verdes antes de nuevo merge.

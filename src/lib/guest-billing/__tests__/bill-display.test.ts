@@ -84,7 +84,17 @@ describe("expandRepeatedItems", () => {
     expect(result[1]).toMatchObject({ displayIndex: 2, displayLabel: "Locro 2" });
   });
 
-  it("preserva los IDs originales sin modificarlos", () => {
+  it("demo default menu labels duplicate Club Verde and Jugo de naranjilla", () => {
+    const items = [
+      { id: "jugo-1", name: "Jugo de naranjilla", qty: 1, unitPrice: 2.5 },
+      { id: "jugo-2", name: "Jugo de naranjilla", qty: 1, unitPrice: 2.5 },
+      { id: "club-1", name: "Club Verde", qty: 1, unitPrice: 2.75 },
+      { id: "club-2", name: "Club Verde", qty: 1, unitPrice: 2.75 },
+    ];
+    const result = expandRepeatedItems(items);
+    expect(result.find((i) => i.id === "club-1")?.displayLabel).toBe("Club Verde 1");
+    expect(result.find((i) => i.id === "club-2")?.displayLabel).toBe("Club Verde 2");
+  });
     const input = [
       makeItem("id-abc-123", "Club Verde"),
       makeItem("id-def-456", "Club Verde"),

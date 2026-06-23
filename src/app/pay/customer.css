@@ -3631,10 +3631,6 @@ html.has-receipt-peek .cust-app[data-stage="bill"] .c-dock.pay-dock-return {
     0 1px 0 rgba(255, 255, 255, 0.95) inset,
     0 20px 44px -16px rgba(40, 34, 28, 0.38);
 }
-.c-dock.pay-dock-return.dock-full .c-pay-btn {
-  font-size: 17px;
-  min-height: 52px;
-}
 .rcpt-peek-payments {
   display: flex;
   flex-wrap: wrap;
@@ -3649,42 +3645,6 @@ html.has-receipt-peek .cust-app[data-stage="bill"] .c-dock.pay-dock-return {
   padding: 4px 10px;
   border-radius: 100px;
   font-variant-numeric: tabular-nums;
-}
-@media (max-width: 480px) {
-  .c-dock.pay-dock-return {
-    left: max(8px, env(safe-area-inset-left, 0px));
-    right: max(8px, env(safe-area-inset-right, 0px));
-    max-width: none;
-  }
-  .c-dock.pay-dock-return.dock-mini-compact {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    border-radius: 22px;
-    padding: 12px 12px 10px;
-    gap: 0;
-  }
-  .c-dock.pay-dock-return.dock-mini-compact .dock-top {
-    display: flex;
-    width: 100%;
-    padding: 0 4px 10px;
-  }
-  .c-dock.pay-dock-return.dock-mini-compact .dock-k small {
-    display: block;
-    font-size: 11.5px;
-  }
-  .c-dock.pay-dock-return.dock-mini-compact .c-pay-btn {
-    width: 100%;
-    min-height: 50px;
-    font-size: 16px;
-    border-radius: 16px;
-    white-space: normal;
-    line-height: 1.2;
-    padding: 10px 14px;
-  }
-  .c-dock.pay-dock-return.dock-full .c-pay-btn {
-    font-size: 16px;
-  }
 }
 .item-row-fp.pay-nudge {
   animation: pay-item-nudge 1.2s var(--ease);

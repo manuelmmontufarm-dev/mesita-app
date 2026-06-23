@@ -33,11 +33,10 @@ import type { LiveSessionActions } from "@/hooks/useLiveTableSession";
 import { fmt } from "@/lib/guest-billing";
 import {
   dockAmountLabel,
-  dockPayButtonLabel,
-  payAgainSelectLabel,
+  payButtonLabel,
 } from "@/lib/guest-billing/bill-display";
 import { mergeDrawerReceipts } from "@/lib/guest-billing/drawer-receipts";
-import { computeTotals, freeUnits, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
+import { freeUnits, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
 import { computeBillShellScrollMetrics } from "@/lib/guest-billing/bill-shell-scroll";
 import { mergeClaimsPreserveLocal } from "@/lib/demo-optimistic-merge";
 import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
@@ -414,51 +413,17 @@ function BillShellStage({
 
   const dockExpanded = atBottom || !scrollable;
   const bump = useBumpOnChange(Math.round(derived.totals.total * 100));
-  const yourServerPayments =
-    paidSummaries?.filter((p) => p.guestId === flow.youId).length ?? 0;
-  const hasPaidBefore = state.receipts.length > 0 || yourServerPayments > 0;
   const tableRemainingSub =
     demoTableProgress?.tableClosed === true
       ? 0
       : (demoTableProgress?.remainingSub ?? derived.remainingSub);
   const showPayDock = tableRemainingSub > 0.001;
-  const payReady = derived.canPay;
-  const mesaRemainingTotal = computeTotals(tableRemainingSub, config, 0).total;
-
-  const dockLayoutFull = hasPaidBefore || dockExpanded || showPayDock;
-
-  const scrollToUnpaidItems = () => {
-    const root = scrollRef.current;
-    if (!root) return;
-    const firstUnpaid = root.querySelector<HTMLElement>(".item-row-fp:not(.paid)");
-    if (firstUnpaid) {
-      firstUnpaid.scrollIntoView({ behavior: "smooth", block: "center" });
-      firstUnpaid.classList.add("pay-nudge");
-      window.setTimeout(() => firstUnpaid.classList.remove("pay-nudge"), 1400);
-    }
-  };
-
-  const handleDockPay = () => {
-    if (payReady) {
-      flow.goToConfirm();
-      return;
-    }
-    if (showPayDock && state.mode === "item") {
-      scrollToUnpaidItems();
-    }
-  };
-
-  const dockLabel = payReady
-    ? dockPayButtonLabel(state.mode, fmt(derived.totals.total), {
-        again: hasPaidBefore,
-        compact: dockLayoutFull,
-      })
-    : payAgainSelectLabel(state.mode);
-
-  const dockHint =
-    hasPaidBefore && derived.canPayMore && !payReady
-      ? "Aún falta en la mesa · elige lo tuyo"
-      : state.name.trim() || "tu parte";
+  const dockPartLabel =
+    state.mode === "todo" ? dockAmountLabel(state.mode) : "Tu parte";
+  const dockPayLabel = payButtonLabel(
+    state.mode,
+    fmt(derived.totals.total),
+  );
 
   return (
     <div
@@ -516,26 +481,27 @@ function BillShellStage({
         <div
           className={
             "c-dock glass-dock pay-dock-return " +
-            (dockLayoutFull ? "dock-full" : "dock-mini dock-mini-compact")
+            (dockExpanded ? "dock-full" : "dock-mini")
           }
         >
           <div className="dock-top">
             <div className="dock-k">
-              {hasPaidBefore ? "Falta por pagar" : dockAmountLabel(state.mode)}
+              {dockPartLabel}
               <small>
-                {dockHint} · Mesa {config.table}
+                {state.name.trim() || "tu parte"} · Mesa {config.table}
               </small>
             </div>
             <div className={"dock-total" + (bump ? " bump" : "")}>
-              {payReady ? fmt(derived.totals.total) : fmt(mesaRemainingTotal)}
+              {fmt(derived.totals.total)}
             </div>
           </div>
           <button
-            className={"c-pay-btn" + (payReady ? "" : " is-soft")}
-            onClick={handleDockPay}
+            className="c-pay-btn"
+            onClick={() => flow.goToConfirm()}
+            disabled={!derived.canPay}
             data-testid="dock-pay-btn"
           >
-            <Ic.lock s={18} /> {dockLabel}
+            <Ic.lock s={18} /> {dockPayLabel}
           </button>
           <div className="pay-secure">
             <Ic.shield s={13} /> Pago cifrado · Factura electrónica automática
