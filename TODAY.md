@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-23 — Quita botón Ver comprobante del dock
+- **Qué:** `GuestBillFlow.tsx`, `ReceiptDrawer.tsx`, `customer.css`.
+- **Por qué:** El botón dentro del dock rompía el layout móvil (Pagar tu parte dejaba de subirse sobre el recibo peek) y ensuciaba el flujo.
+- **Qué hace:** El recibo sigue accesible con el peek inferior; el dock vuelve a su altura normal sin el CTA extra.
+
 ### 2026-06-23 — Split en servidor + brillo en widget + Ver comprobante
 - **Qué:** `demo-table-store.ts`, API `split`, `useDemoTableSession`, `GuestBillFlow`, `BillStage`, `ShareSheet`, `ReceiptDrawer`, `customer.css`.
 - **Por qué:** Logs mostraron `onClaim` con dueño único al guardar split (quitaba el plato al otro); guardar con 1 persona no repartía; brillo iba al nombre del plato; dock y recibo pegados; sin volver al comprobante tras “Ver mesa”.
