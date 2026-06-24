@@ -1,5 +1,15 @@
-import { billSubtotal, computeTotals, isTableFullyPaid } from "./split-math";
-import type { BillItem, ItemId, MemberId, RestaurantConfig } from "./types";
+import { billSubtotal, computeTotals, isTableFullyPaid, paidSubtotal } from "./split-math";
+import type { BillItem, ItemId, MemberId, RestaurantConfig, TablePaymentSummary } from "./types";
+
+/** Subtotal credited to a payment row — never returns 0 when amount > 0. */
+export function paymentRecordSubtotal(p: {
+  subtotal?: number;
+  amount: number;
+}): number {
+  if (p.subtotal != null && p.subtotal > 0.001) return p.subtotal;
+  if (p.amount > 0.001) return p.amount / 1.25;
+  return 0;
+}
 
 export interface DemoTableProgressInput {
   items: readonly BillItem[];
@@ -87,4 +97,52 @@ export function deriveDemoTableProgress(input: DemoTableProgressInput): DemoTabl
         : input.paidGuestIds.length,
     tableClosed,
   };
+}
+
+/**
+ * Mesa-wide % paid for the waiting/summary ring — tax-inclusive, matches
+ * the BillStage header ("Pagado $X (Y%) · mesa $Z").
+ */
+export function resolveMesaPaidPct(input: {
+  items: readonly BillItem[];
+  paidItemIds: readonly ItemId[];
+  paidSummaries?: readonly TablePaymentSummary[];
+  config: Pick<RestaurantConfig, "ivaRate" | "serviceRate" | "serviceEnabled">;
+  demoProgress?: DemoTableProgress | null;
+}): number {
+  const { items, paidItemIds, paidSummaries = [], config, demoProgress } = input;
+  if (demoProgress?.tableClosed) return 100;
+
+  const fullSub = billSubtotal(items);
+  const mesaTotal =
+    demoProgress?.mesaTotal ?? computeTotals(fullSub, config, 0).total;
+  if (mesaTotal <= 0.01) return 100;
+
+  const paidFromItems = computeTotals(
+    paidSubtotal(items, paidItemIds),
+    config,
+    0,
+  ).total;
+  const paidFromPayments =
+    paidSummaries.length > 0
+      ? computeTotals(
+          Math.min(
+            paidSummaries.reduce((s, p) => s + paymentRecordSubtotal(p), 0),
+            fullSub,
+          ),
+          config,
+          0,
+        ).total
+      : 0;
+
+  const paidTotal = Math.max(paidFromItems, paidFromPayments);
+  if (paidTotal > 0.01) {
+    return Math.min(100, Math.round((paidTotal / mesaTotal) * 100));
+  }
+
+  if (demoProgress?.paidPct != null && demoProgress.paidPct > 0) {
+    return demoProgress.paidPct;
+  }
+
+  return 0;
 }

@@ -716,6 +716,7 @@ export function useGuestPaymentFlow(opts: UseGuestPaymentFlowOptions) {
     goToConfirm,
     confirmPay: () => dispatch({ type: "stage/goPayment" }),
     submitPayment,
+    goToWaiting: () => dispatch({ type: "stage/goWaiting" }),
     finishWaiting: () => dispatch({ type: "stage/goSuccess" }),
     reset: (init: FlowInit) => dispatch({ type: "reset", init }),
     syncFromServer: (patch: {

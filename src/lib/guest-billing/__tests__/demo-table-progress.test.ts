@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveDemoTableProgress } from "../demo-table-progress";
+import { deriveDemoTableProgress, resolveMesaPaidPct } from "../demo-table-progress";
 import type { BillItem } from "../types";
 
 const config = {
@@ -91,5 +91,33 @@ describe("deriveDemoTableProgress", () => {
     });
     expect(p.tableClosed).toBe(false);
     expect(p.remainingSub).toBeGreaterThan(0);
+  });
+});
+
+describe("resolveMesaPaidPct", () => {
+  it("uses payment summaries when demo progress paidPct is stuck at 0", () => {
+    const mesaTotal = 23;
+    const pct = resolveMesaPaidPct({
+      items,
+      paidItemIds: [],
+      paidSummaries: [
+        {
+          guestId: "g1",
+          guestName: "Ana",
+          amount: 11.5,
+          subtotal: 10,
+          method: "demo",
+        },
+      ],
+      config,
+      demoProgress: {
+        mesaTotal,
+        remainingSub: 10,
+        paidPct: 0,
+        paidCount: 1,
+        tableClosed: false,
+      },
+    });
+    expect(pct).toBe(54);
   });
 });

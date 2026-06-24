@@ -74,6 +74,24 @@
 ## Product Context
 PagaYa es una app de pagos para restaurantes.
 
+## Demo URL canónica (OBLIGATORIO)
+
+**Siempre usa esta URL** para QRs, demos, QA y compartir con terceros — salvo que
+el usuario pida explícitamente otra:
+
+| Uso | URL |
+|---|---|
+| Demo con debug | `https://mesitademo-two.vercel.app/pay/demo?debug=1` |
+| Demo (producción / QRs impresos) | `https://mesitademo-two.vercel.app/pay/demo` |
+| Mesas 1–4 | `https://mesitademo-two.vercel.app/pay/demo/mesa-{1..4}` |
+
+- **Fuente única en código:** [`src/lib/demo-url.constants.mjs`](./src/lib/demo-url.constants.mjs)
+- **Proyecto Vercel activo:** `mesitademo` (dominio `mesitademo-two.vercel.app`)
+- **NO usar:** `mesita-demo.vercel.app`, `mesitaappdemo.vercel.app` (proyectos
+  legacy duplicados — ver [`docs/DEMO_CANONICAL_URL.md`](./docs/DEMO_CANONICAL_URL.md))
+- `NEXT_PUBLIC_DEMO_PAY_URL` solo para override local/explícito; los scripts QR
+  avisan si difiere del canónico.
+
 La UI debe sentirse:
 - rápida
 - clara

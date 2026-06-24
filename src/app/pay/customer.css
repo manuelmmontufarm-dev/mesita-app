@@ -460,22 +460,74 @@
   background: var(--c-fill);
   border-color: rgba(27, 23, 20, 0.12);
 }
-/* When the dock is mini (collapsed pill), the split would feel cramped —
-   keep the primary visible and tuck Resumen behind a smaller chip. */
+/* ── Mini + split CTA — "iOS Wallet" compact bar ──────────────
+   When the user is scrolling and the dock collapses to mini while a
+   receipt peek is showing, the split CTA renders as a single seamless
+   row pinned just above the peek. Both buttons share the same shape
+   language (12px corners, 44px height) so they read as siblings of a
+   single segmented control instead of two floating pills. */
+.c-dock.dock-mini.has-back-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  /* clear the dock-mini grid so the inner split owns the row layout */
+  grid-template-columns: unset;
+  grid-template-areas: unset;
+  padding: 9px 12px 11px;
+}
+.c-dock.dock-mini.has-back-cta .pay-secure {
+  display: none;
+}
 .c-dock.dock-mini.has-back-cta .pay-dock-split {
-  grid-template-columns: auto 1fr;
+  /* Resumen gets a fixed proportional share — no `auto` which would
+     let the chip shrink and bob in/out as the label width changes. */
+  grid-template-columns: minmax(96px, 0.85fr) 1.55fr;
   gap: 8px;
+  align-items: stretch;
 }
 .c-dock.dock-mini.has-back-cta .c-pay-btn-secondary {
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0 14px;
   font-size: 14px;
-  border-radius: 100px;
+  font-weight: 600;
+  /* Match the green CTA radius so the row reads as a single segmented
+     control, not two unrelated pills. */
+  border-radius: 12px;
+  /* Drop the border in mini — the parent dock chrome already provides
+     edge containment, and the visible border made the chip look bolted on. */
+  background: var(--c-fill);
+  border-color: transparent;
+}
+.c-dock.dock-mini.has-back-cta .c-pay-btn-secondary:active {
+  background: var(--c-fill-2);
 }
 .c-dock.dock-mini.has-back-cta .pay-dock-split .c-pay-btn {
   min-height: 44px;
-  border-radius: 100px;
+  /* Same 12px corner as Resumen — sibling shapes, not pills. */
+  border-radius: 12px;
   font-size: 14.5px;
+  padding: 0 14px;
+  /* Reduce the green glow in mini so it doesn't lift off the dock chrome. */
+  box-shadow: 0 4px 14px -8px rgba(26, 158, 98, 0.55);
+}
+/* When the receipt peek is below, the dock is flush — drop side borders,
+   keep a hairline shadow on top so it visually separates from the bill. */
+html.has-receipt-peek
+  .cust-app[data-stage="bill"]
+  .c-dock.dock-mini.has-back-cta {
+  border-radius: 0;
+  padding: 9px 12px 11px;
+  box-shadow:
+    0 -1px 0 rgba(27, 23, 20, 0.06),
+    0 -10px 22px -16px rgba(40, 34, 28, 0.18);
+  border-left: none;
+  border-right: none;
+}
+html.has-receipt-peek.has-pay-stack-above
+  .cust-app[data-stage="bill"]
+  .c-dock.dock-mini.has-back-cta {
+  border-radius: 0;
 }
 
 /* ── Loading / error / success states ────────────────────── */

@@ -2,6 +2,9 @@ import QRCode from "qrcode";
 import jsPDFDefault, { jsPDF as jsPDFNamed } from "jspdf";
 
 import type { DemoTableDefinition } from "@/lib/demo-table-catalog";
+import { DEMO_BASE_URL } from "@/lib/demo-url";
+
+export { CANONICAL_DEMO_PAY_URL, DEMO_PAY_URL } from "@/lib/demo-url";
 
 // jsPDF ships both a CJS default and a named export; under Next.js (webpack)
 // the default is callable, under raw Node + tsx only the named one is.
@@ -14,13 +17,6 @@ export const QR_BRAND = {
   accent: "#2fb37e",
   ink: "#1B1714",
 } as const;
-
-export const DEMO_PAY_URL =
-  process.env.NEXT_PUBLIC_DEMO_PAY_URL ??
-  "https://mesitademo-two.vercel.app/pay/demo";
-
-const DEMO_BASE_URL =
-  process.env.NEXT_PUBLIC_APP_URL ?? "https://mesitademo-two.vercel.app";
 
 /** Build the public `/pay/...` URL for a demo token (`demo` or `demo-{slug}`). */
 export function buildDemoPayUrl(token: string): string {

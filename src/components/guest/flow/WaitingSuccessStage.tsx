@@ -48,6 +48,7 @@ import type {
   TablePaymentSummary,
 } from "@/lib/guest-billing/types";
 import type { DemoTableProgress } from "@/lib/guest-billing/demo-table-progress";
+import { resolveMesaPaidPct } from "@/lib/guest-billing/demo-table-progress";
 
 import { Ic, LogoMark, NamePill, useBumpOnChange } from "./_shared";
 
@@ -172,7 +173,7 @@ function MesaProgressRing({
           <span className={"ws-mesa-ring-pct" + (pctBump ? " bump" : "")}>
             {clamped}%
           </span>
-          <span className="ws-mesa-ring-lbl">pagado</span>
+          <span className="ws-mesa-ring-lbl">de la mesa pagado</span>
           <span className="ws-mesa-ring-amt">{remainingAmt}</span>
         </div>
       </div>
@@ -432,9 +433,8 @@ export function WaitingSuccessStage({
 
   /* ── shared math ──────────────────────────────────────────────────────── */
 
-  const fullSub = billSubtotal(items);
-  const mesaTotal =
-    demoTableProgress?.mesaTotal ?? computeTotals(fullSub, config, 0).total;
+  // Both `mesaTotal` and `fullSub` are derived inside `resolveMesaPaidPct`
+  // now — kept here as a comment so future readers don't reintroduce them.
   const remainingSub =
     demoTableProgress?.remainingSub ?? derived.remainingSub;
   const remainingTotal = computeTotals(
@@ -442,17 +442,23 @@ export function WaitingSuccessStage({
     config,
     0,
   ).total;
-  const paidPct =
-    demoTableProgress?.paidPct ??
-    (mesaTotal > 0.01
-      ? Math.max(
-          0,
-          Math.min(
-            100,
-            Math.round(((mesaTotal - remainingTotal) / mesaTotal) * 100),
-          ),
-        )
-      : 100);
+  const paidPct = useMemo(
+    () =>
+      resolveMesaPaidPct({
+        items,
+        paidItemIds: state.paidItemIds,
+        paidSummaries,
+        config,
+        demoProgress: demoTableProgress,
+      }),
+    [
+      items,
+      state.paidItemIds,
+      paidSummaries,
+      config,
+      demoTableProgress,
+    ],
+  );
   const paidGuestCount =
     paidSummaries.length > 0
       ? paidSummaries.length

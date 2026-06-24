@@ -289,14 +289,25 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
   }, [serverSync?.resetSeq]);
 
   useEffect(() => {
-    if (!serverSync || items.length === 0) return;
-    if (!serverSync.tableClosed) return;
+    if (items.length === 0) return;
+    const closed =
+      demoTableProgress?.tableClosed === true ||
+      serverSync?.tableClosed === true;
+    if (!closed) return;
     const { stage } = flow.state;
-    // Dejar ver la cuenta (bill) o quedarse en éxito; no expulsar al volver a pagar.
-    if (stage === "success" || stage === "bill") return;
+    // Bill: keep the completed-dock CTA so guests can browse items after close.
+    // Every other stage → cuenta completada / resumen de mesa.
+    if (stage === "bill") return;
+    if (stage === "success") return;
     flow.finishWaiting();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverSync?.version, serverSync?.tableClosed, items.length, flow.state.stage]);
+  }, [
+    demoTableProgress?.tableClosed,
+    serverSync?.tableClosed,
+    serverSync?.version,
+    items.length,
+    flow.state.stage,
+  ]);
 
   useEffect(() => {
     if (seededName.current || !youMember?.name.trim()) return;
@@ -633,7 +644,7 @@ function BillShellStage({
               <button
                 type="button"
                 className="c-pay-btn-secondary"
-                onClick={() => flow.finishWaiting()}
+                onClick={() => flow.goToWaiting()}
                 data-testid="dock-back-to-summary-btn"
               >
                 <Ic.check s={16} /> Resumen

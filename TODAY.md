@@ -79,6 +79,15 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-24 — Dock mini + resumen 0% + auto cuenta completada
+- **Qué:** `customer.css`, `WaitingSuccessStage.tsx`, `demo-table-progress.ts`, `GuestBillFlow.tsx`, `useGuestPaymentFlow.ts`, `GuestPayPage.tsx`, test `demo-table-progress.test.ts`.
+- **Por qué:** Con scroll up el dock split flotaba mal sobre el recibo; "Resumen" mostraba 0% pagado aunque la cuenta ya tenía pagos; al cerrar la mesa no llevaba a cuenta completada desde waiting/confirm/payment.
+- **Qué hace:** Dock mini+split queda pegado al peek sin pill flotante; `goToWaiting()` en Resumen y `resolveMesaPaidPct()` alinea el anillo con el header de la cuenta; cuando `tableClosed` todos los stages (excepto bill) van a éxito automáticamente.
+
+- **Qué:** `src/lib/demo-url.constants.mjs`, `src/lib/demo-url.ts`, `qr-utils.ts`, `scripts/generate-demo-qr.mjs`, `.env.example`, `CLAUDE.md`, `docs/DEMO_CANONICAL_URL.md`.
+- **Por qué:** Había 3 proyectos Vercel del mismo repo y riesgo de usar links distintos; el script QR tenía el URL hardcodeado aparte del resto.
+- **Qué hace:** Una sola constante alimenta QRs, PDF pack, app y docs; override solo vía env con warning; documento lista los 7 links, cuál es canónico (`mesitademo-two`) y cuáles pausar.
+
 ### 2026-06-23 — Pay-again rescue: split CTA [← Resumen | Pagar →]
 - **Qué:** `src/components/guest/flow/GuestBillFlow.tsx`, `src/app/pay/customer.css`.
 - **Por qué:** Tras pagar y volver al bill con "Pagar otra vez", el dock mostraba solo el CTA verde. Si el usuario tocaba "Pagar otra vez" por accidente o cambiaba de idea, **no había forma de regresar a la pantalla de resumen / éxito** donde estaba. Quedaba atrapado eligiendo platos sin querer.

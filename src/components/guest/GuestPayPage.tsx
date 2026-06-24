@@ -10,7 +10,7 @@ import { useLiveTableSession } from "@/hooks/useLiveTableSession";
 import type { FlowInit, PaidPayload } from "@/hooks/useGuestPaymentFlow";
 import { mapSplitModeToDemo } from "@/lib/demo-live-adapter";
 import { isDemoTableToken } from "@/lib/demo-restaurant";
-import { deriveDemoTableProgress } from "@/lib/guest-billing/demo-table-progress";
+import { deriveDemoTableProgress, paymentRecordSubtotal } from "@/lib/guest-billing/demo-table-progress";
 import { guestLabel, personNumberFromLabel } from "@/lib/guest-billing/split-math";
 
 import "@/app/pay/customer.css";
@@ -46,7 +46,7 @@ function GuestPayShell({
   const demoProgress = useMemo(() => {
     if (!isDemo || !("paidSummaries" in live)) return null;
     const paymentsSubtotal = live.paidSummaries.reduce(
-      (sum, p) => sum + (p.subtotal ?? p.amount / 1.25),
+      (sum, p) => sum + paymentRecordSubtotal(p),
       0,
     );
     const itemPaidUnits =
