@@ -485,6 +485,7 @@ function BillShellStage({
   paidSummaries,
   demoTableProgress,
   onResetDemo,
+  receiptPeekActive,
 }: StageProps) {
   const { state, derived } = flow;
   const [resetting, setResetting] = useState(false);
@@ -592,12 +593,16 @@ function BillShellStage({
         />
       </div>
 
-      {/* sticky bottom pay dock — stays visible after prior payments (receipt peek) */}
+      {/* sticky bottom pay dock — stays visible after prior payments (receipt peek).
+          When the receipt peek is active (= already paid at least once), the
+          CTA splits into [← Resumen | Pagar →] so the user can rescue from
+          an accidental tap on "Pagar otra vez" and return to the summary. */}
       {showPayDock ? (
         <div
           className={
             "c-dock glass-dock pay-dock-return " +
-            (dockExpanded ? "dock-full" : "dock-mini")
+            (dockExpanded ? "dock-full" : "dock-mini") +
+            (receiptPeekActive ? " has-back-cta" : "")
           }
         >
           <div className="dock-top">
@@ -611,14 +616,35 @@ function BillShellStage({
               {fmt(derived.totals.total)}
             </div>
           </div>
-          <button
-            className="c-pay-btn"
-            onClick={() => flow.goToConfirm()}
-            disabled={!derived.canPay}
-            data-testid="dock-pay-btn"
-          >
-            <Ic.lock s={18} /> {dockPayLabel}
-          </button>
+          {receiptPeekActive ? (
+            <div className="pay-dock-split">
+              <button
+                type="button"
+                className="c-pay-btn-secondary"
+                onClick={() => flow.finishWaiting()}
+                data-testid="dock-back-to-summary-btn"
+              >
+                <Ic.check s={16} /> Resumen
+              </button>
+              <button
+                className="c-pay-btn pay-dock-primary"
+                onClick={() => flow.goToConfirm()}
+                disabled={!derived.canPay}
+                data-testid="dock-pay-btn"
+              >
+                <Ic.lock s={16} /> {dockPayLabel}
+              </button>
+            </div>
+          ) : (
+            <button
+              className="c-pay-btn"
+              onClick={() => flow.goToConfirm()}
+              disabled={!derived.canPay}
+              data-testid="dock-pay-btn"
+            >
+              <Ic.lock s={18} /> {dockPayLabel}
+            </button>
+          )}
           <div className="pay-secure">
             <Ic.shield s={13} /> Pago cifrado · Factura electrónica automática
           </div>

@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-23 — Pay-again rescue: split CTA [← Resumen | Pagar →]
+- **Qué:** `src/components/guest/flow/GuestBillFlow.tsx`, `src/app/pay/customer.css`.
+- **Por qué:** Tras pagar y volver al bill con "Pagar otra vez", el dock mostraba solo el CTA verde. Si el usuario tocaba "Pagar otra vez" por accidente o cambiaba de idea, **no había forma de regresar a la pantalla de resumen / éxito** donde estaba. Quedaba atrapado eligiendo platos sin querer.
+- **Qué hace:** Cuando `receiptPeekActive` es true (= ya pagaste al menos una vez y el recibo peek está abajo), el dock se parte en dos: a la izquierda, botón gris **"Resumen"** que dispara `flow.finishWaiting()` y devuelve al usuario al success/waiting; a la derecha, el CTA verde **"Pagar tu parte · $X"** intacto. En estado dock-mini (collapsed pill) el botón gris se compacta a chip 44px para no robar protagonismo al CTA primario. Testid nuevo: `dock-back-to-summary-btn`. No cambia el dock cuando es primer pago (solo verde, como antes).
+
 ### 2026-06-23 — Fixes funcionales R1, R3, R5 (sync, scroll, split math)
 - **Qué:**
   - `src/hooks/useDemoTableSession.ts` — heartbeat de poll adaptativo según SSE.
