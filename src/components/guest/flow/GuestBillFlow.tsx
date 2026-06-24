@@ -406,15 +406,15 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
             ? '.cust-app[data-stage="payment"] .flow-foot'
             : null;
 
-    if (stage !== "bill" && !hasReceiptPeek) {
-      if (stage !== "bill") {
-        root.style.removeProperty("--bill-dock-pad");
-      }
-      if (!hasReceiptPeek || !payStackSelector) {
-        root.style.removeProperty("--pay-stack-height");
-        root.classList.remove("has-pay-stack-above");
-      }
-      if (stage !== "bill") return;
+    const shouldMeasureBillDock = stage === "bill";
+    const shouldMeasurePeekStack =
+      hasReceiptPeek && payStackSelector != null;
+
+    if (!shouldMeasureBillDock && !shouldMeasurePeekStack) {
+      root.style.removeProperty("--bill-dock-pad");
+      root.style.removeProperty("--pay-stack-height");
+      root.classList.remove("has-pay-stack-above");
+      return;
     }
 
     let ro: ResizeObserver | null = null;
@@ -424,9 +424,11 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
         ".receipt-drawer.peek .rcpt-perf",
       );
       const payEl = document.querySelector<HTMLElement>(
-        stage === "bill" ? billDockSelector : payStackSelector ?? "",
+        shouldMeasureBillDock
+          ? billDockSelector
+          : (payStackSelector ?? ""),
       );
-      if (stage === "bill" && payEl) {
+      if (shouldMeasureBillDock && payEl) {
         root.style.setProperty(
           "--bill-dock-pad",
           `${measureExpandedPayStackHeight(payEl) + 24}px`,
@@ -442,7 +444,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
           `${peekHd.getBoundingClientRect().height}px`,
         );
       }
-      if (hasReceiptPeek && payStackSelector && payEl) {
+      if (shouldMeasurePeekStack && payEl) {
         root.style.setProperty(
           "--pay-stack-height",
           `${measureExpandedPayStackHeight(payEl)}px`,
@@ -463,7 +465,9 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
       ro = new ResizeObserver(measure);
       const peekHd = document.querySelector(".receipt-drawer.peek .rcpt-perf");
       const payEl = document.querySelector(
-        stage === "bill" ? billDockSelector : payStackSelector ?? "",
+        shouldMeasureBillDock
+          ? billDockSelector
+          : (payStackSelector ?? ""),
       );
       if (peekHd) ro.observe(peekHd);
       if (payEl) ro.observe(payEl);

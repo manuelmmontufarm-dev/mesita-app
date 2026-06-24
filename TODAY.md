@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-24 — Fix build TS en GuestBillFlow
+- **Qué:** `GuestBillFlow.tsx`.
+- **Por qué:** Vercel falló: comparación `stage !== "bill"` redundante tras narrow de TypeScript.
+- **Qué hace:** Lógica del `useLayoutEffect` simplificada con flags `shouldMeasureBillDock` / `shouldMeasurePeekStack`; build verde.
+
 ### 2026-06-24 — Dock colapsable + CTA "Pagar · $monto" unificado
 - **Qué:** `bill-display.ts`, `GuestBillFlow.tsx`, `ConfirmStage.tsx`, `customer.css`, test `bill-display.test.ts`.
 - **Por qué:** El botón verde alternaba a "Pagar tu parte"; la cuenta antes del primer pago tenía dock estático; confirm no colapsaba al scroll; padding fijo de 200px causaba bugs de scroll.
