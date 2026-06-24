@@ -27,6 +27,12 @@ interface DemoDebugPanelProps {
   guests?: readonly DemoGuestRow[];
   /** Optional: token for snapshot copy. */
   token?: string;
+  /** Optional: receipt counts for diagnosing the "I see other guests'
+   *  receipts" class of bug. `mine` = payments by this guest; `total` =
+   *  every payment on the table. They should never be equal unless I
+   *  paid every payment, which is rare. */
+  paymentsMine?: number;
+  paymentsTotal?: number;
 }
 
 function readDeviceId(): string {
@@ -90,6 +96,8 @@ export function DemoDebugPanel({
   sseConnected,
   guests,
   token,
+  paymentsMine,
+  paymentsTotal,
 }: DemoDebugPanelProps) {
   const [open, setOpen] = useState(true);
   const [entries, setEntries] = useState<readonly DemoDebugEntry[]>([]);
@@ -118,7 +126,30 @@ export function DemoDebugPanel({
     return () => window.clearInterval(interval);
   }, [enabled, entries.length]);
 
+  // Force a re-render every 500ms so the "since last sync" delta stays fresh
+  // even when no new events are firing — important for diagnosing stuck SSE.
+  const [, setTickNow] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    const id = window.setInterval(() => setTickNow((n) => n + 1), 500);
+    return () => window.clearInterval(id);
+  }, [enabled]);
+
   if (!enabled) return null;
+
+  /** Latency stats — derived from the live ring buffer. */
+  const now = Date.now();
+  const latestSyncEntry = entries.find((e) => e.event.startsWith("sync:"));
+  const latestSyncSource = latestSyncEntry?.event.replace("sync:", "") ?? null;
+  const sinceLastSyncMs = latestSyncEntry ? now - latestSyncEntry.ts : null;
+  const latestClaimEntry = entries.find((e) => e.event.startsWith("claim"));
+  const sinceLastClaimMs = latestClaimEntry ? now - latestClaimEntry.ts : null;
+  const heartbeatLabel = sseConnected ? "800ms" : "500ms";
+  const fmtMs = (ms: number | null) => {
+    if (ms == null) return "—";
+    if (ms < 1000) return `${ms}ms`;
+    return `${(ms / 1000).toFixed(1)}s`;
+  };
 
   const copySnapshot = async () => {
     const snapshot = {
@@ -160,7 +191,21 @@ export function DemoDebugPanel({
             <span>v{version}</span>
             <span>reset {resetSeq}</span>
             <span>SSE {sseConnected ? "on" : "off"}</span>
-            <span>poll 500ms</span>
+            <span title="poll heartbeat">poll {heartbeatLabel}</span>
+          </div>
+          <div
+            className="demo-debug-row"
+            title="time since the most recent sync event of each source"
+          >
+            <span>
+              sync {latestSyncSource ?? "—"} · {fmtMs(sinceLastSyncMs)}
+            </span>
+            <span>claim · {fmtMs(sinceLastClaimMs)}</span>
+            {paymentsMine != null || paymentsTotal != null ? (
+              <span title="my receipts vs total table payments">
+                pay {paymentsMine ?? "—"} / {paymentsTotal ?? "—"}
+              </span>
+            ) : null}
           </div>
           <div className="demo-debug-row">
             <span>guest {guestSessionId?.slice(0, 8) ?? "—"}</span>

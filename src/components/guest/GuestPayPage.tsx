@@ -173,6 +173,16 @@ function GuestPayShell({
             hue: m.hue,
           }))}
           token={token}
+          paymentsTotal={
+            "paidSummaries" in live ? live.paidSummaries.length : undefined
+          }
+          paymentsMine={
+            "paidSummaries" in live
+              ? live.paidSummaries.filter(
+                  (p) => p.guestId === live.guestSessionId,
+                ).length
+              : undefined
+          }
         />
       ) : null}
       <GuestBillFlow

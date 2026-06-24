@@ -578,13 +578,14 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     };
   }, [token, guestSessionId, ingestDemoState]);
 
-  /** Poll every 500ms for continuous multi-device sync.
+  /** Poll for continuous multi-device sync.
    *
-   *  R1 (2026-06-23): when SSE is connected the poll becomes redundant —
-   *  the server pushes every state mutation, so polling on top doubles
-   *  the request rate and contributes to the "trabado" feel under load.
-   *  We keep poll firing at a slower 1.5s heartbeat as a heal channel
-   *  in case SSE silently drops, and snap back to 500ms when SSE is off.
+   *  Iteration 2 (2026-06-23): the first R1 attempt slowed the heartbeat
+   *  to 1500ms with SSE on — that was too aggressive and made tap-to-other
+   *  feel laggy when SSE silently misses a push. We now run poll at 800ms
+   *  with SSE on (~1.6× the no-SSE interval, ~40% less traffic than the
+   *  dual-fire baseline) and 500ms when SSE is off so the app stays
+   *  responsive on flaky connections.
    *
    *  A bootstrap fetch always runs once on mount so the first paint is
    *  populated before SSE handshakes. */
@@ -610,7 +611,9 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
 
     // Bootstrap once — guarantees a fresh snapshot before SSE handshakes.
     void poll();
-    const heartbeatMs = sseConnected ? SYNC_INTERVAL_MS * 3 : SYNC_INTERVAL_MS;
+    const heartbeatMs = sseConnected
+      ? SYNC_INTERVAL_MS + 300 // 800ms — leaves SSE primary, keeps heal tight
+      : SYNC_INTERVAL_MS;       // 500ms — SSE off, full polling fallback
     const interval = setInterval(() => void poll(), heartbeatMs);
     return () => {
       cancelled = true;

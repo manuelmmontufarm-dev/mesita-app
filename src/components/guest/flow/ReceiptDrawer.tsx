@@ -13,6 +13,8 @@ export interface ReceiptDrawerProps {
   receipts: Receipt[];
   config: RestaurantConfig;
   peekLabel?: string;
+  /** When true the bill is fully settled — show "Mesa cerrada" stamp. */
+  tableClosed?: boolean;
 }
 
 function ReceiptSection({ receipt, config, index, total }: {
@@ -72,7 +74,12 @@ function ReceiptSection({ receipt, config, index, total }: {
   );
 }
 
-export function ReceiptDrawer({ receipts, config, peekLabel = "Tu recibo" }: ReceiptDrawerProps) {
+export function ReceiptDrawer({
+  receipts,
+  config,
+  peekLabel = "Tu recibo",
+  tableClosed = false,
+}: ReceiptDrawerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const perfRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ startY: number; base: number; moved: number; active: boolean } | null>(null);
@@ -154,7 +161,14 @@ export function ReceiptDrawer({ receipts, config, peekLabel = "Tu recibo" }: Rec
         <div className="rcpt-peek">
           <div className="rcpt-grab" />
           <div className="rcpt-peek-row">
-            <span className="rcpt-peek-l"><Ic.receipt s={16} /> {peekLabel}</span>
+            <span className="rcpt-peek-l">
+              <Ic.receipt s={16} /> {peekLabel}
+              {tableClosed && (
+                <span className="rcpt-table-closed-chip" data-testid="receipt-table-closed-chip">
+                  Mesa cerrada
+                </span>
+              )}
+            </span>
             <span className="rcpt-peek-amt">
               <span className="rcpt-peek-badge">{paymentsLabel}</span>
               {fmt(totalAmt)} <Ic.chevron s={15} />
@@ -182,6 +196,14 @@ export function ReceiptDrawer({ receipts, config, peekLabel = "Tu recibo" }: Rec
             <div className="rcpt-status"><span className="rcpt-status-dot" /> Pago aprobado</div>
             <span className="rcpt-proof-pill">Usar como comprobante de pago</span>
           </div>
+          {tableClosed && (
+            <div className="rcpt-stamp" data-testid="receipt-table-closed-stamp" aria-label="Mesa cerrada — toda la cuenta fue pagada">
+              <span className="rcpt-stamp-border">
+                <span className="rcpt-stamp-title">Mesa cerrada</span>
+                <span className="rcpt-stamp-sub">Toda la cuenta pagada</span>
+              </span>
+            </div>
+          )}
           {count > 1 && (
             <button type="button" className="rcpt-pdf rcpt-pdf-all" data-testid="receipt-pdf-all"
               onClick={() => receipts.forEach((r, i) => setTimeout(() => downloadReceiptPdf(r, config), i * 350))}>

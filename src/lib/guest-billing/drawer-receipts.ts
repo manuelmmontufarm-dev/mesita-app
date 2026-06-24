@@ -74,7 +74,14 @@ function receiptFromSummary(
   };
 }
 
-/** Merge server payments + local receipts for the receipt drawer (oldest = Pago 1). */
+/** Merge server payments + local receipts for the receipt drawer (oldest = Pago 1).
+ *
+ *  Strictly scoped to `youId` — the receipt drawer is "TU recibo", not the
+ *  table's payment log. If you haven't paid, you don't see a peek.
+ *  (Previous behavior silently fell back to showing every payer's receipts
+ *  when youId didn't match, which leaked Persona 1's pay into Persona 2's
+ *  drawer — reproduced 2026-06-23.)
+ */
 export function mergeDrawerReceipts(
   localReceipts: readonly Receipt[],
   paidSummaries: readonly TablePaymentSummary[],
@@ -87,19 +94,13 @@ export function mergeDrawerReceipts(
     .slice()
     .reverse();
 
-  let fromServer = yours.map((p) => receiptFromSummary(p, items, config));
+  const fromServer = yours.map((p) => receiptFromSummary(p, items, config));
 
-  if (fromServer.length === 0 && paidSummaries.length > 0) {
-    fromServer = paidSummaries
-      .slice()
-      .reverse()
-      .map((p) => receiptFromSummary(p, items, config));
-  }
-
+  // De-dupe local receipts against server-confirmed ones so a just-paid
+  // payment in flight doesn't show as a ghost row alongside its server twin.
   const refs = new Set(fromServer.map((r) => r.ref));
   const extras = localReceipts.filter((r) => !refs.has(r.ref));
 
   if (fromServer.length > 0) return fromServer;
-
-  return extras.length > 0 ? extras : [];
+  return extras;
 }

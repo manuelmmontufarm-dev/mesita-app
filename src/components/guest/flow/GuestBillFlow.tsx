@@ -340,6 +340,10 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     [flow.state.receipts, paidSummaries, resolvedYouId, items, config],
   );
 
+  const tableClosed =
+    demoTableProgress?.tableClosed === true ||
+    serverSync?.tableClosed === true;
+
   const stageProps: StageProps = {
     flow: activeFlow,
     items,
@@ -353,14 +357,16 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     onResetDemo,
     tableToken,
     receiptPeekActive: drawerReceipts.length > 0,
-    tableClosed:
-      demoTableProgress?.tableClosed === true ||
-      serverSync?.tableClosed === true,
+    tableClosed,
   };
 
   const receiptDrawer =
     drawerReceipts.length > 0 ? (
-      <ReceiptDrawer receipts={drawerReceipts} config={config} />
+      <ReceiptDrawer
+        receipts={drawerReceipts}
+        config={config}
+        tableClosed={tableClosed}
+      />
     ) : null;
 
   useEffect(() => {
