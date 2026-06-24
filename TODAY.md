@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-24 — Dock colapsable + CTA "Pagar · $monto" unificado
+- **Qué:** `bill-display.ts`, `GuestBillFlow.tsx`, `ConfirmStage.tsx`, `customer.css`, test `bill-display.test.ts`.
+- **Por qué:** El botón verde alternaba a "Pagar tu parte"; la cuenta antes del primer pago tenía dock estático; confirm no colapsaba al scroll; padding fijo de 200px causaba bugs de scroll.
+- **Qué hace:** `dockGreenPayLabel` siempre muestra `Pagar · $X`; bill y confirm usan dock mini/full al scroll; padding dinámico `--bill-dock-pad` / `--confirm-dock-pad`; confirm foot fijo como bill.
+
 ### 2026-06-24 — Dock Resumen|Pagar igual que confirmar
 - **Qué:** `GuestBillFlow.tsx`, `customer.css`.
 - **Por qué:** En la cuenta, tras un pago previo, el dock mostraba un bloque gris enorme con "Resumen" y "Pagar tu parte · $0" separados; debía verse como en confirmar (← Editar | Pagar en pills).

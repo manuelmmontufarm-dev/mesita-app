@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { BillItem } from "../types";
-import { expandRepeatedItems, buildItemPayerNames, payButtonLabel, backToBillLabel, dockPayButtonLabel } from "../bill-display";
+import { expandRepeatedItems, buildItemPayerNames, payButtonLabel, backToBillLabel, dockPayButtonLabel, dockGreenPayLabel } from "../bill-display";
 import { equalShareSubtotal } from "../split-math";
 
 const makeItem = (id: string, name: string, overrides?: Partial<BillItem>): BillItem => ({
@@ -153,6 +153,14 @@ describe("payButtonLabel", () => {
     expect(dockPayButtonLabel("item", "$12.00", { again: true, compact: true })).toBe(
       "Pagar otra vez",
     );
+  });
+});
+
+describe("dockGreenPayLabel", () => {
+  it("uses Pagar · amount (never Pagar tu parte)", () => {
+    expect(dockGreenPayLabel("item", "$12.00")).toBe("Pagar · $12.00");
+    expect(dockGreenPayLabel("equal", "$8.40")).toBe("Pagar · $8.40");
+    expect(dockGreenPayLabel("todo", "$50.00")).toBe("Pagar todo · $50.00");
   });
 });
 

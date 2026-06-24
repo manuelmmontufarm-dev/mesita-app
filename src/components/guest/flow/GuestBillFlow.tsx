@@ -34,7 +34,7 @@ import type { LiveSessionActions } from "@/hooks/useLiveTableSession";
 import { fmt } from "@/lib/guest-billing";
 import {
   dockAmountLabel,
-  payButtonLabel,
+  dockGreenPayLabel,
 } from "@/lib/guest-billing/bill-display";
 import { mergeDrawerReceipts } from "@/lib/guest-billing/drawer-receipts";
 import {
@@ -395,19 +395,26 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
 
   useLayoutEffect(() => {
     const root = document.documentElement;
+    const billDockSelector =
+      '.cust-app[data-stage="bill"] .c-dock.pay-dock-return';
     const payStackSelector =
       stage === "bill"
-        ? '.cust-app[data-stage="bill"] .c-dock.pay-dock-return'
+        ? billDockSelector
         : stage === "confirm"
           ? '.cust-app[data-stage="confirm"] .flow-foot[data-pay-stack="confirm"]'
           : stage === "payment"
             ? '.cust-app[data-stage="payment"] .flow-foot'
             : null;
 
-    if (!hasReceiptPeek || !payStackSelector) {
-      root.style.removeProperty("--pay-stack-height");
-      root.classList.remove("has-pay-stack-above");
-      return;
+    if (stage !== "bill" && !hasReceiptPeek) {
+      if (stage !== "bill") {
+        root.style.removeProperty("--bill-dock-pad");
+      }
+      if (!hasReceiptPeek || !payStackSelector) {
+        root.style.removeProperty("--pay-stack-height");
+        root.classList.remove("has-pay-stack-above");
+      }
+      if (stage !== "bill") return;
     }
 
     let ro: ResizeObserver | null = null;
@@ -416,8 +423,16 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
       const peekHd = document.querySelector<HTMLElement>(
         ".receipt-drawer.peek .rcpt-perf",
       );
-      const payEl = document.querySelector<HTMLElement>(payStackSelector);
-      if (peekHd) {
+      const payEl = document.querySelector<HTMLElement>(
+        stage === "bill" ? billDockSelector : payStackSelector ?? "",
+      );
+      if (stage === "bill" && payEl) {
+        root.style.setProperty(
+          "--bill-dock-pad",
+          `${measureExpandedPayStackHeight(payEl) + 24}px`,
+        );
+      }
+      if (hasReceiptPeek && peekHd) {
         const peekOffset = measureReceiptPeekBottomOffset(peekHd);
         if (peekOffset != null) {
           root.style.setProperty("--receipt-peek", `${peekOffset}px`);
@@ -427,13 +442,13 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
           `${peekHd.getBoundingClientRect().height}px`,
         );
       }
-      if (payEl) {
+      if (hasReceiptPeek && payStackSelector && payEl) {
         root.style.setProperty(
           "--pay-stack-height",
           `${measureExpandedPayStackHeight(payEl)}px`,
         );
         root.classList.add("has-pay-stack-above");
-      } else {
+      } else if (!hasReceiptPeek) {
         root.style.removeProperty("--pay-stack-height");
         root.classList.remove("has-pay-stack-above");
       }
@@ -447,7 +462,9 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     if (typeof ResizeObserver !== "undefined") {
       ro = new ResizeObserver(measure);
       const peekHd = document.querySelector(".receipt-drawer.peek .rcpt-perf");
-      const payEl = document.querySelector(payStackSelector);
+      const payEl = document.querySelector(
+        stage === "bill" ? billDockSelector : payStackSelector ?? "",
+      );
       if (peekHd) ro.observe(peekHd);
       if (payEl) ro.observe(payEl);
     }
@@ -463,6 +480,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
       window.removeEventListener("resize", measure);
       window.visualViewport?.removeEventListener("resize", measure);
       window.visualViewport?.removeEventListener("scroll", measure);
+      root.style.removeProperty("--bill-dock-pad");
       root.style.removeProperty("--pay-stack-height");
       root.classList.remove("has-pay-stack-above");
     };
@@ -565,17 +583,10 @@ function BillShellStage({
   const showPayDock = !tableClosed && tableRemainingSub > 0.01;
   const dockPartLabel =
     state.mode === "todo" ? dockAmountLabel(state.mode) : "Tu parte";
-  const dockPayLabel = payButtonLabel(
+  const dockPayLabel = dockGreenPayLabel(
     state.mode,
     fmt(derived.totals.total),
   );
-  const dockFootPayLabel = receiptPeekActive
-    ? state.mode === "todo"
-      ? "Pagar todo"
-      : dockExpanded
-        ? dockPayLabel
-        : "Pagar"
-    : dockPayLabel;
 
   return (
     <div
@@ -670,7 +681,7 @@ function BillShellStage({
                 disabled={!derived.canPay}
                 data-testid="dock-pay-btn"
               >
-                <Ic.lock s={16} /> {dockFootPayLabel}
+                <Ic.lock s={16} /> {dockPayLabel}
               </button>
               <button
                 type="button"

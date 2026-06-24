@@ -53,6 +53,23 @@ export function dockPayButtonLabel(
   return payButtonLabel(mode, formattedTotal, { again });
 }
 
+/** Green dock CTA — always "Pagar · $X" (never "Pagar tu parte"). */
+export function dockGreenPayLabel(
+  mode: SplitMode,
+  formattedTotal: string,
+  opts?: { again?: boolean },
+): string {
+  const again = opts?.again ?? false;
+  if (mode === "todo") {
+    return again
+      ? `Pagar todo otra vez · ${formattedTotal}`
+      : `Pagar todo · ${formattedTotal}`;
+  }
+  return again
+    ? `Pagar otra vez · ${formattedTotal}`
+    : `Pagar · ${formattedTotal}`;
+}
+
 /** Dock CTA when the table still owes but nothing is selected yet. */
 export function payAgainSelectLabel(mode: SplitMode): string {
   if (mode === "item") return "Pagar otra vez — elige platos";

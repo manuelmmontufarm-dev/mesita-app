@@ -14,7 +14,7 @@
 
 import { useMemo, useRef, useState, useLayoutEffect, type UIEvent } from "react";
 
-import { payButtonLabel } from "@/lib/guest-billing/bill-display";
+import { dockGreenPayLabel } from "@/lib/guest-billing/bill-display";
 import { measureExpandedPayStackHeight } from "@/lib/guest-billing/bill-shell-scroll";
 import { useCollapsiblePayDock } from "@/hooks/useCollapsiblePayDock";
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
@@ -319,49 +319,41 @@ export function ConfirmStage({
       members.length,
       Object.keys(claims).length,
     ],
-    receiptPeekActive,
+    true,
   );
 
   const handleScroll = (e: UIEvent<HTMLDivElement>) => {
     onDockScroll(e);
   };
 
-  const payLabel = payButtonLabel(state.mode, fmt(derived.totals.total));
-  const footPayLabel = receiptPeekActive
-    ? state.mode === "todo"
-      ? "Pagar todo"
-      : dockExpanded
-        ? "Pagar tu parte"
-        : "Pagar"
-    : payLabel;
-  const backLabel =
-    receiptPeekActive && !dockExpanded ? "← Editar" : "← Volver a editar";
+  const footPayLabel = dockGreenPayLabel(state.mode, fmt(derived.totals.total));
+  const backLabel = dockExpanded ? "← Volver a editar" : "← Editar";
 
   const footClassName =
-    "flow-foot" +
-    (receiptPeekActive
-      ? ` pay-flow-dock glass-dock confirm-pay-dock ${
-          dockExpanded ? "dock-full" : "dock-mini"
-        }`
-      : "");
+    `flow-foot pay-flow-dock glass-dock confirm-pay-dock ${
+      dockExpanded ? "dock-full" : "dock-mini"
+    }`;
 
   useLayoutEffect(() => {
-    if (!receiptPeekActive) return;
     const root = document.documentElement;
     const measure = () => {
       const foot = footRef.current;
       if (!foot) return;
-      root.style.setProperty(
-        "--pay-stack-height",
-        `${measureExpandedPayStackHeight(foot)}px`,
-      );
+      const h = measureExpandedPayStackHeight(foot);
+      root.style.setProperty("--confirm-dock-pad", `${h + 24}px`);
+      if (receiptPeekActive) {
+        root.style.setProperty("--pay-stack-height", `${h}px`);
+      }
     };
     measure();
     const foot = footRef.current;
     if (!foot || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(measure);
     ro.observe(foot);
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("--confirm-dock-pad");
+    };
   }, [receiptPeekActive, dockExpanded, needsAck, acked, footPayLabel]);
 
   const tryPay = () => {
@@ -418,19 +410,8 @@ export function ConfirmStage({
       data-testid="guest-bill-flow"
       data-stage="confirm"
     >
-      <div
-        className={
-          "flowscreen" + (receiptPeekActive ? " flowscreen--peek-stack" : "")
-        }
-      >
-        <div
-          className={
-            "flow-scroll" +
-            (receiptPeekActive ? " flow-scroll--peek-stack" : "")
-          }
-          ref={scrollRef}
-          onScroll={receiptPeekActive ? handleScroll : undefined}
-        >
+      <div className="flowscreen">
+        <div className="flow-scroll" ref={scrollRef} onScroll={handleScroll}>
           {/* ── Header compacto ─────────────────────────────── */}
           <div className="bill-head-compact glassx">
             <div className="bill-head-row">
@@ -502,10 +483,8 @@ export function ConfirmStage({
             </label>
           )}
         </div>
-
-        {!receiptPeekActive ? confirmFoot : null}
       </div>
-      {receiptPeekActive ? confirmFoot : null}
+      {confirmFoot}
     </div>
   );
 }
