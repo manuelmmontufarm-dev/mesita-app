@@ -4086,50 +4086,65 @@ html.has-receipt-peek .flow-foot.pay-flow-dock.dock-mini .c-pay-btn {
   white-space: nowrap;
 }
 html.has-receipt-peek .flow-foot.confirm-pay-dock.dock-mini {
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-areas: "back total pay";
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  grid-template-areas: "back pay";
+  gap: 10px;
+  padding: 10px 14px 12px;
 }
 html.has-receipt-peek .flow-foot.confirm-pay-dock.dock-mini .dock-back-btn {
   grid-area: back;
-  width: auto;
-  min-height: 44px;
-  min-width: 44px;
-  padding: 0 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
   border-radius: 100px;
   font-size: clamp(13px, 3.5vw, 14px);
   white-space: nowrap;
 }
-html.has-receipt-peek .flow-foot.confirm-pay-dock.dock-mini .dock-total {
-  grid-area: total;
-  text-align: center;
-}
 html.has-receipt-peek .flow-foot.confirm-pay-dock.dock-mini .c-pay-btn {
   grid-area: pay;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 18px;
+  font-size: clamp(14px, 3.8vw, 16px);
+  border-radius: 100px;
 }
-html.has-receipt-peek .flow-foot.confirm-pay-dock.dock-mini .dock-k {
-  display: none;
+html.has-receipt-peek .flow-foot.confirm-pay-dock.dock-full {
+  gap: 10px;
 }
-html.has-receipt-peek .flow-foot.payment-pay-dock.dock-mini {
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  grid-template-areas: "label total pay";
+html.has-receipt-peek .flow-foot.confirm-pay-dock.dock-full .c-pay-btn {
+  width: 100%;
+  min-height: 56px;
+  border-radius: 18px;
+  font-size: 18px;
 }
-html.has-receipt-peek .flow-foot.payment-pay-dock.dock-mini .dock-k {
-  grid-area: label;
+html.has-receipt-peek .flow-foot.confirm-pay-dock.dock-full .dock-back-btn {
+  width: 100%;
+  min-height: 48px;
 }
-html.has-receipt-peek .flow-foot.payment-pay-dock.dock-mini .dock-total {
-  grid-area: total;
+html.has-receipt-peek .flow-foot.payment-pay-dock--solo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 14px;
+  border-radius: 22px 22px 0 0;
 }
-html.has-receipt-peek .flow-foot.payment-pay-dock.dock-mini .c-pay-btn {
-  grid-area: pay;
+html.has-receipt-peek .flow-foot.payment-pay-dock--solo .c-pay-btn {
+  width: 100%;
+  min-height: 56px;
+  border-radius: 18px;
+  font-size: 18px;
+  font-weight: 650;
+}
+html.has-receipt-peek .flow-foot.payment-pay-dock--solo .foot-error--peek {
+  font-size: 13px;
+  text-align: center;
+  margin-bottom: 2px;
 }
 html.has-receipt-peek .flow-foot.pay-flow-dock.dock-mini .foot-error {
   display: none;
 }
 html.has-receipt-peek .flow-foot.pay-flow-dock.dock-full .dock-top {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  padding: 2px 4px 10px;
+  display: none;
 }
 html.has-receipt-peek .flow-foot.pay-flow-dock.dock-full .dock-total {
   font-size: clamp(24px, 7vw, 30px);

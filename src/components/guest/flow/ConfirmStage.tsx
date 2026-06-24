@@ -325,6 +325,15 @@ export function ConfirmStage({
   };
 
   const payLabel = payButtonLabel(state.mode, fmt(derived.totals.total));
+  const footPayLabel = receiptPeekActive
+    ? state.mode === "todo"
+      ? "Pagar todo"
+      : dockExpanded
+        ? "Pagar tu parte"
+        : "Pagar"
+    : payLabel;
+  const backLabel =
+    receiptPeekActive && !dockExpanded ? "← Editar" : "← Volver a editar";
 
   const tryPay = () => {
     if (needsAck && !acked) {
@@ -440,17 +449,6 @@ export function ConfirmStage({
               : "")
           }
         >
-          {receiptPeekActive ? (
-            <div className="dock-top">
-              <div className="dock-k">
-                Tu parte
-                <small>{state.name.trim() || "tu parte"}</small>
-              </div>
-              <div className={"dock-total" + (bump ? " bump" : "")}>
-                {fmt(derived.totals.total)}
-              </div>
-            </div>
-          ) : null}
           <button
             className={
               "c-pay-btn" +
@@ -462,14 +460,14 @@ export function ConfirmStage({
             disabled={!derived.canPay}
             data-testid="confirm-pay-btn"
           >
-            <Ic.lock s={18} /> {payLabel}
+            <Ic.lock s={18} /> {footPayLabel}
           </button>
           <button
             className="flow-secondary solid dock-back-btn"
             onClick={() => flow.goToBill()}
             data-testid="confirm-back-btn"
           >
-            ← Volver a editar
+            {backLabel}
           </button>
         </div>
       </div>

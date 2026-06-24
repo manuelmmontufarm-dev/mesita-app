@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-23 — Foot confirm/payment sin monto duplicado (pay-again)
+- **Qué:** `ConfirmStage.tsx`, `PaymentStage.tsx`, `customer.css`.
+- **Por qué:** Con recibo abajo, el total en negro en el foot se veía fuera de lugar; en tarjeta el usuario solo quiere un CTA verde “Pagar”.
+- **Qué hace:** Confirm mini = dos botones (Editar | Pagar) sin monto; confirm full = “Pagar tu parte” + volver; payment pay-again = un solo botón verde grande “Pagar”, sin widget “Tu parte” en el foot.
+
 ### 2026-06-23 — Dock mini/full en confirm y payment + anti-flicker scroll
 - **Qué:** `useCollapsiblePayDock.ts`, `bill-shell-scroll.ts`, `GuestBillFlow.tsx`, `ConfirmStage.tsx`, `PaymentStage.tsx`, `customer.css`.
 - **Por qué:** Con recibo abajo, confirm/payment tenían foot fijo sin colapsar al scroll; el dock de bill parpadeaba mini↔full al bajar por feedback entre altura del dock y `padding-bottom`.
