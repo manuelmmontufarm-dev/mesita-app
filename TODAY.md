@@ -79,6 +79,16 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-24 — Dock Resumen|Pagar igual que confirmar
+- **Qué:** `GuestBillFlow.tsx`, `customer.css`.
+- **Por qué:** En la cuenta, tras un pago previo, el dock mostraba un bloque gris enorme con "Resumen" y "Pagar tu parte · $0" separados; debía verse como en confirmar (← Editar | Pagar en pills).
+- **Qué hace:** Reusa clases `confirm-pay-dock` + `dock-back-btn`; grid 1fr/1.2fr con pills redondas; etiquetas "← Resumen" y "Pagar" (compacto en mini); aplica en dock-full y dock-mini encima del peek.
+
+### 2026-06-24 — Dock + recibo flush en móvil (Safari)
+- **Qué:** `bill-shell-scroll.ts`, `GuestBillFlow.tsx`, `ReceiptDrawer.tsx`, `customer.css` (media ≤480px).
+- **Por qué:** En teléfono el strip "Tu recibo" quedaba flotando encima de Resumen|Pagar; en desktop se veía bien porque `offsetHeight` no coincide con el visual viewport de Safari.
+- **Qué hace:** `measureReceiptPeekBottomOffset()` usa `getBoundingClientRect` + `visualViewport`; listeners de resize/scroll; CSS móvil pone ambos botones a 48px igual y elimina el gap (sin rcpt-tear, padding-bottom 0 en dock).
+
 ### 2026-06-24 — Dock mini + resumen 0% + auto cuenta completada
 - **Qué:** `customer.css`, `WaitingSuccessStage.tsx`, `demo-table-progress.ts`, `GuestBillFlow.tsx`, `useGuestPaymentFlow.ts`, `GuestPayPage.tsx`, test `demo-table-progress.test.ts`.
 - **Por qué:** Con scroll up el dock split flotaba mal sobre el recibo; "Resumen" mostraba 0% pagado aunque la cuenta ya tenía pagos; al cerrar la mesa no llevaba a cuenta completada desde waiting/confirm/payment.

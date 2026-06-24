@@ -75,6 +75,26 @@ export function measureExpandedPayStackHeight(el: HTMLElement): number {
   return height > 0 ? height : el.offsetHeight;
 }
 
+/**
+ * Distance from the visual viewport bottom to the top of the receipt peek
+ * header — used to pin the pay dock flush above "Tu recibo" on mobile Safari
+ * where offsetHeight alone can leave a floating gap.
+ */
+export function measureReceiptPeekBottomOffset(
+  peekEl: HTMLElement | null | undefined,
+): number | null {
+  if (!peekEl) return null;
+  if (typeof window === "undefined") return Math.ceil(peekEl.offsetHeight);
+
+  const rect = peekEl.getBoundingClientRect();
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  const fromLayout = Math.ceil(viewportHeight - rect.top);
+  const fromHeight = Math.ceil(peekEl.getBoundingClientRect().height);
+
+  if (fromLayout > 0) return fromLayout;
+  return fromHeight > 0 ? fromHeight : null;
+}
+
 /** Initials in the payer avatar circle (typed name wins over seat fallback). */
 export function payerAvatarInitials(
   typedName: string,

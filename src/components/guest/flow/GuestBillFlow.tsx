@@ -42,7 +42,10 @@ import {
   shouldEnableSheetOpenClass,
 } from "@/lib/guest-billing/receipt-peek-layout";
 import { freeUnits, personNumberFromLabel, unitsOf } from "@/lib/guest-billing/split-math";
-import { measureExpandedPayStackHeight } from "@/lib/guest-billing/bill-shell-scroll";
+import {
+  measureExpandedPayStackHeight,
+  measureReceiptPeekBottomOffset,
+} from "@/lib/guest-billing/bill-shell-scroll";
 import { useCollapsiblePayDock } from "@/hooks/useCollapsiblePayDock";
 import { mergeClaimsForDisplay } from "@/lib/demo-optimistic-merge";
 import type { PendingClaimOp } from "@/lib/demo-optimistic-merge";
@@ -415,7 +418,14 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
       );
       const payEl = document.querySelector<HTMLElement>(payStackSelector);
       if (peekHd) {
-        root.style.setProperty("--receipt-peek", `${peekHd.offsetHeight}px`);
+        const peekOffset = measureReceiptPeekBottomOffset(peekHd);
+        if (peekOffset != null) {
+          root.style.setProperty("--receipt-peek", `${peekOffset}px`);
+        }
+        peekHd.closest<HTMLElement>(".receipt-drawer")?.style.setProperty(
+          "--peek",
+          `${peekHd.getBoundingClientRect().height}px`,
+        );
       }
       if (payEl) {
         root.style.setProperty(
@@ -443,12 +453,16 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     }
 
     window.addEventListener("resize", measure);
+    window.visualViewport?.addEventListener("resize", measure);
+    window.visualViewport?.addEventListener("scroll", measure);
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(t0);
       window.clearTimeout(t1);
       ro?.disconnect();
       window.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("scroll", measure);
       root.style.removeProperty("--pay-stack-height");
       root.classList.remove("has-pay-stack-above");
     };
@@ -555,6 +569,13 @@ function BillShellStage({
     state.mode,
     fmt(derived.totals.total),
   );
+  const dockFootPayLabel = receiptPeekActive
+    ? state.mode === "todo"
+      ? "Pagar todo"
+      : dockExpanded
+        ? dockPayLabel
+        : "Pagar"
+    : dockPayLabel;
 
   return (
     <div
@@ -625,7 +646,9 @@ function BillShellStage({
           className={
             "c-dock glass-dock pay-dock-return " +
             (dockExpanded ? "dock-full" : "dock-mini") +
-            (receiptPeekActive ? " has-back-cta" : "")
+            (receiptPeekActive
+              ? " has-back-cta pay-flow-dock confirm-pay-dock"
+              : "")
           }
         >
           <div className="dock-top">
@@ -640,24 +663,24 @@ function BillShellStage({
             </div>
           </div>
           {receiptPeekActive ? (
-            <div className="pay-dock-split">
-              <button
-                type="button"
-                className="c-pay-btn-secondary"
-                onClick={() => flow.goToWaiting()}
-                data-testid="dock-back-to-summary-btn"
-              >
-                <Ic.check s={16} /> Resumen
-              </button>
+            <>
               <button
                 className="c-pay-btn pay-dock-primary"
                 onClick={() => flow.goToConfirm()}
                 disabled={!derived.canPay}
                 data-testid="dock-pay-btn"
               >
-                <Ic.lock s={16} /> {dockPayLabel}
+                <Ic.lock s={16} /> {dockFootPayLabel}
               </button>
-            </div>
+              <button
+                type="button"
+                className="flow-secondary solid dock-back-btn"
+                onClick={() => flow.goToWaiting()}
+                data-testid="dock-back-to-summary-btn"
+              >
+                ← Resumen
+              </button>
+            </>
           ) : (
             <button
               className="c-pay-btn"

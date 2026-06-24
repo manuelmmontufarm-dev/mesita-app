@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Receipt, receiptsTotal } from "@/hooks/useGuestPaymentFlow";
+import { measureReceiptPeekBottomOffset } from "@/lib/guest-billing/bill-shell-scroll";
 import { downloadReceiptPdf } from "@/lib/guest-billing/receipt-pdf";
 import { fmt, guestLabel } from "@/lib/guest-billing/split-math";
 import type { RestaurantConfig } from "@/lib/guest-billing/types";
@@ -108,21 +109,33 @@ export function ReceiptDrawer({
     const hd = perfRef.current;
     const root = document.documentElement;
     if (!el || !hd) return;
-    const peek = `${hd.offsetHeight}px`;
-    el.style.setProperty("--peek", peek);
-    root.style.setProperty("--receipt-peek", peek);
-    const ro = typeof ResizeObserver !== "undefined"
-      ? new ResizeObserver(() => {
-          const h = perfRef.current?.offsetHeight;
-          if (!h || !containerRef.current) return;
-          const px = `${h}px`;
-          containerRef.current.style.setProperty("--peek", px);
-          root.style.setProperty("--receipt-peek", px);
-        })
-      : null;
+
+    const syncPeekVars = () => {
+      if (!perfRef.current || !containerRef.current) return;
+      const header = perfRef.current;
+      const headerH = Math.ceil(header.getBoundingClientRect().height);
+      const peekForDrawer = `${headerH}px`;
+      containerRef.current.style.setProperty("--peek", peekForDrawer);
+      const bottomOffset = measureReceiptPeekBottomOffset(header);
+      if (bottomOffset != null) {
+        root.style.setProperty("--receipt-peek", `${bottomOffset}px`);
+      }
+    };
+
+    syncPeekVars();
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => syncPeekVars())
+        : null;
     ro?.observe(hd);
+    window.addEventListener("resize", syncPeekVars);
+    window.visualViewport?.addEventListener("resize", syncPeekVars);
+    window.visualViewport?.addEventListener("scroll", syncPeekVars);
     return () => {
       ro?.disconnect();
+      window.removeEventListener("resize", syncPeekVars);
+      window.visualViewport?.removeEventListener("resize", syncPeekVars);
+      window.visualViewport?.removeEventListener("scroll", syncPeekVars);
       root.style.removeProperty("--receipt-peek");
     };
   }, [count, pos, totalAmt]);
