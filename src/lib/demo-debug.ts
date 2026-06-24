@@ -18,7 +18,21 @@ export type DemoDebugEvent =
   | "reset"
   | "name:normalize"
   | "lobby"
-  | "error";
+  | "error"
+  // Phase 0 instrumentation (added for visual-QA regression tracing):
+  | "dock:mini"
+  | "dock:full"
+  | "scroll:bill"
+  | "scroll:confirm"
+  | "scroll:payment"
+  | "receipt:open"
+  | "receipt:peek"
+  | "receipt:close"
+  | "stage:enter"
+  | "stage:leave"
+  | "claim:add"
+  | "claim:release"
+  | "claim:split";
 
 export interface DemoDebugEntry {
   ts: number;

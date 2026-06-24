@@ -209,9 +209,11 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
   const displayClaimsForStages = useMemo(
     () =>
       sessionClaims
-        ? mergeClaimsForDisplay(sessionClaims, flow.state.claims, resolvedYouId)
+        ? mergeClaimsForDisplay(sessionClaims, flow.state.claims, resolvedYouId, {
+            paidItemIds: serverSync?.paidItemIds,
+          })
         : flow.state.claims,
-    [sessionClaims, flow.state.claims, resolvedYouId],
+    [sessionClaims, flow.state.claims, resolvedYouId, serverSync?.paidItemIds],
   );
 
   const derivedFromDisplayClaims = useMemo(
@@ -242,6 +244,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
         serverSync.claims,
         flow.state.claims,
         resolvedYouId,
+        { paidItemIds: serverSync.paidItemIds },
       ),
       paidItemIds: serverSync.paidItemIds,
       paidIds: serverSync.paidIds,
@@ -510,11 +513,18 @@ function BillShellStage({
   };
 
   const bump = useBumpOnChange(Math.round(derived.totals.total * 100));
-  const tableRemainingSub =
-    demoTableProgress?.tableClosed === true
-      ? 0
-      : (demoTableProgress?.remainingSub ?? derived.remainingSub);
-  const showPayDock = tableRemainingSub > 0.001;
+  // R2 hardening: treat the table as closed from EITHER demoTableProgress
+  // (demo) OR serverSync (live + race-condition fallback when the demo
+  // progress payload hasn't merged yet). Epsilon raised to 0.01 (one cent)
+  // so split-50/50 rounding noise from `mergeClaimsForDisplay` doesn't
+  // strand a fractional balance that would hide the completed dock.
+  const tableClosed =
+    demoTableProgress?.tableClosed === true ||
+    serverSync?.tableClosed === true;
+  const tableRemainingSub = tableClosed
+    ? 0
+    : (demoTableProgress?.remainingSub ?? derived.remainingSub);
+  const showPayDock = !tableClosed && tableRemainingSub > 0.01;
   const dockPartLabel =
     state.mode === "todo" ? dockAmountLabel(state.mode) : "Tu parte";
   const dockPayLabel = payButtonLabel(
@@ -613,7 +623,7 @@ function BillShellStage({
             <Ic.shield s={13} /> Pago cifrado · Factura electrónica automática
           </div>
         </div>
-      ) : demoTableProgress?.tableClosed ? (
+      ) : tableClosed ? (
         <div className="c-dock glass-dock pay-dock-return completed-dock dock-full">
           <button
             type="button"

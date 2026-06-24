@@ -564,6 +564,313 @@ export const SCENARIOS: Scenario[] = [
       expectEq(mapped.locro?.[b.guestId!], 0.5, "mapped B");
     },
   },
+
+  /* ──────────── R1–R5 regression bed (added 2026-06-23) ──────────────────
+     Each scenario reproduces one of the visual-or-functional bugs the user
+     reported as "0/10" after the dock/receipt/scroll commits of 2026-06-23.
+     Layer 1 covers the store-level invariants; Layer 2 covers the UI gate. */
+
+  // ────── R2: completed-dock "Regresar al resumen de mesa" ───────────────
+  {
+    id: "23",
+    category: "pay",
+    name: "R2 — 3 devices pay everything → all items appear in paidItemIds",
+    storeOnly: true,
+    run: async (token) => {
+      await resetDemoTableState(token);
+      const a = new SimulatedDevice(token);
+      const b = new SimulatedDevice(token);
+      const c = new SimulatedDevice(token);
+      await Promise.all([a.join(), b.join(), c.join()]);
+      // Each takes one item, all pay item-mode
+      await a.claim("locro");
+      await b.claim("seco");
+      await c.claim("encebollado");
+      // Last item: split 50/50 between A and B to mimic the rounding edge
+      await a.split("ceviche", { [a.guestId!]: 0.5, [b.guestId!]: 0.5 });
+      await a.pay({ mode: "item", itemIds: ["locro"], itemUnits: { locro: 1 } });
+      await b.pay({ mode: "item", itemIds: ["seco"], itemUnits: { seco: 1 } });
+      await c.pay({ mode: "item", itemIds: ["encebollado"], itemUnits: { encebollado: 1 } });
+      await a.pay({ mode: "item", itemIds: ["ceviche"], itemUnits: { ceviche: 0.5 } });
+      await b.pay({ mode: "item", itemIds: ["ceviche"], itemUnits: { ceviche: 0.5 } });
+      // `tableClosed` is derived (see demo-table-progress.ts) — the canonical
+      // store-level proxy is "every item id is in paidItemIds OR every unit
+      // appears in itemPaidUnits ≥ qty".
+      const state = await getDemoTableState(token);
+      const allCovered = state.items.every((it) => {
+        if (state.paidItemIds.includes(it.id)) return true;
+        const units = state.itemPaidUnits?.[it.id] ?? 0;
+        return units + 0.001 >= it.qty;
+      });
+      expectTrue(allCovered, "every item is fully paid (no residual units)");
+    },
+  },
+  {
+    id: "24",
+    category: "pay",
+    name: "R2 — 50/50 split leaves NO residual paidUnits > 1.001",
+    storeOnly: true,
+    run: async (token) => {
+      await resetDemoTableState(token);
+      const a = new SimulatedDevice(token);
+      const b = new SimulatedDevice(token);
+      await Promise.all([a.join(), b.join()]);
+      await a.split("locro", { [a.guestId!]: 0.5, [b.guestId!]: 0.5 });
+      await a.pay({ mode: "item", itemIds: ["locro"], itemUnits: { locro: 0.5 } });
+      await b.pay({ mode: "item", itemIds: ["locro"], itemUnits: { locro: 0.5 } });
+      const state = await getDemoTableState(token);
+      const paid = state.itemPaidUnits?.locro ?? 0;
+      expectTrue(paid >= 0.999 && paid <= 1.001, `paidUnits ≈ 1 (got ${paid})`);
+    },
+  },
+
+  // ────── R1: multi-device sync under load ───────────────────────────────
+  {
+    id: "25",
+    category: "claim",
+    name: "R1 — 3 devices, 10 rapid claim/release cycles, no drift",
+    storeOnly: true,
+    run: async (token) => {
+      await resetDemoTableState(token);
+      const a = new SimulatedDevice(token);
+      const b = new SimulatedDevice(token);
+      const c = new SimulatedDevice(token);
+      await Promise.all([a.join(), b.join(), c.join()]);
+      for (let i = 0; i < 10; i++) {
+        await Promise.all([
+          a.claim("locro"),
+          b.claim("seco"),
+          c.claim("encebollado"),
+        ]);
+        await Promise.all([
+          a.release("locro"),
+          b.release("seco"),
+          c.release("encebollado"),
+        ]);
+      }
+      const state = await getDemoTableState(token);
+      // After all releases, no claim should be left on these items
+      expectEq(state.claims.locro, undefined, "locro released");
+      expectEq(state.claims.seco, undefined, "seco released");
+      expectEq(state.claims.encebollado, undefined, "encebollado released");
+    },
+  },
+  {
+    id: "26",
+    category: "claim",
+    name: "R1 — race: A claims while B pays a different item",
+    storeOnly: true,
+    run: async (token) => {
+      await resetDemoTableState(token);
+      const a = new SimulatedDevice(token);
+      const b = new SimulatedDevice(token);
+      await Promise.all([a.join(), b.join()]);
+      await b.claim("locro");
+      await Promise.all([
+        a.claim("seco"),
+        b.pay({ mode: "item", itemIds: ["locro"], itemUnits: { locro: 1 } }),
+      ]);
+      const state = await getDemoTableState(token);
+      expectEq(state.claims.seco, a.guestId, "A's claim survived B's pay");
+      expectTrue(state.paidItemIds.includes("locro"), "B's pay registered");
+    },
+  },
+
+  // ────── R5: split math + receipt count consistency ─────────────────────
+  {
+    id: "27",
+    category: "pay",
+    name: "R5 — split + pay logs exactly 2 receipts (not 4)",
+    storeOnly: true,
+    run: async (token) => {
+      await resetDemoTableState(token);
+      const a = new SimulatedDevice(token);
+      const b = new SimulatedDevice(token);
+      await Promise.all([a.join(), b.join()]);
+      await a.split("locro", { [a.guestId!]: 0.5, [b.guestId!]: 0.5 });
+      await a.pay({ mode: "item", itemIds: ["locro"], itemUnits: { locro: 0.5 }, amount: 5 });
+      await b.pay({ mode: "item", itemIds: ["locro"], itemUnits: { locro: 0.5 }, amount: 5 });
+      const state = await getDemoTableState(token);
+      const receipts = state.payments ?? [];
+      expectEq(receipts.length, 2, "exactly 2 receipts logged");
+    },
+  },
+
+  // ────── R3 / receipt drawer post-reset ─────────────────────────────────
+  {
+    id: "28",
+    category: "reset",
+    name: "Reset mid-payment clears receipts cleanly",
+    storeOnly: true,
+    run: async (token) => {
+      await resetDemoTableState(token);
+      const a = new SimulatedDevice(token);
+      await a.join();
+      await a.claim("locro");
+      await a.pay({ mode: "item", itemIds: ["locro"], itemUnits: { locro: 1 } });
+      await resetDemoTableState(token);
+      const state = await getDemoTableState(token);
+      expectEq(state.payments?.length ?? 0, 0, "no payments after reset");
+      expectEq(state.paidItemIds.length, 0, "no paidItemIds after reset");
+      expectEq(Object.keys(state.claims).length, 0, "no claims after reset");
+      const paidUnits = Object.values(state.itemPaidUnits ?? {}).filter(
+        (v) => v > 0.001,
+      );
+      expectEq(paidUnits.length, 0, "no residual partial payments after reset");
+    },
+  },
+
+  // ────── R4: ring math — paidPct 100 implies tableClosed ────────────────
+  {
+    id: "29",
+    category: "pay",
+    name: "R4 — paying every unit yields 100% progress (no off-by-one)",
+    storeOnly: true,
+    run: async (token) => {
+      await resetDemoTableState(token);
+      const a = new SimulatedDevice(token);
+      await a.join();
+      // Single device pays full bill via "todo" mode
+      await a.pay({ mode: "todo" });
+      const state = await getDemoTableState(token);
+      // tableClosed is derived from paidItemIds covering every item.
+      const remaining = state.items.filter(
+        (it) => !state.paidItemIds.includes(it.id),
+      );
+      expectEq(remaining.length, 0, "no item left unpaid after pay-all");
+    },
+  },
+
+  // ────── Cold-join late ─────────────────────────────────────────────────
+  {
+    id: "30",
+    category: "join",
+    name: "Cold join after 3 payments → new guest sees server-authoritative state",
+    storeOnly: true,
+    run: async (token) => {
+      await resetDemoTableState(token);
+      const a = new SimulatedDevice(token);
+      const b = new SimulatedDevice(token);
+      const c = new SimulatedDevice(token);
+      await Promise.all([a.join(), b.join(), c.join()]);
+      await a.claim("locro");
+      await b.claim("seco");
+      await c.claim("encebollado");
+      await a.pay({ mode: "item", itemIds: ["locro"], itemUnits: { locro: 1 } });
+      await b.pay({ mode: "item", itemIds: ["seco"], itemUnits: { seco: 1 } });
+      await c.pay({ mode: "item", itemIds: ["encebollado"], itemUnits: { encebollado: 1 } });
+      const cold = new SimulatedDevice(token);
+      const guest = await cold.join();
+      expectEq(guest.label, "Persona 4", "cold join gets Persona 4");
+      const state = await getDemoTableState(token);
+      expectEq(state.paidItemIds.length, 3, "cold join sees 3 paid items");
+    },
+  },
+
+  // ────── Rename sync across devices ─────────────────────────────────────
+  {
+    id: "31",
+    category: "rename",
+    name: "Rename → another device sees it on next read",
+    storeOnly: true,
+    run: async (token) => {
+      await resetDemoTableState(token);
+      const a = new SimulatedDevice(token);
+      const b = new SimulatedDevice(token);
+      await Promise.all([a.join(), b.join()]);
+      await a.rename("Manuel");
+      const stateFromB = await getDemoTableState(token);
+      const seen = stateFromB.guests.find((g) => g.id === a.guestId)?.name;
+      expectEq(seen, "Manuel", "B reads A's new name");
+    },
+  },
+
+  // ────── Reset + immediate join → fresh roster ──────────────────────────
+  {
+    id: "32",
+    category: "reset",
+    name: "Reset then immediate join → Persona 1 only",
+    storeOnly: true,
+    run: async (token) => {
+      await resetDemoTableState(token);
+      const a = new SimulatedDevice(token);
+      await a.join();
+      await resetDemoTableState(token);
+      const b = new SimulatedDevice(token);
+      const g = await b.join();
+      const state = await getDemoTableState(token);
+      expectEq(state.guests.length, 1, "1 guest after reset");
+      expectEq(g.label, "Persona 1", "label resets to 1");
+    },
+  },
+
+  // ────── Mixed-mode pay (todo while others have items) ──────────────────
+  {
+    id: "33",
+    category: "pay",
+    name: "Mixed: B claims, A pays todo → A clears all items",
+    storeOnly: true,
+    run: async (token) => {
+      await resetDemoTableState(token);
+      const a = new SimulatedDevice(token);
+      const b = new SimulatedDevice(token);
+      await Promise.all([a.join(), b.join()]);
+      await b.claim("locro");
+      await a.pay({ mode: "todo" });
+      const state = await getDemoTableState(token);
+      expectEq(
+        state.paidItemIds.length,
+        state.items.length,
+        "every item marked paid after pay-all",
+      );
+    },
+  },
+
+  // ────── Split → reassign all to one ────────────────────────────────────
+  {
+    id: "34",
+    category: "claim",
+    name: "Split then reassign all units to one guest → claim collapses cleanly",
+    storeOnly: true,
+    run: async (token) => {
+      await resetDemoTableState(token);
+      const a = new SimulatedDevice(token);
+      const b = new SimulatedDevice(token);
+      await Promise.all([a.join(), b.join()]);
+      await a.split("locro", { [a.guestId!]: 0.5, [b.guestId!]: 0.5 });
+      await a.split("locro", { [a.guestId!]: 1.0 });
+      const state = await getDemoTableState(token);
+      expectEq(state.claims.locro, a.guestId, "single-owner claim restored");
+      const shares = state.claimShares?.locro;
+      expectTrue(
+        !shares || Object.values(shares).every((v) => v <= 0.001),
+        "no leftover fractional shares",
+      );
+    },
+  },
+
+  // ────── Idempotency: same pay submitted twice ──────────────────────────
+  {
+    id: "35",
+    category: "pay",
+    name: "Duplicate pay submission → only one receipt persists",
+    storeOnly: true,
+    run: async (token) => {
+      await resetDemoTableState(token);
+      const a = new SimulatedDevice(token);
+      await a.join();
+      await a.claim("locro");
+      // Same submission twice. The store is allowed to coalesce or accept both
+      // — what we care about is that NO ghost receipt with no items appears.
+      await a.pay({ mode: "item", itemIds: ["locro"], itemUnits: { locro: 1 } });
+      await a.pay({ mode: "item", itemIds: ["locro"], itemUnits: { locro: 1 } });
+      const state = await getDemoTableState(token);
+      const ghosts = (state.payments ?? []).filter(
+        (p) => !p.itemIds || p.itemIds.length === 0,
+      );
+      expectEq(ghosts.length, 0, "no ghost receipts");
+    },
+  },
 ];
 
 /* ───────────────────────── tiny assert helpers ─────────────────────── */

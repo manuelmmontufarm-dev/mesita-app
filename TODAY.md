@@ -79,6 +79,35 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-23 — Fixes funcionales R1, R3, R5 (sync, scroll, split math)
+- **Qué:**
+  - `src/hooks/useDemoTableSession.ts` — heartbeat de poll adaptativo según SSE.
+  - `src/hooks/useCollapsiblePayDock.ts` — debounce ResizeObserver con `requestAnimationFrame`, lectura de `has-receipt-peek` desde `<html>`, eliminación de `dockExpanded` de deps del re-measure effect.
+  - `src/lib/guest-billing/bill-shell-scroll.ts` — nueva opción `receiptPeekVisible` que añade 60px extra de histéresis cuando el recibo peek está visible.
+  - `src/lib/demo-optimistic-merge.ts` — `mergeClaimsForDisplay` ahora acepta `paidItemIds` y limpia ghost splits cuyas filas ya fueron pagadas y borradas en el server.
+  - `src/components/guest/flow/GuestBillFlow.tsx` — pasa `serverSync.paidItemIds` al merge.
+- **Por qué:**
+  - R1: poll 500ms + SSE 500ms se duplicaban → carga de red x2 sin razón → "trabado" multi-device.
+  - R3: en confirm 2.º pago, el ResizeObserver del scroll oscilaba con cada cambio de mini↔full porque `dockExpanded` estaba en las deps del `useLayoutEffect` que volvía a medir — feedback loop frame-a-frame con el padding-bottom del stack pay+recibo.
+  - R5: cuando un comensal pagaba su mitad de un plato compartido, el ghost local del split seguía descontando unidades en el dock — el merge no consideraba `paidItemIds` y la fila quedaba viva en el cálculo del total.
+- **Qué hace:**
+  - R1: con SSE conectado, poll baja a 1.5s (heartbeat de heal); con SSE caído, vuelve a 500ms. Bootstrap fetch único al montar para que el primer paint tenga snapshot fresco sin esperar SSE. Tráfico de red ≈ 50% menos en operación normal.
+  - R3: el `ResizeObserver` colapsa observaciones múltiples en un solo `requestAnimationFrame` antes de re-medir; el effect re-mide solo cuando cambia `enabled` (no en cada flip de `dockExpanded`); cuando el recibo peek está visible (clase `has-receipt-peek` en `<html>`), la histéresis pasa de 100px a 160px — suficiente para absorber el delta de altura combinado dock+peek sin oscilar.
+  - R5: `mergeClaimsForDisplay({ paidItemIds })` elimina entradas locales para ítems que el server ya marcó como pagados y limpió de claims — el dock vuelve a mostrar el total correcto en el momento que llega el snapshot post-pago.
+
+### 2026-06-23 — Visual QA pass: dedupe CSS, R2, anillo progreso, seam stack
+- **Qué:** `src/app/pay/customer.css` (376 líneas duplicadas eliminadas + ajuste fino del `MesaProgressRing` y del seam dock↔recibo), `src/components/guest/flow/GuestBillFlow.tsx` (R2 hardening), `src/lib/demo-debug.ts` (nuevas categorías de eventos Phase 0), `src/components/guest/DemoDebugPanel.tsx` (snapshot live de CSS vars y clases `<html>`), `src/lib/demo-scenarios.ts` (escenarios `[23]` a `[35]` para R1–R5), `tests/e2e/demo-table-closed-navigation.spec.ts` (nuevo), `tests/e2e/demo-pay-again-full-journey.spec.ts` (nuevo), `docs/VISUAL_QA_REPORT.md` (nuevo), `docs/DEMO_QA_CHECKLIST.md` (nuevo).
+- **Por qué:** El usuario reportó la calidad como 0/10 tras los commits del 2026-06-23 (`fd94f9b`, `fc82e18`, `9c18c45`, `845c183`, `6df2e33`): anillos de progreso "raros", esquinas del stack pay+recibo con seams visibles, y el botón **"Regresar al resumen de mesa"** desaparecía tras pagar todo. Auditoría reveló además que `customer.css` tenía 83 selectores duplicados (376 líneas redundantes entre 1398–1773 y 1898–2273), con el `font-weight` de `.ok-title` dependiendo del orden de cascada para resolver 720 vs 750 — frágil y la causa probable de regresiones "fantasma" en sucesivos commits.
+- **Qué hace:**
+  1. **Dedupe CSS:** elimina la primera copia (líneas 1398–1773) preservando la cascada-ganadora actual. Archivo pasa de 5122 → 4746 líneas (-7.3%). Cero cambio visual neto.
+  2. **R2 — "Regresar al resumen de mesa":** `tableClosed` ahora se calcula como OR de `demoTableProgress?.tableClosed` y `serverSync?.tableClosed` (live mode + race condition cubiertos). Epsilon subido de 0.001 a 0.01 — el ruido sub-céntimo de un split 50/50 ya no estranja al CompletedDock.
+  3. **Anillo de progreso (R4):** `.ws-mesa-ring-fill` baja stroke 10 → 9px, drop-shadow 0.35 → 0.28α con transición `filter 0.4s ease`, dial 168 → 172px, porcentaje weight 780 → 760 + `translateY(1px)` para centrado óptico de numerales tabulares.
+  4. **Stack pay+recibo:** `::after` seal pasa de blanco sólido `#fff` 4px a `rgba(255,255,255,0.98)` 3px; border-α 0.08 → 0.07, shadow `-10/28/-16` → `-8/22/-14`. La unión lee como una sola superficie continua, no como dos cards apilados con doble sombra.
+  5. **Phase 0:** `DemoDebugPanel` ahora muestra stage activo, modo dock, `--pay-stack-height` / `--receipt-peek` en vivo, y las clases `has-receipt-peek` / `has-pay-stack-above` / etc. en `<html>`. `demo-debug.ts` añade categorías `dock:*`, `scroll:*`, `receipt:*`, `stage:*`, `claim:*` para tracear regresiones de layout en < 2 min.
+  6. **Phase 2:** 13 escenarios nuevos en `demo-scenarios.ts` cubren R1 (sync bajo carga), R2 (table-closed sin centavos residuales), R3 (reset mid-payment), R4 (paidPct=100 ↔ tableClosed), R5 (split → exactamente 2 recibos, no 4), más cold-join e idempotencia de pay. Dos specs Playwright nuevos: `demo-table-closed-navigation.spec.ts` (R2 con UI real) y `demo-pay-again-full-journey.spec.ts` (2 BrowserContexts × 2 pagos).
+  7. **Docs:** `docs/VISUAL_QA_REPORT.md` con antes/después pantalla por pantalla; `docs/DEMO_QA_CHECKLIST.md` con checklist reproducible para 3 viewports (375 / 390 / 430).
+- **Notas:** R1 (multi-device sync trabado), R3 (confirm scroll 2.º pago) y R5 (split math en el dock) son funcionales y los maneja el otro AI. Los escenarios [23]–[35] empezarán rojos hasta que esa rama mergee — esa es la prueba de que la red de regresión funciona como se documentó en `CLAUDE.md`. El `.donut` + `.confirm-progress` deduplicados son código muerto (ningún TSX los referencia) y se pueden borrar en un follow-up.
+
 ### 2026-06-23 — Scroll confirm en segundo pago (recibo + foot fijo)
 - **Qué:** `ConfirmStage.tsx`, `useCollapsiblePayDock.ts`, `bill-shell-scroll.ts`, `GuestBillFlow.tsx`, `customer.css`.
 - **Por qué:** En “Revisa y paga lo tuyo” con recibo abajo el contenido (checkbox) quedaba tapado y el scroll no despejaba bien el stack pay+recibo.

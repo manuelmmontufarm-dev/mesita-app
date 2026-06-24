@@ -174,11 +174,22 @@ function serverMapClone(server: Claims): Claims {
   return out;
 }
 
-/** Bill UI: server demo claims are single-owner; keep local multi-guest splits visible. */
+/** Bill UI: server demo claims are single-owner; keep local multi-guest splits visible.
+ *
+ *  Precedence (highest wins):
+ *    1. Server multi-guest split  — always authoritative for shared dishes
+ *    2. Local multi-guest split   — optimistic split still in flight
+ *    3. mergeClaimsPreserveLocal — single-owner preservation for `youId`
+ *
+ *  R5 (2026-06-23): added explicit cleanup of stale local splits whose
+ *  server counterpart no longer exists — a paid + cleared item previously
+ *  left a ghost split in the dock math.
+ */
 export function mergeClaimsForDisplay(
   server: Claims,
   local: Claims,
   youId: MemberId,
+  opts?: { paidItemIds?: readonly string[] },
 ): Claims {
   const merged = mergeClaimsPreserveLocal(server, local, youId, {
     trustLocal: true,
@@ -193,6 +204,19 @@ export function mergeClaimsForDisplay(
     const claimants = Object.values(serverMap).filter((u) => u > 0.001).length;
     if (claimants > 1) {
       merged[itemId] = { ...serverMap };
+    }
+  }
+  // Drop ghost local-only splits for items the server has already marked
+  // as paid — without this, the dock keeps subtracting fractional units
+  // forever once a split is collected, which is what surfaced the R5
+  // "totales del dock ignoran el reparto 50/50" complaint.
+  if (opts?.paidItemIds && opts.paidItemIds.length > 0) {
+    for (const paidId of opts.paidItemIds) {
+      // Only drop if the server has no claim for it either — preserves
+      // splits that are in-flight while one of the participants pays.
+      if (!server[paidId]) {
+        delete merged[paidId];
+      }
     }
   }
   return merged;

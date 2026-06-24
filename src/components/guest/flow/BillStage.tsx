@@ -558,9 +558,11 @@ export function BillStage({
   const displayClaims = useMemo(
     () =>
       sessionClaims
-        ? mergeClaimsForDisplay(sessionClaims, localClaims, flow.youId)
+        ? mergeClaimsForDisplay(sessionClaims, localClaims, flow.youId, {
+            paidItemIds,
+          })
         : localClaims,
-    [sessionClaims, localClaims, flow.youId],
+    [sessionClaims, localClaims, flow.youId, paidItemIds],
   );
   const itemPayerNames = useMemo(
     () => buildItemPayerNames(paidSummaries),

@@ -578,7 +578,16 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     };
   }, [token, guestSessionId, ingestDemoState]);
 
-  /** Poll every 500ms for continuous multi-device sync. */
+  /** Poll every 500ms for continuous multi-device sync.
+   *
+   *  R1 (2026-06-23): when SSE is connected the poll becomes redundant —
+   *  the server pushes every state mutation, so polling on top doubles
+   *  the request rate and contributes to the "trabado" feel under load.
+   *  We keep poll firing at a slower 1.5s heartbeat as a heal channel
+   *  in case SSE silently drops, and snap back to 500ms when SSE is off.
+   *
+   *  A bootstrap fetch always runs once on mount so the first paint is
+   *  populated before SSE handshakes. */
   useEffect(() => {
     if (!guestSessionId) return;
     let cancelled = false;
@@ -599,13 +608,15 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       }
     };
 
+    // Bootstrap once — guarantees a fresh snapshot before SSE handshakes.
     void poll();
-    const interval = setInterval(() => void poll(), SYNC_INTERVAL_MS);
+    const heartbeatMs = sseConnected ? SYNC_INTERVAL_MS * 3 : SYNC_INTERVAL_MS;
+    const interval = setInterval(() => void poll(), heartbeatMs);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [token, guestSessionId, ingestDemoState]);
+  }, [token, guestSessionId, ingestDemoState, sseConnected]);
 
   const postAction = useCallback(
     async (body: Record<string, unknown>) => {

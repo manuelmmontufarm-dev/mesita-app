@@ -38,6 +38,49 @@ function readDeviceId(): string {
   }
 }
 
+/** Read live CSS custom properties + html-level classes the layout depends on.
+ *  Phase 0: surfacing this in the debug panel lets us diagnose dock/peek
+ *  regressions in under 2 minutes without DevTools. */
+interface LayoutSnapshot {
+  payStackHeight: string;
+  receiptPeek: string;
+  receiptDockGap: string;
+  classes: string[];
+  stage: string;
+  dockMode: "mini" | "full" | "none";
+}
+
+function readLayoutSnapshot(): LayoutSnapshot {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return {
+      payStackHeight: "—",
+      receiptPeek: "—",
+      receiptDockGap: "—",
+      classes: [],
+      stage: "—",
+      dockMode: "none",
+    };
+  }
+  const html = document.documentElement;
+  const rootStyles = getComputedStyle(html);
+  const classes = ["has-receipt-peek", "has-pay-stack-above", "has-sheet-open", "has-receipt-open"]
+    .filter((c) => html.classList.contains(c));
+  const stageEl = document.querySelector<HTMLElement>(".cust-app[data-stage]");
+  const stage = stageEl?.dataset.stage ?? "—";
+  const dock = document.querySelector<HTMLElement>(".c-dock");
+  let dockMode: LayoutSnapshot["dockMode"] = "none";
+  if (dock?.classList.contains("dock-mini")) dockMode = "mini";
+  else if (dock?.classList.contains("dock-full")) dockMode = "full";
+  return {
+    payStackHeight: (rootStyles.getPropertyValue("--pay-stack-height") || "—").trim(),
+    receiptPeek: (rootStyles.getPropertyValue("--receipt-peek") || "—").trim(),
+    receiptDockGap: (rootStyles.getPropertyValue("--receipt-dock-gap") || "—").trim(),
+    classes,
+    stage,
+    dockMode,
+  };
+}
+
 export function DemoDebugPanel({
   version,
   resetSeq,
@@ -54,6 +97,7 @@ export function DemoDebugPanel({
   const [joinCount, setJoinCount] = useState(0);
   const [deviceId, setDeviceId] = useState("—");
   const [copied, setCopied] = useState(false);
+  const [layout, setLayout] = useState<LayoutSnapshot>(() => readLayoutSnapshot());
 
   useEffect(() => {
     setEnabled(isDemoDebugEnabled());
@@ -63,6 +107,16 @@ export function DemoDebugPanel({
       setJoinCount(getDemoJoinCount());
     });
   }, []);
+
+  // Re-read layout snapshot on every debug event + every 750ms — cheap polling
+  // is fine here because the panel is gated behind ?debug=1 (dev/QA only).
+  useEffect(() => {
+    if (!enabled) return;
+    const tick = () => setLayout(readLayoutSnapshot());
+    tick();
+    const interval = window.setInterval(tick, 750);
+    return () => window.clearInterval(interval);
+  }, [enabled, entries.length]);
 
   if (!enabled) return null;
 
@@ -124,6 +178,19 @@ export function DemoDebugPanel({
               {copied ? "✓ copiado" : "copiar snapshot"}
             </button>
           </div>
+          <div className="demo-debug-row" title="Layout — stage, dock mode, CSS vars">
+            <span>stage {layout.stage}</span>
+            <span>dock {layout.dockMode}</span>
+            <span title="--pay-stack-height">stack {layout.payStackHeight}</span>
+            <span title="--receipt-peek">peek {layout.receiptPeek}</span>
+          </div>
+          {layout.classes.length > 0 ? (
+            <div className="demo-debug-row" title="<html> classes">
+              {layout.classes.map((c) => (
+                <span key={c} className="demo-debug-ev">{c}</span>
+              ))}
+            </div>
+          ) : null}
           {guests && guests.length > 0 ? (
             <div className="demo-debug-log">
               {guests.map((g) => (

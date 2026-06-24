@@ -143,6 +143,25 @@ describe("mergeClaimsForDisplay", () => {
     const merged = mergeClaimsForDisplay(server, local, "g1");
     expect(merged.locro).toEqual({ g1: 0.5, g2: 0.5 });
   });
+
+  it("drops ghost local split when item is paid + cleared on the server (R5)", () => {
+    const server = {}; // server cleared the claim after the pay went through
+    const local = { locro: { g1: 0.5, g2: 0.5 } }; // stale optimistic split
+    const merged = mergeClaimsForDisplay(server, local, "g1", {
+      paidItemIds: ["locro"],
+    });
+    expect(merged.locro).toBeUndefined();
+  });
+
+  it("keeps split visible while server still has the claim (paid mid-flight)", () => {
+    const server = { locro: { g1: 0.5, g2: 0.5 } };
+    const local = { locro: { g1: 0.5, g2: 0.5 } };
+    const merged = mergeClaimsForDisplay(server, local, "g1", {
+      paidItemIds: ["locro"],
+    });
+    // Server still has the split → don't drop it even if it's listed paid.
+    expect(merged.locro).toEqual({ g1: 0.5, g2: 0.5 });
+  });
 });
 
 describe("mapClaimsFromDemoRaw", () => {

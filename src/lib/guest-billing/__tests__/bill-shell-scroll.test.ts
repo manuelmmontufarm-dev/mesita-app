@@ -46,6 +46,23 @@ describe("bill-shell-scroll", () => {
       expect(isScrollAtBottom(input)).toBe(false);
       expect(isScrollAtBottom(input, { dockExpanded: true })).toBe(true);
     });
+
+    it("widens hysteresis even more when receipt peek is visible (R3)", () => {
+      // Distance from bottom: scrollTop + clientHeight = 850, scrollHeight = 1000
+      // → 150px from the bottom edge.
+      // Plain threshold (40px) → false.
+      // Dock-expanded hysteresis (140px total) → still false at 150px.
+      // Peek-extended hysteresis (200px total) → true.
+      const input = { scrollTop: 450, clientHeight: 400, scrollHeight: 1000 };
+      expect(isScrollAtBottom(input)).toBe(false);
+      expect(isScrollAtBottom(input, { dockExpanded: true })).toBe(false);
+      expect(
+        isScrollAtBottom(input, {
+          dockExpanded: true,
+          receiptPeekVisible: true,
+        }),
+      ).toBe(true);
+    });
   });
 
   describe("isContentScrollable", () => {
