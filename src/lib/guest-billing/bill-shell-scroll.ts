@@ -47,13 +47,17 @@ export function computeBillShellScrollMetrics(
 
 /** Reserve scroll space for the expanded dock — avoids mini↔full padding feedback loops. */
 export function measureExpandedPayStackHeight(el: HTMLElement): number {
-  if (!el.classList.contains("dock-mini")) return el.offsetHeight;
-  el.classList.remove("dock-mini");
-  el.classList.add("dock-full");
-  const height = el.offsetHeight;
-  el.classList.add("dock-mini");
-  el.classList.remove("dock-full");
-  return height;
+  const hadMini = el.classList.contains("dock-mini");
+  if (hadMini) {
+    el.classList.remove("dock-mini");
+    el.classList.add("dock-full");
+  }
+  const height = Math.ceil(el.getBoundingClientRect().height);
+  if (hadMini) {
+    el.classList.add("dock-mini");
+    el.classList.remove("dock-full");
+  }
+  return height > 0 ? height : el.offsetHeight;
 }
 
 /** Initials in the payer avatar circle (typed name wins over seat fallback). */

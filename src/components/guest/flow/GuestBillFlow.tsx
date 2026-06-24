@@ -365,13 +365,16 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
 
   useLayoutEffect(() => {
     const root = document.documentElement;
-    const payStackSelector = [
-      '.cust-app[data-stage="bill"] .c-dock.pay-dock-return',
-      '.cust-app[data-stage="confirm"] .flow-foot',
-      '.cust-app[data-stage="payment"] .flow-foot',
-    ].join(", ");
+    const payStackSelector =
+      stage === "bill"
+        ? '.cust-app[data-stage="bill"] .c-dock.pay-dock-return'
+        : stage === "confirm"
+          ? '.cust-app[data-stage="confirm"] .flow-foot[data-pay-stack="confirm"]'
+          : stage === "payment"
+            ? '.cust-app[data-stage="payment"] .flow-foot'
+            : null;
 
-    if (!hasReceiptPeek) {
+    if (!hasReceiptPeek || !payStackSelector) {
       root.style.removeProperty("--pay-stack-height");
       root.classList.remove("has-pay-stack-above");
       return;

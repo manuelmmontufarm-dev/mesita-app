@@ -66,5 +66,10 @@ export function useCollapsiblePayDock(
 
   const dockExpanded = !enabled || atBottom || !scrollable;
 
+  useLayoutEffect(() => {
+    if (!enabled) return;
+    remeasureScroll();
+  }, [enabled, dockExpanded, remeasureScroll]);
+
   return { handleScroll, dockExpanded, atBottom, scrollable, remeasureScroll };
 }

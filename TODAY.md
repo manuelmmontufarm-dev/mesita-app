@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-23 — Scroll confirm en segundo pago (recibo + foot fijo)
+- **Qué:** `ConfirmStage.tsx`, `useCollapsiblePayDock.ts`, `bill-shell-scroll.ts`, `GuestBillFlow.tsx`, `customer.css`.
+- **Por qué:** En “Revisa y paga lo tuyo” con recibo abajo el contenido (checkbox) quedaba tapado y el scroll no despejaba bien el stack pay+recibo.
+- **Qué hace:** Foot fijo fuera del `flowscreen`; padding extra en confirm; medición local del foot expandido; ack hace `scrollIntoView`; histéresis re-mide al cambiar mini/full.
+
 ### 2026-06-23 — Foot confirm/payment sin monto duplicado (pay-again)
 - **Qué:** `ConfirmStage.tsx`, `PaymentStage.tsx`, `customer.css`.
 - **Por qué:** Con recibo abajo, el total en negro en el foot se veía fuera de lugar; en tarjeta el usuario solo quiere un CTA verde “Pagar”.

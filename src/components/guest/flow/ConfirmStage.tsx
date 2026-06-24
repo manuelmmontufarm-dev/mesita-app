@@ -12,9 +12,10 @@
  * scroll-nudge, resumen tax/propina/total, CTA "Pagar tu parte".
  */
 
-import { useMemo, useRef, useState, type UIEvent } from "react";
+import { useMemo, useRef, useState, useLayoutEffect, type UIEvent } from "react";
 
 import { payButtonLabel } from "@/lib/guest-billing/bill-display";
+import { measureExpandedPayStackHeight } from "@/lib/guest-billing/bill-shell-scroll";
 import { useCollapsiblePayDock } from "@/hooks/useCollapsiblePayDock";
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
 import {
@@ -299,6 +300,7 @@ export function ConfirmStage({
   const [acked, setAcked] = useState(false);
   const [nudge, setNudge] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const footRef = useRef<HTMLDivElement | null>(null);
   const ackRef = useRef<HTMLLabelElement | null>(null);
 
   const needsAck = mode !== "todo";
@@ -335,17 +337,48 @@ export function ConfirmStage({
   const backLabel =
     receiptPeekActive && !dockExpanded ? "← Editar" : "← Volver a editar";
 
+  const footClassName =
+    "flow-foot" +
+    (receiptPeekActive
+      ? ` pay-flow-dock glass-dock confirm-pay-dock ${
+          dockExpanded ? "dock-full" : "dock-mini"
+        }`
+      : "");
+
+  useLayoutEffect(() => {
+    if (!receiptPeekActive) return;
+    const root = document.documentElement;
+    const measure = () => {
+      const foot = footRef.current;
+      if (!foot) return;
+      root.style.setProperty(
+        "--pay-stack-height",
+        `${measureExpandedPayStackHeight(foot)}px`,
+      );
+    };
+    measure();
+    const foot = footRef.current;
+    if (!foot || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(foot);
+    return () => ro.disconnect();
+  }, [receiptPeekActive, dockExpanded, needsAck, acked, footPayLabel]);
+
   const tryPay = () => {
     if (needsAck && !acked) {
       const c = scrollRef.current;
       const a = ackRef.current;
-      if (c && a) {
-        const to =
-          c.scrollTop +
-          a.getBoundingClientRect().top -
-          c.getBoundingClientRect().top -
-          90;
-        smoothScrollTo(c, Math.max(0, to));
+      if (a) {
+        if (receiptPeekActive) {
+          a.scrollIntoView({ behavior: "smooth", block: "center" });
+        } else if (c) {
+          const to =
+            c.scrollTop +
+            a.getBoundingClientRect().top -
+            c.getBoundingClientRect().top -
+            90;
+          smoothScrollTo(c, Math.max(0, to));
+        }
       }
       setNudge(true);
       setTimeout(() => setNudge(false), 700);
@@ -354,15 +387,47 @@ export function ConfirmStage({
     flow.confirmPay();
   };
 
+  const confirmFoot = (
+    <div ref={footRef} className={footClassName} data-pay-stack="confirm">
+      <button
+        className={
+          "c-pay-btn" +
+          (bump ? " bump" : "") +
+          (needsAck && !acked ? " is-locked" : "")
+        }
+        onClick={tryPay}
+        aria-disabled={!derived.canPay || (needsAck && !acked)}
+        disabled={!derived.canPay}
+        data-testid="confirm-pay-btn"
+      >
+        <Ic.lock s={18} /> {footPayLabel}
+      </button>
+      <button
+        className="flow-secondary solid dock-back-btn"
+        onClick={() => flow.goToBill()}
+        data-testid="confirm-back-btn"
+      >
+        {backLabel}
+      </button>
+    </div>
+  );
+
   return (
     <div
       className="cust-root cust-app"
       data-testid="guest-bill-flow"
       data-stage="confirm"
     >
-      <div className="flowscreen">
+      <div
+        className={
+          "flowscreen" + (receiptPeekActive ? " flowscreen--peek-stack" : "")
+        }
+      >
         <div
-          className="flow-scroll"
+          className={
+            "flow-scroll" +
+            (receiptPeekActive ? " flow-scroll--peek-stack" : "")
+          }
           ref={scrollRef}
           onScroll={receiptPeekActive ? handleScroll : undefined}
         >
@@ -438,39 +503,9 @@ export function ConfirmStage({
           )}
         </div>
 
-        {/* ── Footer CTA ─────────────────────────────────────── */}
-        <div
-          className={
-            "flow-foot" +
-            (receiptPeekActive
-              ? ` pay-flow-dock glass-dock confirm-pay-dock ${
-                  dockExpanded ? "dock-full" : "dock-mini"
-                }`
-              : "")
-          }
-        >
-          <button
-            className={
-              "c-pay-btn" +
-              (bump ? " bump" : "") +
-              (needsAck && !acked ? " is-locked" : "")
-            }
-            onClick={tryPay}
-            aria-disabled={!derived.canPay || (needsAck && !acked)}
-            disabled={!derived.canPay}
-            data-testid="confirm-pay-btn"
-          >
-            <Ic.lock s={18} /> {footPayLabel}
-          </button>
-          <button
-            className="flow-secondary solid dock-back-btn"
-            onClick={() => flow.goToBill()}
-            data-testid="confirm-back-btn"
-          >
-            {backLabel}
-          </button>
-        </div>
+        {!receiptPeekActive ? confirmFoot : null}
       </div>
+      {receiptPeekActive ? confirmFoot : null}
     </div>
   );
 }

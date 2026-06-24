@@ -4153,6 +4153,27 @@ html.has-receipt-peek .flow-foot.pay-flow-dock.dock-full .dock-total {
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
+html.has-receipt-peek .cust-app[data-stage="confirm"] .flowscreen.flowscreen--peek-stack {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+html.has-receipt-peek .cust-app[data-stage="confirm"] .flow-scroll.flow-scroll--peek-stack {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(
+    var(--pay-stack-height, 148px) + var(--receipt-peek, 58px) + 44px +
+      env(safe-area-inset-bottom, 0px)
+  ) !important;
+  scroll-padding-bottom: calc(
+    var(--pay-stack-height, 148px) + var(--receipt-peek, 58px) + 44px +
+      env(safe-area-inset-bottom, 0px)
+  );
+}
 html.has-receipt-peek .cust-app[data-stage="confirm"] .flow-scroll,
 html.has-receipt-peek .cust-app[data-stage="payment"] .flow-scroll {
   flex: 1;
