@@ -72,6 +72,10 @@ interface StageProps {
   onResetDemo?: () => Promise<void>;
   tableToken?: string;
   receiptPeekActive?: boolean;
+  /** True when the table is fully paid — derived in the parent so the
+   *  bill-shell dock can fall back to the "Regresar al resumen" CTA
+   *  without re-reading serverSync from a child scope. R2 fix. */
+  tableClosed?: boolean;
 }
 
 export interface GuestBillFlowProps {
@@ -349,6 +353,9 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     onResetDemo,
     tableToken,
     receiptPeekActive: drawerReceipts.length > 0,
+    tableClosed:
+      demoTableProgress?.tableClosed === true ||
+      serverSync?.tableClosed === true,
   };
 
   const receiptDrawer =
@@ -486,6 +493,7 @@ function BillShellStage({
   demoTableProgress,
   onResetDemo,
   receiptPeekActive,
+  tableClosed = false,
 }: StageProps) {
   const { state, derived } = flow;
   const [resetting, setResetting] = useState(false);
@@ -514,14 +522,12 @@ function BillShellStage({
   };
 
   const bump = useBumpOnChange(Math.round(derived.totals.total * 100));
-  // R2 hardening: treat the table as closed from EITHER demoTableProgress
-  // (demo) OR serverSync (live + race-condition fallback when the demo
-  // progress payload hasn't merged yet). Epsilon raised to 0.01 (one cent)
-  // so split-50/50 rounding noise from `mergeClaimsForDisplay` doesn't
-  // strand a fractional balance that would hide the completed dock.
-  const tableClosed =
-    demoTableProgress?.tableClosed === true ||
-    serverSync?.tableClosed === true;
+  // R2 hardening: `tableClosed` is derived in the parent (combining
+  // demoTableProgress.tableClosed | serverSync.tableClosed) and passed
+  // down so this scope doesn't need to re-read serverSync. Epsilon at
+  // 0.01 (one cent) so split-50/50 rounding noise from
+  // `mergeClaimsForDisplay` can't strand a fractional balance and hide
+  // the completed dock.
   const tableRemainingSub = tableClosed
     ? 0
     : (demoTableProgress?.remainingSub ?? derived.remainingSub);
