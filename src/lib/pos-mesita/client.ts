@@ -4,7 +4,7 @@
  */
 
 const DEFAULT_BASE =
-  "https://pos-mesita-demo-production.up.railway.app/sistema/api/v1";
+  "https://mesita-pos.vercel.app/sistema/api/v1";
 
 export interface PosMesitaDetalle {
   id: string;
@@ -105,7 +105,7 @@ async function posFetch<T>(
     const text = await res.text().catch(() => "");
     if (res.status === 401) {
       throw new Error(
-        `POS Mesita 401: credenciales inválidas. POS_MESITA_API_KEY debe coincidir con API_KEY en Railway (pos-mesita-demo). ${text.slice(0, 120)}`,
+        `POS Mesita 401: credenciales inválidas. POS_MESITA_API_KEY debe coincidir con API_KEY en Vercel (proyecto Mesita-POS). ${text.slice(0, 120)}`,
       );
     }
     throw new Error(`POS Mesita ${res.status}: ${text.slice(0, 200)}`);

@@ -416,7 +416,7 @@ export async function getDemoPosConfigStatus() {
 
   return {
     provider: "mesita-pos-demo",
-    name: "Mesita POS (API Railway)",
+      name: "POS Mesita Demo",
     enabled: settings.posMesita.enabled,
     apiConfigured: true,
     environment: settings.posMesita.environment,

@@ -130,7 +130,7 @@ export function DemoConfiguracionPanel() {
                 <div>
                   <CardTitle>POS Mesita (API)</CardTitle>
                   <CardDescription className="mt-1">
-                    Conectado vía API a Railway — menú, mesas y facturación
+                    Conectado vía API en Vercel — menú, mesas y facturación
                   </CardDescription>
                 </div>
                 {posStatus && (
@@ -148,8 +148,8 @@ export function DemoConfiguracionPanel() {
                 <div className="p-3 rounded-lg text-xs" style={{ background: "rgba(242,169,59,.1)", border: "1px solid rgba(242,169,59,.25)" }}>
                   <p className="text-amber-800 font-medium">{posStatus.error}</p>
                   <p className="text-amber-700 mt-2">
-                    En Vercel → <strong>POS_MESITA_API_KEY</strong> debe ser exactamente la variable{" "}
-                    <strong>API_KEY</strong> de Railway (servicio pos-mesita-demo).
+                    En Vercel (mesitademo) → <strong>POS_MESITA_API_KEY</strong> debe coincidir con{" "}
+                    <strong>API_KEY</strong> del proyecto <strong>Mesita-POS</strong> en Vercel.
                     Clave demo documentada: <code className="font-mono">mesita2024secret</code>
                   </p>
                 </div>
