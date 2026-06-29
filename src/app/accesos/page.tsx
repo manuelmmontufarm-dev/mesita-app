@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ChangelogPreview } from "@/components/changes/ChangelogPreview";
-import { DEMO_TABLE_DEFINITIONS } from "@/lib/demo-table-catalog/definitions";
+import { DemoMesaQrGrid } from "@/components/accesos/DemoMesaQrGrid";
 
 const mesitaBase = "https://mesitademo-two.vercel.app";
 const posBase = "https://mesita-pos.vercel.app";
@@ -39,12 +39,6 @@ const quickLinks: CompactLink[] = [
   { title: "QR demo", href: `${mesitaBase}/pay/demo/qr`, icon: QrCode },
   { title: "GitHub", href: "https://github.com/manuelmmontufarm-dev/mesita-app", icon: Code2 },
 ];
-
-const mesaLinks: CompactLink[] = DEMO_TABLE_DEFINITIONS.map((def) => ({
-  title: `Mesa ${def.table.name}`,
-  href: def.slug === "default" ? `${mesitaBase}/pay/demo` : `${mesitaBase}/pay/demo/${def.slug}`,
-  icon: QrCode,
-}));
 
 const systemNodes = [
   {
@@ -219,17 +213,33 @@ export default function AccesosPage() {
         </section>
 
         <section className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm sm:p-5">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold tracking-tight">QR de mesas demo</h2>
-            <a
-              href="/cambios"
-              className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-900"
-            >
-              <Newspaper className="h-3 w-3" aria-hidden="true" />
-              Bitácora
-            </a>
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold tracking-tight">QR de mesas demo</h2>
+              <p className="mt-0.5 text-[10px] text-black/45">
+                Mismos códigos del PDF · escanea con la cámara del celular
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href={`${mesitaBase}/pay/demo/qr`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-[#fafaf7] px-2.5 py-1 text-[10px] font-semibold text-black/55 hover:border-black/20"
+              >
+                <QrCode className="h-3 w-3" aria-hidden="true" />
+                Poster Mesa 12
+              </a>
+              <a
+                href="/cambios"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-900"
+              >
+                <Newspaper className="h-3 w-3" aria-hidden="true" />
+                Bitácora
+              </a>
+            </div>
           </div>
-          <CompactLinkGrid links={mesaLinks} />
+          <DemoMesaQrGrid />
         </section>
 
         <footer className="mt-8 flex justify-between gap-2 border-t border-black/10 pt-4 text-[10px] text-black/35">
