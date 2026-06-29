@@ -2,13 +2,17 @@ import Link from "next/link";
 import {
   ArrowRight,
   ArrowUpRight,
+  Clock3,
   GitCommitHorizontal,
   Lightbulb,
   Newspaper,
   Sparkles,
 } from "lucide-react";
 import {
+  changelogRevalidateSeconds,
+  formatLastUpdated,
   getDailyChanges,
+  getLastUpdatedFromDays,
   getTodayEntries,
   type ChangeCategory,
 } from "@/lib/changelog";
@@ -37,6 +41,8 @@ export async function ChangelogPreview() {
   const changeCount = days.reduce((total, day) => total + day.entries.length, 0);
   const featuredNote = notes[0];
   const recentEntries = latest?.entries.slice(0, 5) ?? [];
+  const lastUpdatedIso = getLastUpdatedFromDays(days);
+  const lastUpdatedLabel = lastUpdatedIso ? formatLastUpdated(lastUpdatedIso) : null;
 
   return (
     <section
@@ -63,8 +69,14 @@ export async function ChangelogPreview() {
                 </span>
                 Bitácora viva
               </span>
+              {lastUpdatedLabel && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1.5 text-[10px] font-semibold text-white/55">
+                  <Clock3 className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  Última actualización: {lastUpdatedLabel}
+                </span>
+              )}
               <span className="rounded-full bg-white/[0.06] px-3 py-1.5 text-[10px] font-semibold text-white/45">
-                Se actualiza cada deployment
+                Se refresca cada {changelogRevalidateSeconds / 60} min
               </span>
             </div>
 

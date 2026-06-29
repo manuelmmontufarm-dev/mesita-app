@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CheckCircle2,
   CircleDot,
+  Clock3,
   Code2,
   GitCommitHorizontal,
   Lightbulb,
@@ -13,7 +14,10 @@ import {
 } from "lucide-react";
 import {
   changelogRepositoryUrl,
+  changelogRevalidateSeconds,
+  formatLastUpdated,
   getDailyChanges,
+  getLastUpdatedFromDays,
   getTodayEntries,
   type ChangeCategory,
 } from "@/lib/changelog";
@@ -40,6 +44,8 @@ function compactDate(date: string): string {
 export default async function CambiosPage() {
   const [days, notes] = await Promise.all([getDailyChanges(60), getTodayEntries(10)]);
   const changeCount = days.reduce((total, day) => total + day.entries.length, 0);
+  const lastUpdatedIso = getLastUpdatedFromDays(days);
+  const lastUpdatedLabel = lastUpdatedIso ? formatLastUpdated(lastUpdatedIso) : null;
 
   return (
     <main className="min-h-screen bg-[#f5f5f0] text-[#171714]">
@@ -94,9 +100,17 @@ export default async function CambiosPage() {
           </div>
 
           <div className="mt-6 flex flex-col gap-2 border-t border-white/10 pt-5 text-[10px] text-white/40 sm:mt-8 sm:flex-row sm:flex-wrap sm:gap-2 sm:text-[11px]">
+            {lastUpdatedLabel && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 font-medium text-emerald-200/80">
+                <Clock3 className="h-3 w-3 shrink-0" aria-hidden="true" />
+                Última actualización: {lastUpdatedLabel}
+              </span>
+            )}
             <span className="rounded-full bg-white/[0.05] px-3 py-1.5">Fuente automática: commits de GitHub</span>
             <span className="rounded-full bg-white/[0.05] px-3 py-1.5">Contexto editorial: TODAY.md</span>
-            <span className="rounded-full bg-white/[0.05] px-3 py-1.5">Actualización: cada deployment</span>
+            <span className="rounded-full bg-white/[0.05] px-3 py-1.5">
+              Se refresca cada {changelogRevalidateSeconds / 60} min · cada deployment
+            </span>
           </div>
         </header>
 
@@ -218,7 +232,14 @@ export default async function CambiosPage() {
 
         <footer className="mt-16 flex flex-col justify-between gap-3 border-t border-black/10 pt-6 text-xs text-black/40 sm:flex-row">
           <span className="inline-flex items-center gap-2"><Wrench className="h-3.5 w-3.5" /> Mesita · bitácora viva</span>
-          <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5" /> Basado en cambios reales del repositorio</span>
+          {lastUpdatedLabel ? (
+            <span className="inline-flex items-center gap-2">
+              <Clock3 className="h-3.5 w-3.5 shrink-0" />
+              Última actualización: {lastUpdatedLabel}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5" /> Basado en cambios reales del repositorio</span>
+          )}
         </footer>
       </div>
     </main>
