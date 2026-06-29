@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ChangelogPreview } from "@/components/changes/ChangelogPreview";
+import { DEMO_TABLE_DEFINITIONS } from "@/lib/demo-table-catalog/definitions";
 
 const mesitaBase = "https://mesitademo-two.vercel.app";
 const posBase = "https://mesita-pos.vercel.app";
@@ -132,13 +133,6 @@ const groups: AccessGroup[] = [
         icon: QrCode,
       },
       {
-        title: "Mesa 1",
-        description: "Acceso directo al flujo de una mesa demo.",
-        href: `${mesitaBase}/pay/demo/mesa-1`,
-        host: "Vercel",
-        icon: CreditCard,
-      },
-      {
         title: "Bitácora de cambios",
         description: "Qué mejoró cada día, explicado desde GitHub.",
         href: `${mesitaBase}/cambios`,
@@ -163,6 +157,21 @@ const groups: AccessGroup[] = [
     ],
   },
 ];
+
+const mesaQrGroup: AccessGroup = {
+  title: "QR de las mesas demo",
+  description: "Acceso directo al flujo de pago de cada mesa que ya funciona en producción.",
+  links: DEMO_TABLE_DEFINITIONS.map((def) => ({
+    title: `Mesa ${def.table.name}`,
+    description: def.scenarioDescription,
+    href: def.slug === "default" ? `${mesitaBase}/pay/demo` : `${mesitaBase}/pay/demo/${def.slug}`,
+    host: "QR activo",
+    icon: QrCode,
+    featured: def.slug === "default",
+  })),
+};
+
+const linkGroups: AccessGroup[] = [groups[0], mesaQrGroup, groups[1], groups[2]];
 
 const systemNodes = [
   {
@@ -275,6 +284,71 @@ export default function AccesosPage() {
             </p>
           </div>
         </header>
+
+        <div className="mb-14 space-y-14">
+          {linkGroups.map((group) => (
+            <section key={group.title}>
+              <div className="mb-5 flex flex-col justify-between gap-1 sm:flex-row sm:items-end">
+                <h2 className="text-xl font-semibold tracking-tight">{group.title}</h2>
+                <p className="text-sm text-black/50">{group.description}</p>
+              </div>
+
+              <div
+                className={`grid gap-3 ${
+                  group.title === "QR de las mesas demo"
+                    ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+                    : "sm:grid-cols-2 lg:grid-cols-3"
+                }`}
+              >
+                {group.links.map((link) => {
+                  const Icon = link.icon;
+                  return (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`group relative flex min-h-44 flex-col justify-between overflow-hidden rounded-2xl border p-5 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+                        link.featured
+                          ? "border-[#171714] bg-[#171714] text-white shadow-md"
+                          : "border-black/10 bg-white text-[#171714] shadow-sm"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <span
+                          className={`rounded-xl p-2.5 ${
+                            link.featured ? "bg-white/10" : "bg-[#f0f0ea]"
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <ArrowUpRight className="h-5 w-5 opacity-45 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100" />
+                      </div>
+
+                      <div>
+                        <span
+                          className={`mb-2 inline-block text-[10px] font-bold uppercase tracking-[0.16em] ${
+                            link.featured ? "text-white/45" : "text-black/40"
+                          }`}
+                        >
+                          {link.host}
+                        </span>
+                        <h3 className="text-lg font-semibold tracking-tight">{link.title}</h3>
+                        <p
+                          className={`mt-1 text-sm leading-5 ${
+                            link.featured ? "text-white/60" : "text-black/50"
+                          }`}
+                        >
+                          {link.description}
+                        </p>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
 
         <ChangelogPreview />
 
@@ -433,65 +507,6 @@ export default function AccesosPage() {
             ))}
           </div>
         </section>
-
-        <div className="space-y-14">
-          {groups.map((group) => (
-            <section key={group.title}>
-              <div className="mb-5 flex flex-col justify-between gap-1 sm:flex-row sm:items-end">
-                <h2 className="text-xl font-semibold tracking-tight">{group.title}</h2>
-                <p className="text-sm text-black/50">{group.description}</p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {group.links.map((link) => {
-                  const Icon = link.icon;
-                  return (
-                    <a
-                      key={link.href}
-                      href={link.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`group relative flex min-h-44 flex-col justify-between overflow-hidden rounded-2xl border p-5 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
-                        link.featured
-                          ? "border-[#171714] bg-[#171714] text-white shadow-md"
-                          : "border-black/10 bg-white text-[#171714] shadow-sm"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <span
-                          className={`rounded-xl p-2.5 ${
-                            link.featured ? "bg-white/10" : "bg-[#f0f0ea]"
-                          }`}
-                        >
-                          <Icon className="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <ArrowUpRight className="h-5 w-5 opacity-45 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100" />
-                      </div>
-
-                      <div>
-                        <span
-                          className={`mb-2 inline-block text-[10px] font-bold uppercase tracking-[0.16em] ${
-                            link.featured ? "text-white/45" : "text-black/40"
-                          }`}
-                        >
-                          {link.host}
-                        </span>
-                        <h3 className="text-lg font-semibold tracking-tight">{link.title}</h3>
-                        <p
-                          className={`mt-1 text-sm leading-5 ${
-                            link.featured ? "text-white/60" : "text-black/50"
-                          }`}
-                        >
-                          {link.description}
-                        </p>
-                      </div>
-                    </a>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
 
         <footer className="mt-16 flex flex-col justify-between gap-2 border-t border-black/10 pt-6 text-xs text-black/40 sm:flex-row">
           <span>Mesita · accesos de producción</span>
