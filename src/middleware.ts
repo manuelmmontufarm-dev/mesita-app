@@ -162,38 +162,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for dashboard access (/dashboard/*)
+  // Dashboard is temporarily public — auth removed for UI development.
+  // Re-enable the session check here once DB + auth is fully wired.
   if (pathname.startsWith("/dashboard")) {
-    const session = await auth();
-
-    if (!session || !session.user) {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-
-    const userRole = session.user.role;
-
-    // Extract the role prefix from the URL
-    // /dashboard/owner/... -> "owner"
-    // /dashboard/manager/... -> "manager"
-    // /dashboard/server/... -> "server"
-    const pathSegments = pathname.split("/");
-    const urlRole = pathSegments[2]; // Index 2 is the role part
-
-    // Allow /dashboard index — page.tsx handles the redirect
-    if (!urlRole) {
-      return NextResponse.next();
-    }
-
-    // Only the owner dashboard exists
-    if (urlRole !== "owner") {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-
-    // Only OWNER role can access the dashboard
-    if (userRole !== "OWNER") {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-
     return NextResponse.next();
   }
 

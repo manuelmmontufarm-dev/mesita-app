@@ -15,7 +15,10 @@ function timingSafeEqualStr(a: string, b: string): boolean {
 }
 
 /**
- * Authenticate request and extract session
+ * Authenticate request and extract session.
+ * When DEMO_DASHBOARD_RESTAURANT_ID is set the session check is bypassed so
+ * the dashboard API routes work without a login cookie — useful while DB/auth
+ * is being wired up. Remove this env var (or set it to "") to re-enable auth.
  * @returns Object with userId, restaurantId, role or a 401 Response
  */
 export async function requireAuth(): Promise<
@@ -25,6 +28,11 @@ export async function requireAuth(): Promise<
     role: string;
   } | Response
 > {
+  const demoRestaurantId = process.env.DEMO_DASHBOARD_RESTAURANT_ID;
+  if (demoRestaurantId) {
+    return { userId: "demo-user", restaurantId: demoRestaurantId, role: "OWNER" };
+  }
+
   const session = await auth();
 
   if (!session || !session.user) {

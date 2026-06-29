@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-28 — Dashboard público sin auth (modo demo)
+- **Qué:** `src/middleware.ts`, `src/lib/api-utils.ts`.
+- **Por qué:** El dashboard estaba bloqueado por auth; el usuario quiere verlo y trabajar en él en Vercel sin necesitar login.
+- **Qué hace:** Middleware ya no redirige `/dashboard/*` a login. `requireAuth` en las rutas API devuelve el restaurante demo si la env var `DEMO_DASHBOARD_RESTAURANT_ID` está seteada — sin esa var, el comportamiento real de auth no cambia. Para reactivar auth: quitar la var y revertir el bloque del middleware.
+
 ### 2026-06-28 — Coordinación multi-agente: AGENTS.md + HANDOFF.md
 - **Qué:** `AGENTS.md` (nuevo), `HANDOFF.md` (nuevo).
 - **Por qué:** El usuario trabaja con tres AIs en paralelo (Claude Code, Codex, Cursor Agent); hacía falta un sistema de coordinación para que no se pisen entre sí.
