@@ -1,6 +1,7 @@
+import { successResponse } from "@/lib/api-utils";
 import { getDemoTableState } from "@/lib/demo-table-store";
 import { DEMO_TABLE_DEFINITIONS } from "@/lib/demo-table-catalog/definitions";
-import { successResponse } from "@/lib/api-utils";
+import { listAllTables, listInvoices } from "@/lib/demo-pos";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,9 @@ export async function GET(): Promise<Response> {
   const activeTables = states.filter(
     (s) => s && s.guests.some((g) => g.status !== "paid")
   ).length;
-  const totalTables = DEMO_TABLE_DEFINITIONS.length;
+  const allTables = await listAllTables();
+  const totalTables = allTables.length;
+  const invoices = await listInvoices(20);
 
   const hasLiveData = allPayments.length > 0;
   const displayRevenue = hasLiveData ? revenueToday : 4820;
@@ -61,44 +64,30 @@ export async function GET(): Promise<Response> {
   const maxVal = Math.max(...finalBuckets, 1);
   const hourlyActivity = finalBuckets.map((v) => Math.round((v / maxVal) * 100));
 
-  const recentConfirmations = allPayments.slice(0, 5).map((p) => ({
+  const recentConfirmations = (allPayments.length > 0
+    ? allPayments
+    : invoices.map((inv) => ({
+        tableName: inv.tableName,
+        amount: inv.amount,
+        guestName: inv.guestName,
+        createdAt: inv.createdAt,
+      }))
+  ).slice(0, 5).map((p) => ({
     tableName: p.tableName,
     amount: p.amount,
     guestName: p.guestName,
     createdAt: p.createdAt,
   }));
 
-  const tables = states.map((s, i) => {
-    const def = DEMO_TABLE_DEFINITIONS[i];
-    const tableTotal = def.items.reduce(
-      (sum, it) => sum + it.qty * it.unitPrice,
-      0
-    );
-    if (!s)
-      return {
-        id: def.token,
-        name: `Mesa ${def.table.name}`,
-        status: "closed" as const,
-        guestCount: 0,
-        total: tableTotal,
-      };
-    const hasGuests = s.guests.length > 0;
-    const hasPayments = s.payments.length > 0;
-    const allPaid =
-      s.paidItemIds.length >= s.items.length && s.items.length > 0;
-    let status: "open" | "paying" | "closed";
-    if (allPaid) status = "closed";
-    else if (hasPayments) status = "paying";
-    else if (hasGuests) status = "open";
-    else status = "closed";
-    return {
-      id: def.token,
-      name: `Mesa ${def.table.name}`,
-      status,
-      guestCount: s.guests.length,
-      total: tableTotal,
-    };
-  });
+  const tables = allTables.map((t) => ({
+    id: t.id,
+    name: t.name,
+    status: t.status,
+    guestCount: t.guestCount,
+    total: t.total,
+    live: t.live,
+    kind: t.kind,
+  }));
 
   return successResponse(
     {

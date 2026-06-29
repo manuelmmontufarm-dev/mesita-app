@@ -12,6 +12,8 @@ import {
   type DemoGuestStatus,
   type DemoSplitMode,
 } from "@/lib/demo-table-store";
+import { resolveDemoTableToken } from "@/lib/demo-table-catalog";
+import { registerDemoPosInvoice } from "@/lib/demo-pos";
 import { errorResponse, successResponse } from "@/lib/api-utils";
 import { z } from "zod";
 
@@ -116,24 +118,42 @@ export async function POST(
       );
     }
     if (body.action === "pay") {
-      return successResponse(
-        await recordDemoPayment(token, {
-          guestId: body.guestId,
-          guestName: body.guestName,
-          mode: body.mode as DemoSplitMode,
-          amount: body.amount,
-          subtotal: body.subtotal,
-          iva: body.iva,
-          service: body.service,
-          tip: body.tip,
-          itemIds: body.itemIds,
-          itemUnits: body.itemUnits,
-          equalPeople: body.equalPeople,
-          method: body.method,
-          ref: body.ref,
-        }),
-        200
-      );
+      const state = await recordDemoPayment(token, {
+        guestId: body.guestId,
+        guestName: body.guestName,
+        mode: body.mode as DemoSplitMode,
+        amount: body.amount,
+        subtotal: body.subtotal,
+        iva: body.iva,
+        service: body.service,
+        tip: body.tip,
+        itemIds: body.itemIds,
+        itemUnits: body.itemUnits,
+        equalPeople: body.equalPeople,
+        method: body.method,
+        ref: body.ref,
+      });
+
+      const def = resolveDemoTableToken(token);
+      const payment = state.payments[0];
+      if (def && payment) {
+        registerDemoPosInvoice({
+          tableToken: token,
+          tableName: `Mesa ${def.table.name}`,
+          guestName: payment.guestName,
+          amount: payment.amount,
+          subtotal: payment.subtotal,
+          iva: payment.iva,
+          service: payment.service,
+          tip: payment.tip,
+          method: payment.method,
+          ref: payment.ref,
+          mode: payment.mode,
+          createdAt: payment.createdAt,
+        }).catch((err) => console.error("[demo-pos] invoice register failed:", err));
+      }
+
+      return successResponse(state, 200);
     }
 
     return successResponse(await resetDemoTableState(token), 200);

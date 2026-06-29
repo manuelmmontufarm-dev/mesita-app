@@ -78,11 +78,17 @@ export default function LoginPage() {
       <CardContent className="space-y-5">
         <button
           type="button"
-          onClick={() => {
-            if (typeof window !== "undefined") {
-              localStorage.setItem("mesita-demo-mode", "true");
+          onClick={async () => {
+            try {
+              const res = await fetch("/api/demo-auth/enter", { method: "POST" });
+              if (res.ok) {
+                router.push("/dashboard/owner/panel");
+              } else {
+                toast({ title: "Error", description: "No se pudo entrar al demo", variant: "destructive" });
+              }
+            } catch {
+              toast({ title: "Error de conexión", description: "Intenta de nuevo", variant: "destructive" });
             }
-            router.push("/dashboard/owner/panel");
           }}
           className="w-full h-12 rounded-xl text-sm font-semibold transition-opacity hover:opacity-90"
           style={{

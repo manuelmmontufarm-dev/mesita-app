@@ -17,6 +17,8 @@ interface TableRow {
   status: "open" | "paying" | "closed";
   guestCount: number;
   total: number;
+  live?: boolean;
+  kind?: "qr" | "demo" | "custom";
 }
 
 interface DashboardData {
@@ -556,6 +558,11 @@ export function PanelDashboard() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ink-900)" }}>
                         {t.name}
+                        {t.live === false && (
+                          <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 100, background: "rgba(27,25,22,.06)", color: "#6B7280", verticalAlign: "middle" }}>
+                            DEMO
+                          </span>
+                        )}
                       </span>
                       <span style={{
                         fontSize: 10.5,

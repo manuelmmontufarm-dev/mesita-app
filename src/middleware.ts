@@ -116,8 +116,17 @@ export async function middleware(request: NextRequest) {
   }
 
   // Public routes (no auth required)
-  const publicRoutes = ["/login", "/register", "/api/auth/register"];
+  const publicRoutes = ["/login", "/register", "/api/auth/register", "/api/demo-auth/enter"];
   if (pathname === "/" || publicRoutes.some((route) => pathname.startsWith(route))) {
+    return NextResponse.next();
+  }
+
+  // Guest pay + demo table APIs stay public
+  if (
+    pathname.startsWith("/pay/") ||
+    pathname.startsWith("/api/demo/table/") ||
+    pathname.startsWith("/api/guest/")
+  ) {
     return NextResponse.next();
   }
 
@@ -161,9 +170,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Dashboard is temporarily public — auth removed for UI development.
-  // Re-enable the session check here once DB + auth is fully wired.
-  if (pathname.startsWith("/dashboard")) {
+  // Dashboard + demo POS APIs require demo cookie or real session
+  if (pathname.startsWith("/dashboard") || pathname.startsWith("/api/demo-pos") || pathname.startsWith("/api/demo-dashboard")) {
+    const demoCookie = request.cookies.get("mesita-demo-mode")?.value === "1";
+    const sessionToken =
+      request.cookies.get("authjs.session-token")?.value ??
+      request.cookies.get("__Secure-authjs.session-token")?.value;
+
+    if (!demoCookie && !sessionToken) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      }
+      const login = new URL("/login", request.url);
+      login.searchParams.set("next", pathname);
+      return NextResponse.redirect(login);
+    }
     return NextResponse.next();
   }
 
