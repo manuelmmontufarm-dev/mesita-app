@@ -92,7 +92,6 @@ export interface DemoPosReport {
   posOnlyPaid: number;
   paidViaMesita: boolean;
   live: boolean;
-  demo?: boolean;
   posDocumentId: string | null;
   createdAt: string;
   updatedAt: string;

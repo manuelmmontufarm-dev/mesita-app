@@ -34,4 +34,3 @@ build/
 # Playwright test artifacts
 test-results/
 playwright-report/
-.env*

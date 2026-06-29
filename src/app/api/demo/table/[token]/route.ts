@@ -3,7 +3,6 @@ import {
   DemoGuestNotFoundError,
   getDemoTableState,
   joinDemoTable,
-  patchDemoTablePosLinks,
   recordDemoPayment,
   releaseDemoItem,
   renameDemoGuest,
@@ -14,17 +13,8 @@ import {
   type DemoSplitMode,
 } from "@/lib/demo-table-store";
 import { resolveDemoTableToken } from "@/lib/demo-table-catalog";
-import {
-  isDemoPosBillingEnabled,
-  registerDemoPosInvoice,
-  registerDemoPosActivity,
-} from "@/lib/demo-pos";
+import { registerDemoPosInvoice, registerDemoPosActivity } from "@/lib/demo-pos";
 import { registerPaymentInPosMesita } from "@/lib/pos-mesita/client";
-import {
-  isDemoUxTable,
-  syncDemoItemsToPos,
-  syncDemoJoinToPos,
-} from "@/lib/pos-mesita/sync";
 import { errorResponse, successResponse } from "@/lib/api-utils";
 import { z } from "zod";
 
@@ -100,8 +90,6 @@ export async function POST(
     if (!parsed.success) return errorResponse("Invalid demo action", 400);
 
     const body = parsed.data;
-    const billingEnabled = await isDemoPosBillingEnabled();
-
     if (body.action === "join") {
       const before = await getDemoTableState(token).catch(() => null);
       const hadGuests = (before?.guests.length ?? 0) > 0;
@@ -114,17 +102,6 @@ export async function POST(
       if (def) {
         const tableName = `Mesa ${def.table.name}`;
         const isNewGuest = joined.guest.joinedAt === joined.guest.updatedAt;
-
-        if (billingEnabled && isNewGuest && !hadGuests && !isDemoUxTable(def)) {
-          try {
-            const links = await syncDemoJoinToPos(def, joined.state);
-            await patchDemoTablePosLinks(token, links);
-            joined.state = { ...joined.state, ...links };
-          } catch (err) {
-            console.error("[pos-mesita] join sync failed:", err);
-          }
-        }
-
         if (isNewGuest) {
           if (!hadGuests) {
             registerDemoPosActivity({
@@ -156,14 +133,7 @@ export async function POST(
       );
     }
     if (body.action === "claim") {
-      const state = await claimDemoItem(token, body.guestId, body.itemId);
-      const def = resolveDemoTableToken(token);
-      if (def && billingEnabled && !isDemoUxTable(def)) {
-        syncDemoItemsToPos(def, state).catch((err) =>
-          console.error("[pos-mesita] claim sync failed:", err),
-        );
-      }
-      return successResponse(state, 200);
+      return successResponse(await claimDemoItem(token, body.guestId, body.itemId), 200);
     }
     if (body.action === "release") {
       return successResponse(await releaseDemoItem(token, body.guestId, body.itemId), 200);
@@ -193,8 +163,6 @@ export async function POST(
 
       const def = resolveDemoTableToken(token);
       const payment = state.payments[0];
-      let posWarning: string | undefined;
-
       if (def && payment) {
         registerDemoPosInvoice({
           tableToken: token,
@@ -219,40 +187,24 @@ export async function POST(
           amount: payment.amount,
         }).catch(() => {});
 
-        if (billingEnabled) {
-          const posResult = await registerPaymentInPosMesita({
-            tableName: `Mesa ${def.table.name}`,
-            guestName: payment.guestName,
-            amount: payment.amount,
-            ref: payment.ref,
-            method: payment.method,
-            posMesaId: def.posMesaId,
-            posOrdenId: state.posOrdenId,
-            posDocumentoId: state.posDocumentoId,
-            isDemoUx: isDemoUxTable(def),
-            items: body.itemIds
-              .map((itemId) => {
-                const item = def.items.find((i) => i.id === itemId);
-                if (!item) return null;
-                const qty = body.itemUnits?.[itemId] ?? item.qty;
-                return { name: item.name, qty, unitPrice: item.unitPrice };
-              })
-              .filter((x): x is { name: string; qty: number; unitPrice: number } => x !== null),
-          });
-          if (!posResult.ok) {
-            posWarning = posResult.error ?? "No se pudo registrar en POS";
-            console.error("[pos-mesita] sync failed:", posWarning);
-          } else if (posResult.ordenId || posResult.documentoId) {
-            await patchDemoTablePosLinks(token, {
-              posOrdenId: posResult.ordenId ?? state.posOrdenId,
-              posDocumentoId: posResult.documentoId ?? state.posDocumentoId,
-              posMesaId: def.posMesaId,
-            });
-          }
-        }
+        registerPaymentInPosMesita({
+          tableName: `Mesa ${def.table.name}`,
+          guestName: payment.guestName,
+          amount: payment.amount,
+          ref: payment.ref,
+          method: payment.method,
+          items: body.itemIds
+            .map((itemId) => {
+              const item = def.items.find((i) => i.id === itemId);
+              if (!item) return null;
+              const qty = body.itemUnits?.[itemId] ?? item.qty;
+              return { name: item.name, qty, unitPrice: item.unitPrice };
+            })
+            .filter((x): x is { name: string; qty: number; unitPrice: number } => x !== null),
+        }).catch((err) => console.error("[pos-mesita] sync failed:", err));
       }
 
-      return successResponse({ ...state, posWarning }, 200);
+      return successResponse(state, 200);
     }
 
     return successResponse(await resetDemoTableState(token), 200);

@@ -204,7 +204,7 @@ export function extractMesaName(doc: PosMesitaDocumento): string {
   return match?.[0] ?? "POS";
 }
 
-/** Registra un pago del app en el POS Mesita (PRE/orden vinculada). */
+/** Registra un pago del app como FAC + cobro en el POS Mesita. */
 export async function registerPaymentInPosMesita(input: {
   tableName: string;
   guestName: string;
@@ -212,13 +212,60 @@ export async function registerPaymentInPosMesita(input: {
   ref: string;
   method?: string;
   items?: Array<{ name: string; qty: number; unitPrice: number }>;
-  posMesaId?: string;
-  posOrdenId?: string;
-  posDocumentoId?: string;
-  isDemoUx?: boolean;
-}): Promise<{ ok: boolean; documentoId?: string; ordenId?: string; error?: string }> {
-  const { registerPaymentInPosMesita: register } = await import("./sync");
-  return register(input);
+}): Promise<{ ok: boolean; documentoId?: string; error?: string }> {
+  if (!isPosMesitaConfigured()) {
+    return { ok: false, error: "POS_MESITA_API_KEY not configured" };
+  }
+
+  try {
+    const detalles =
+      input.items && input.items.length > 0
+        ? input.items.map((item) => {
+            const line = Math.round(item.qty * item.unitPrice * 100) / 100;
+            return {
+              cantidad: item.qty,
+              precio: item.unitPrice,
+              porcentaje_iva: 15,
+              base_gravable: line,
+              base_cero: 0,
+              base_no_gravable: 0,
+            };
+          })
+        : undefined;
+
+    const subtotalFromItems = detalles
+      ? detalles.reduce((s, d) => s + d.cantidad * d.precio, 0)
+      : input.amount / 1.15;
+    const subtotal15 = Math.round(subtotalFromItems * 100) / 100;
+    const iva = Math.round((input.amount - subtotal15) * 100) / 100;
+
+    const doc = await posFetch<PosMesitaDocumento>("/documento/", {
+      method: "POST",
+      json: {
+        tipo_documento: "FAC",
+        fecha_emision: todayEcPosDate(),
+        descripcion: `Pago MesitaQR — ${input.tableName} — ${input.guestName}`,
+        subtotal_15: subtotal15,
+        iva: iva > 0 ? iva : Math.round(subtotal15 * 0.15 * 100) / 100,
+        total: input.amount,
+        ...(detalles ? { detalles } : {}),
+        cobros: [
+          {
+            forma_cobro: input.method === "EF" ? "EF" : "TC",
+            monto: input.amount,
+            referencia: `MESITAQR:${input.ref}`,
+            procesador: "MesitaQR",
+            detalle: input.guestName,
+          },
+        ],
+      },
+    });
+
+    return { ok: true, documentoId: doc.id };
+  } catch (e) {
+    console.error("[pos-mesita] register payment failed:", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Error" };
+  }
 }
 
 export function cobroViaMesita(
