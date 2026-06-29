@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-28 — Coordinación multi-agente: AGENTS.md + HANDOFF.md
+- **Qué:** `AGENTS.md` (nuevo), `HANDOFF.md` (nuevo).
+- **Por qué:** El usuario trabaja con tres AIs en paralelo (Claude Code, Codex, Cursor Agent); hacía falta un sistema de coordinación para que no se pisen entre sí.
+- **Qué hace:** `AGENTS.md` documenta cada agente activo, su rol, fortalezas y reglas de ownership de archivos. `HANDOFF.md` es el inbox compartido donde cada agente deja el estado de su tarea antes de pasar el turno.
+
 ### 2026-06-24 — Fix build TS en GuestBillFlow
 - **Qué:** `GuestBillFlow.tsx`.
 - **Por qué:** Vercel falló: comparación `stage !== "bill"` redundante tras narrow de TypeScript.
