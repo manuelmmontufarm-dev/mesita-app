@@ -1,6 +1,5 @@
 import {
   ArrowUpRight,
-  BookOpen,
   Code2,
   CreditCard,
   LayoutDashboard,
@@ -14,7 +13,7 @@ import {
 } from "lucide-react";
 
 const mesitaBase = "https://mesitademo-two.vercel.app";
-const posBase = "https://pos-mesita-demo-production.up.railway.app";
+const posBase = "https://mesita-pos.vercel.app";
 
 type AccessLink = {
   title: string;
@@ -39,8 +38,8 @@ const groups: AccessGroup[] = [
       {
         title: "POS Mesita",
         description: "Punto de venta: mesas, órdenes y cobros.",
-        href: posBase,
-        host: "Railway",
+        href: `${posBase}/index.html`,
+        host: "Vercel",
         icon: MonitorSmartphone,
         featured: true,
       },
@@ -127,13 +126,6 @@ const groups: AccessGroup[] = [
         href: `${mesitaBase}/pay/demo/mesa-1`,
         host: "Vercel",
         icon: CreditCard,
-      },
-      {
-        title: "POS API / Swagger",
-        description: "Documentación interactiva de la API del POS.",
-        href: `${posBase}/sistema/api/v1/docs`,
-        host: "Railway",
-        icon: BookOpen,
       },
       {
         title: "Proyecto en Vercel",
