@@ -552,7 +552,10 @@ function docToDocumentSummary(
 ): DemoPosReportDocument {
   const payments: DemoPosReportPayment[] = (doc.cobros ?? []).map((c) => ({
     id: c.id,
-    amount: c.monto,
+    amount:
+      typeof c.monto === "number"
+        ? c.monto
+        : Number.parseFloat(String(c.monto ?? 0)) || 0,
     guestName: c.detalle ?? "Cliente",
     method: c.forma_cobro,
     viaMesita: cobroViaMesita(c),

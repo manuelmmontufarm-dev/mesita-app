@@ -487,10 +487,16 @@ export async function refreshDemoStateFromPos(
   const pulled = await pullPosOrdenIntoDemoState(token, def, current, opts);
   if (!pulled.changed) return current;
 
+  const { buildItemIdMigrationMap, remapDemoItemReferences } = await import(
+    "@/lib/pos-mesita/remap-item-refs"
+  );
+  const idMap = buildItemIdMigrationMap(current.items, pulled.state.items);
+
   return mutateDemoState(token, (draft) => {
     draft.items = pulled.state.items.map((it) => ({ ...it }));
     draft.posOrdenId = pulled.state.posOrdenId ?? draft.posOrdenId;
     draft.posMesaId = def.posMesaId;
+    remapDemoItemReferences(draft, idMap);
   });
 }
 

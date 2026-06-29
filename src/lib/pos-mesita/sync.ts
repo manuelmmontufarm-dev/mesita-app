@@ -162,14 +162,37 @@ export async function finalizePosAfterMesitaPayment(input: {
     }).catch(() => {});
   }
 
-  if (input.tableFullyPaid && input.ordenId) {
-    await posFetch(`/orden/${input.ordenId}/`, {
+  if (input.tableFullyPaid) {
+    await releasePosMesaAfterFullPayment(input.mesaId, input.ordenId);
+  }
+}
+
+/** Close orden + libera mesa so the POS UI returns to the floor plan. */
+export async function releasePosMesaAfterFullPayment(
+  mesaId: string,
+  ordenId?: string,
+): Promise<void> {
+  if (ordenId) {
+    await posFetch(`/orden/${ordenId}/`, {
       method: "PATCH",
       json: { estado: "C" },
     }).catch(() => {});
-    await posFetch(`/mesa/${input.mesaId}/`, {
+  }
+
+  await posFetch(`/mesa/${mesaId}/`, {
+    method: "PATCH",
+    json: { estado: "L" },
+  }).catch(() => {});
+
+  // Some POS builds keep the editor open until the active orden is cleared.
+  const active = ordenId
+    ? null
+    : await findActivePosOrdenForMesa(mesaId).catch(() => null);
+  const closeId = ordenId ?? active?.id;
+  if (closeId) {
+    await posFetch(`/orden/${closeId}/`, {
       method: "PATCH",
-      json: { estado: "L" },
+      json: { estado: "C" },
     }).catch(() => {});
   }
 }
@@ -224,10 +247,14 @@ export async function registerPaymentInPosMesita(input: {
     const subtotal15 = Math.round(subtotalFromItems * 100) / 100;
     const iva = Math.round(subtotal15 * 0.15 * 100) / 100;
     const servicio = 0;
+    const docTotal =
+      input.amount > 0.009
+        ? input.amount
+        : Math.round((subtotal15 + iva + servicio) * 100) / 100;
 
     const cobro = {
       forma_cobro: input.method === "EF" ? "EF" : "TC",
-      monto: input.amount,
+      monto: docTotal,
       referencia: `MESITAQR:${input.ref}`,
       procesador: "MesitaQR",
       detalle: input.guestName,
@@ -243,7 +270,7 @@ export async function registerPaymentInPosMesita(input: {
         subtotal_15: subtotal15,
         iva,
         servicio,
-        total: input.amount,
+        total: docTotal,
         estado: input.tableFullyPaid ? "C" : "P",
         ...(detalles ? { detalles } : {}),
         cobros: [cobro],

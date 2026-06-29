@@ -35,6 +35,27 @@ describe("mergePosDetallesIntoItems", () => {
     expect(items).toHaveLength(0);
   });
 
+  it("keeps emoji when detalle id changes but dish matches", () => {
+    const withPos: DemoFoodItem[] = [
+      {
+        id: "pos-d-1",
+        posDetalleId: "d-1",
+        name: "Humita",
+        note: "",
+        emoji: "🌽",
+        qty: 1,
+        unitPrice: 3.25,
+      },
+    ];
+    const { items } = mergePosDetallesIntoItems(withPos, [
+      { id: "d-2", nombre: "Humita", cantidad: 1, precio: 3.25 },
+    ]);
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe("pos-d-1");
+    expect(items[0].emoji).toBe("🌽");
+    expect(items[0].posDetalleId).toBe("d-2");
+  });
+
   it("keeps paid rows removed from POS", () => {
     const withPos: DemoFoodItem[] = [
       {

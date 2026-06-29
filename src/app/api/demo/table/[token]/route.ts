@@ -26,6 +26,11 @@ import {
   isDemoTableFullyPaid,
   syncDemoJoinToPos,
 } from "@/lib/pos-mesita/sync";
+import {
+  computeServerPayTotals,
+  remapPayItemIds,
+  resolvePayItemIds,
+} from "@/lib/pos-mesita/resolve-pay";
 import { errorResponse, successResponse } from "@/lib/api-utils";
 import { z } from "zod";
 
@@ -173,16 +178,40 @@ export async function POST(
     }
     if (body.action === "pay") {
       const stateBeforePay = await refreshDemoStateFromPos(token, { force: true });
+      const remappedItemIds = remapPayItemIds(
+        stateBeforePay,
+        stateBeforePay,
+        resolvePayItemIds(
+          stateBeforePay,
+          body.guestId,
+          body.mode as DemoSplitMode,
+          body.itemIds,
+        ),
+      );
+      const serverTotals = computeServerPayTotals(
+        stateBeforePay,
+        body.mode as DemoSplitMode,
+        remappedItemIds,
+        body.equalPeople,
+        body.tip,
+      );
+      const amount =
+        body.amount > 0.009 ? body.amount : serverTotals.amount;
+      const subtotal =
+        body.subtotal > 0.009 ? body.subtotal : serverTotals.subtotal;
+
       const state = await recordDemoPayment(token, {
         guestId: body.guestId,
         guestName: body.guestName,
         mode: body.mode as DemoSplitMode,
-        amount: body.amount,
-        subtotal: body.subtotal,
-        iva: body.iva,
-        service: body.service,
+        amount,
+        subtotal,
+        iva: body.iva > 0.009 ? body.iva : serverTotals.iva,
+        service: body.service > 0.009 ? body.service : serverTotals.service,
         tip: body.tip,
-        itemIds: body.itemIds,
+        itemIds: serverTotals.itemIds.length
+          ? serverTotals.itemIds
+          : remappedItemIds,
         itemUnits: body.itemUnits,
         equalPeople: body.equalPeople,
         method: body.method,
@@ -228,7 +257,7 @@ export async function POST(
             posOrdenId: state.posOrdenId ?? stateBeforePay.posOrdenId,
             isDemoUx: isDemoUxTable(def),
             tableFullyPaid: isDemoTableFullyPaid(state),
-            items: body.itemIds
+            items: (serverTotals.itemIds.length ? serverTotals.itemIds : remappedItemIds)
               .map((itemId) => {
                 const item = state.items.find((i) => i.id === itemId);
                 if (!item) return null;
@@ -248,9 +277,22 @@ export async function POST(
             });
           }
         }
+
+        if (
+          billingEnabled &&
+          !isDemoUxTable(def) &&
+          isDemoTableFullyPaid(state)
+        ) {
+          await patchDemoTablePosLinks(token, {
+            posOrdenId: undefined,
+            posDocumentoId: undefined,
+          });
+          await refreshDemoStateFromPos(token, { force: true });
+        }
       }
 
-      return successResponse({ ...state, posWarning }, 200);
+      const finalState = await getDemoTableState(token);
+      return successResponse({ ...finalState, posWarning }, 200);
     }
 
     return successResponse(await resetDemoTableState(token), 200);

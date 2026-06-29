@@ -15,7 +15,8 @@ import {
   type PendingClaimOp,
   type PendingDemoOps,
 } from "@/lib/demo-optimistic-merge";
-import { emojiForItemName, getDemoLobbyFallback } from "@/lib/demo-restaurant";
+import { getDemoLobbyFallback } from "@/lib/demo-restaurant";
+import { emojiForPosDish } from "@/lib/pos-mesita/menu-emoji";
 import type { DemoTableState } from "@/lib/demo-table-store";
 import { shouldApplyDemoVersion } from "@/lib/demo-table-store";
 import { isFreshDocumentNavigation } from "@/lib/navigation-kind";
@@ -118,7 +119,7 @@ function mapDemoItems(raw: DemoTableState): BillItem[] {
     name: it.name,
     qty: it.qty,
     unitPrice: it.unitPrice,
-    emoji: it.emoji || emojiForItemName(it.name),
+    emoji: it.emoji || emojiForPosDish(it.name, it.unitPrice),
   }));
 }
 
