@@ -50,10 +50,8 @@ const RESET_SEQ_KEY = (token: string) => `mesita:demo-reset-seq:${token}`;
 /** Device-scoped (NOT token-scoped) — survives nav/refresh/QR. Idempotency key for join. */
 const DEVICE_ID_KEY = "mesita:device-id";
 
-/** Poll interval: 1000ms with SSE (SYNC_INTERVAL_MS + 300), 700ms without.
- *  Was 500ms → 800ms with SSE. Raised because SSE already pushes version
- *  changes; the poll is only a heal fallback. */
-const SYNC_INTERVAL_MS = 700;
+/** Poll interval: 1s — POS ↔ app sync. */
+const SYNC_INTERVAL_MS = 1_000;
 
 export interface UseDemoTableSessionResult {
   state: TableSessionState | null;
@@ -613,9 +611,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
 
     // Bootstrap once — guarantees a fresh snapshot before SSE handshakes.
     void poll();
-    const heartbeatMs = sseConnected
-      ? SYNC_INTERVAL_MS + 300 // 1000ms — SSE primary, poll is heal-only
-      : SYNC_INTERVAL_MS;       // 700ms — SSE off, full polling fallback
+    const heartbeatMs = SYNC_INTERVAL_MS;
     const interval = setInterval(() => void poll(), heartbeatMs);
     return () => {
       cancelled = true;

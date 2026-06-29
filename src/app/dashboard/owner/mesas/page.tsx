@@ -25,7 +25,7 @@ interface TableRow {
 
 const STATUS = {
   open: { label: "Abierta", bg: "rgba(232,106,51,.13)", color: "#c45a1a" },
-  paying: { label: "Pagando", bg: "rgba(91,107,140,.14)", color: "#4a5a78" },
+  paying: { label: "Pagando con Mesita", bg: "rgba(47,179,126,.14)", color: "#1f6b4c" },
   closed: { label: "Cerrada", bg: "rgba(27,25,22,.08)", color: "#6B7280" },
 };
 
@@ -60,7 +60,7 @@ export default function MesasPage() {
 
   useEffect(() => {
     load();
-    const id = setInterval(load, 10_000);
+    const id = setInterval(load, 3_000);
     return () => clearInterval(id);
   }, [load]);
 

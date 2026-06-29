@@ -4,10 +4,16 @@
 import type { DemoTableDefinition } from "@/lib/demo-table-catalog/definitions";
 import type { DemoFoodItem, DemoTableState } from "@/lib/demo-table-store";
 import {
+  findActivePosOrdenForMesa,
+  getPosOrden,
   isPosMesitaConfigured,
   todayEcPosDate,
   type PosMesitaDocumento,
 } from "./client";
+import { mergePosDetallesIntoItems } from "./merge-from-pos";
+
+const POS_PULL_MIN_MS = 500;
+const lastPosPullAt = new Map<string, number>();
 
 interface OpenOrdenResult {
   orden: { id: string };
@@ -44,27 +50,6 @@ export function isDemoUxTable(def: DemoTableDefinition): boolean {
   return def.token === "demo" || def.table.name === "12";
 }
 
-function buildDetalles(items: DemoFoodItem[]) {
-  return items.map((item) => ({
-    nombre: item.name,
-    cantidad: item.qty,
-    precio: item.unitPrice,
-    porcentaje_iva: 15,
-    base_gravable: Math.round(item.qty * item.unitPrice * 100) / 100,
-    base_cero: 0,
-    base_no_gravable: 0,
-  }));
-}
-
-function totalsFromItems(items: DemoFoodItem[], serviceRate = 0.1, serviceEnabled = true) {
-  const subtotal15 = items.reduce((s, i) => s + i.qty * i.unitPrice, 0);
-  const sub = Math.round(subtotal15 * 100) / 100;
-  const iva = Math.round(sub * 0.15 * 100) / 100;
-  const servicio = serviceEnabled ? Math.round(sub * serviceRate * 100) / 100 : 0;
-  const total = Math.round((sub + iva + servicio) * 100) / 100;
-  return { subtotal_15: sub, iva, servicio, total };
-}
-
 export async function openPosOrden(mesaId: string): Promise<OpenOrdenResult> {
   return posFetch<OpenOrdenResult>("/orden/open/", {
     method: "POST",
@@ -72,72 +57,119 @@ export async function openPosOrden(mesaId: string): Promise<OpenOrdenResult> {
   });
 }
 
+function unpaidItemsForPos(state: DemoTableState): DemoFoodItem[] {
+  return state.items.flatMap((item) => {
+    const paidUnits = state.itemPaidUnits?.[item.id] ?? 0;
+    const fullyPaid =
+      state.paidItemIds.includes(item.id) && paidUnits >= item.qty - 0.001;
+    if (fullyPaid) return [];
+    const remaining = Math.max(0, item.qty - paidUnits);
+    if (remaining <= 0.001) return [];
+    return [{ ...item, qty: remaining }];
+  });
+}
+
+/** Replace POS orden líneas with current unpaid app items (no PRE). */
+export async function reconcilePosOrdenFromApp(
+  ordenId: string,
+  state: DemoTableState,
+): Promise<void> {
+  const orden = await posFetch<{
+    detalles?: Array<{ id: string }>;
+  }>(`/orden/${ordenId}/`);
+
+  const deletes: Promise<unknown>[] = [];
+  for (const d of orden.detalles ?? []) {
+    deletes.push(
+      posFetch(`/orden/${ordenId}/detalle/${d.id}/`, { method: "DELETE" }).catch(
+        () => {},
+      ),
+    );
+  }
+  await Promise.all(deletes);
+
+  const adds = unpaidItemsForPos(state).map((item) =>
+    posFetch(`/orden/${ordenId}/detalle/`, {
+      method: "POST",
+      json: {
+        nombre: item.name,
+        cantidad: item.qty,
+        precio: item.unitPrice,
+        porcentaje_iva: 15,
+      },
+    }).catch(() => {}),
+  );
+  await Promise.all(adds);
+}
+
 export async function syncDemoJoinToPos(
   def: DemoTableDefinition,
-  state: DemoTableState,
+  _state: DemoTableState,
+  _opts: { freshOrden?: boolean } = {},
 ): Promise<Partial<DemoTableState>> {
   if (!isPosMesitaConfigured() || isDemoUxTable(def)) {
     return { posMesaId: def.posMesaId };
   }
-  const opened = await openPosOrden(def.posMesaId);
-  const ordenId = opened.orden.id;
-  const totals = totalsFromItems(
-    state.items,
-    def.restaurant.serviceRate,
-    def.restaurant.serviceEnabled,
-  );
-  const pre = await posFetch<PosMesitaDocumento>("/documento/", {
-    method: "POST",
-    json: {
-      tipo_documento: "PRE",
-      orden_id: ordenId,
-      fecha_emision: todayEcPosDate(),
-      descripcion: `MesitaQR — Mesa ${def.table.name}`,
-      subtotal_15: totals.subtotal_15,
-      iva: totals.iva,
-      servicio: totals.servicio,
-      total: totals.total,
-      detalles: buildDetalles(state.items),
-    },
-  });
-  for (const item of state.items) {
-    await posFetch(`/orden/${ordenId}/detalle/`, {
-      method: "POST",
-      json: {
-        nombre: item.name,
-        cantidad: item.qty,
-        precio: item.unitPrice,
-        porcentaje_iva: 15,
-      },
-    }).catch(() => {});
+
+  // POS is source of truth — link to the active orden or open an empty one.
+  // Never push catalog seed items into the POS precuenta.
+  let orden = await findActivePosOrdenForMesa(def.posMesaId).catch(() => null);
+  let ordenId = orden?.id;
+
+  if (!ordenId) {
+    const opened = await openPosOrden(def.posMesaId);
+    ordenId = opened.orden.id;
   }
+
   return {
     posMesaId: def.posMesaId,
     posOrdenId: ordenId,
-    posDocumentoId: pre.id,
+    posDocumentoId: undefined,
   };
 }
 
 export async function syncDemoItemsToPos(
-  def: DemoTableDefinition,
-  state: DemoTableState,
+  _def: DemoTableDefinition,
+  _state: DemoTableState,
 ): Promise<void> {
-  if (!isPosMesitaConfigured() || isDemoUxTable(def) || !state.posOrdenId) return;
-  const ordenId = state.posOrdenId;
-  const orden = await posFetch<{ detalles?: Array<{ id: string; nombre: string }> }>(
-    `/orden/${ordenId}/`,
+  // POS is source of truth — app pulls orden; no push on claim.
+}
+
+export function isDemoTableFullyPaid(state: DemoTableState): boolean {
+  const billSub = state.items.reduce((s, it) => s + it.qty * it.unitPrice, 0);
+  const paidSub = state.payments.reduce((s, p) => s + p.subtotal, 0);
+  if (state.items.length === 0) return false;
+  return (
+    state.items.every((it) => state.paidItemIds.includes(it.id)) ||
+    paidSub >= billSub - 0.02
   );
-  const existing = new Set((orden.detalles ?? []).map((d) => d.nombre));
-  for (const item of state.items) {
-    if (existing.has(item.name)) continue;
-    await posFetch(`/orden/${ordenId}/detalle/`, {
-      method: "POST",
+}
+
+export async function finalizePosAfterMesitaPayment(input: {
+  mesaId: string;
+  ordenId?: string;
+  documentoId?: string;
+  tableFullyPaid: boolean;
+  guestName: string;
+  amount: number;
+}): Promise<void> {
+  if (input.documentoId) {
+    await posFetch(`/documento/${input.documentoId}/`, {
+      method: "PATCH",
       json: {
-        nombre: item.name,
-        cantidad: item.qty,
-        precio: item.unitPrice,
-        porcentaje_iva: 15,
+        estado: input.tableFullyPaid ? "C" : "P",
       },
+    }).catch(() => {});
+  }
+
+  if (input.tableFullyPaid && input.ordenId) {
+    await posFetch(`/orden/${input.ordenId}/`, {
+      method: "PATCH",
+      json: { estado: "C" },
+    }).catch(() => {});
+    await posFetch(`/mesa/${input.mesaId}/`, {
+      method: "PATCH",
+      json: { estado: "L" },
     }).catch(() => {});
   }
 }
@@ -153,6 +185,7 @@ export async function registerPaymentInPosMesita(input: {
   posOrdenId?: string;
   posDocumentoId?: string;
   isDemoUx?: boolean;
+  tableFullyPaid?: boolean;
 }): Promise<{
   ok: boolean;
   documentoId?: string;
@@ -165,18 +198,17 @@ export async function registerPaymentInPosMesita(input: {
 
   try {
     let ordenId = input.posOrdenId;
-    let documentoId = input.posDocumentoId;
 
-    if (input.posMesaId) {
-      if (!ordenId) {
-        const opened = await openPosOrden(input.posMesaId);
-        ordenId = opened.orden.id;
-      }
+    if (input.posMesaId && !ordenId) {
+      const opened = await openPosOrden(input.posMesaId);
+      ordenId = opened.orden.id;
     }
 
+    const payItems = input.items ?? [];
     const detalles =
-      input.items && input.items.length > 0
-        ? input.items.map((item) => ({
+      payItems.length > 0
+        ? payItems.map((item) => ({
+            nombre: item.name,
             cantidad: item.qty,
             precio: item.unitPrice,
             porcentaje_iva: 15,
@@ -190,7 +222,8 @@ export async function registerPaymentInPosMesita(input: {
       ? detalles.reduce((s, d) => s + d.cantidad * d.precio, 0)
       : input.amount / 1.15;
     const subtotal15 = Math.round(subtotalFromItems * 100) / 100;
-    const iva = Math.round((input.amount - subtotal15) * 100) / 100;
+    const iva = Math.round(subtotal15 * 0.15 * 100) / 100;
+    const servicio = 0;
 
     const cobro = {
       forma_cobro: input.method === "EF" ? "EF" : "TC",
@@ -200,27 +233,37 @@ export async function registerPaymentInPosMesita(input: {
       detalle: input.guestName,
     };
 
-    if (documentoId) {
-      await posFetch(`/documento/${documentoId}/`, {
-        method: "PATCH",
-        json: { cobro },
-      });
-      return { ok: true, documentoId, ordenId };
-    }
-
     const doc = await posFetch<PosMesitaDocumento>("/documento/", {
       method: "POST",
       json: {
-        tipo_documento: input.isDemoUx ? "FAC" : "PRE",
+        tipo_documento: input.tableFullyPaid ? "FAC" : input.isDemoUx ? "FAC" : "PRE",
         orden_id: ordenId ?? undefined,
         fecha_emision: todayEcPosDate(),
         descripcion: `Pago MesitaQR — ${input.tableName} — ${input.guestName}`,
         subtotal_15: subtotal15,
-        iva: iva > 0 ? iva : Math.round(subtotal15 * 0.15 * 100) / 100,
+        iva,
+        servicio,
         total: input.amount,
+        estado: input.tableFullyPaid ? "C" : "P",
         ...(detalles ? { detalles } : {}),
         cobros: [cobro],
       },
+    });
+
+    if (input.posMesaId) {
+      await posFetch(`/mesa/${input.posMesaId}/`, {
+        method: "PATCH",
+        json: { estado: input.tableFullyPaid ? "L" : "P" },
+      }).catch(() => {});
+    }
+
+    await finalizePosAfterMesitaPayment({
+      mesaId: input.posMesaId ?? "",
+      ordenId,
+      documentoId: doc.id,
+      tableFullyPaid: Boolean(input.tableFullyPaid),
+      guestName: input.guestName,
+      amount: input.amount,
     });
 
     return { ok: true, documentoId: doc.id, ordenId };
@@ -238,4 +281,83 @@ export async function resetDemoPosMesa(_def: DemoTableDefinition, state: DemoTab
       json: { estado: "C" },
     });
   } catch (_) { /* ignore */ }
+}
+
+function shouldPullPosNow(token: string, force: boolean): boolean {
+  if (force) return true;
+  const now = Date.now();
+  const last = lastPosPullAt.get(token) ?? 0;
+  if (now - last < POS_PULL_MIN_MS) return false;
+  lastPosPullAt.set(token, now);
+  return true;
+}
+
+/**
+ * Pull active POS orden líneas into demo Redis state (mesas 1–4 only).
+ */
+export async function pullPosOrdenIntoDemoState(
+  token: string,
+  def: DemoTableDefinition,
+  state: DemoTableState,
+  opts: { force?: boolean } = {},
+): Promise<{ state: DemoTableState; changed: boolean; posOrdenId?: string }> {
+  if (isDemoUxTable(def) || !isPosMesitaConfigured()) {
+    return { state, changed: false };
+  }
+  if (!shouldPullPosNow(token, Boolean(opts.force))) {
+    return { state, changed: false };
+  }
+
+  let ordenId = state.posOrdenId;
+  let orden = ordenId ? await getPosOrden(ordenId).catch(() => null) : null;
+
+  if (!orden) {
+    orden = await findActivePosOrdenForMesa(def.posMesaId).catch(() => null);
+    ordenId = orden?.id;
+  }
+
+  if (!orden || !ordenId) {
+    const merged = mergePosDetallesIntoItems(state.items, [], {
+      paidItemIds: state.paidItemIds,
+      itemPaidUnits: state.itemPaidUnits,
+    });
+    const cleared =
+      merged.changed ||
+      state.posOrdenId != null ||
+      state.items.some((it) => !state.paidItemIds.includes(it.id));
+    if (!cleared) return { state, changed: false };
+
+    return {
+      state: {
+        ...state,
+        items: merged.items,
+        posOrdenId: undefined,
+        posMesaId: def.posMesaId,
+      },
+      changed: true,
+    };
+  }
+
+  const detalles = (orden.detalles ?? []).filter((d) => d.nombre);
+  const merged = mergePosDetallesIntoItems(state.items, detalles, {
+    paidItemIds: state.paidItemIds,
+    itemPaidUnits: state.itemPaidUnits,
+  });
+
+  const linksChanged =
+    state.posOrdenId !== ordenId ||
+    state.posMesaId !== def.posMesaId;
+
+  if (!merged.changed && !linksChanged) {
+    return { state, changed: false, posOrdenId: ordenId };
+  }
+
+  const next: DemoTableState = {
+    ...state,
+    items: merged.items,
+    posOrdenId: ordenId,
+    posMesaId: def.posMesaId,
+  };
+
+  return { state: next, changed: true, posOrdenId: ordenId };
 }

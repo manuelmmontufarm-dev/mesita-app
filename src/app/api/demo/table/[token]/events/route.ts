@@ -1,4 +1,4 @@
-import { getDemoTableState } from "@/lib/demo-table-store";
+import { getDemoTableState, refreshDemoStateFromPos } from "@/lib/demo-table-store";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -14,6 +14,7 @@ export async function GET(
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = async () => {
+        await refreshDemoStateFromPos(token).catch(() => {});
         const state = await getDemoTableState(token);
         if (state.version === lastVersion) return;
         lastVersion = state.version;

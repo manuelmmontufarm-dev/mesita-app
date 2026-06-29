@@ -135,12 +135,13 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function isPosMirroredTable(def: ReturnType<typeof resolveDemoTableToken>): boolean {
+  if (!def) return false;
+  return def.token !== "demo" && def.table.name !== "12";
+}
+
 function createState(token: string): DemoTableState {
   const ts = nowIso();
-  // Tokens that match the catalog (`demo`, `demo-mesa-N`) get their declared
-  // restaurant/menu/seed. Anything else (test harness tokens like `rigor-…`,
-  // legacy ad-hoc tokens) falls back to the default catalog entry so state
-  // shape stays useful.
   const def =
     resolveDemoTableToken(token) ?? resolveDemoTableToken("demo");
   const restaurant = def?.restaurant ?? {
@@ -152,10 +153,14 @@ function createState(token: string): DemoTableState {
     serviceEnabled: true,
   };
   const tableName = def?.table.name ?? "12";
-  const items = def?.items
-    ? def.items.map((it) => ({ ...it }))
-    : [];
-  const seed = def?.seed;
+  const mirrorPos =
+    isPosMirroredTable(def) && Boolean(process.env.POS_MESITA_API_KEY?.trim());
+  const items = mirrorPos
+    ? []
+    : def?.items
+      ? def.items.map((it) => ({ ...it }))
+      : [];
+  const seed = mirrorPos ? undefined : def?.seed;
   return {
     token,
     restaurant: { ...restaurant },
@@ -453,6 +458,40 @@ export async function joinDemoTable(
 
   if (!resolvedGuest) throw new Error("joinDemoTable: guest not resolved");
   return { state, guest: resolvedGuest };
+}
+
+export async function patchDemoTablePosLinks(
+  token: string,
+  links: Partial<Pick<DemoTableState, "posOrdenId" | "posDocumentoId" | "posMesaId">>,
+): Promise<DemoTableState> {
+  return mutateDemoState(token, (draft) => {
+    Object.assign(draft, links);
+  });
+}
+
+export async function refreshDemoStateFromPos(
+  token: string,
+  opts: { force?: boolean } = {},
+): Promise<DemoTableState> {
+  const def = resolveDemoTableToken(token);
+  if (!def) return getDemoTableState(token);
+
+  const { isDemoUxTable, pullPosOrdenIntoDemoState } = await import("@/lib/pos-mesita/sync");
+  const { isPosMesitaConfigured } = await import("@/lib/pos-mesita/client");
+
+  if (isDemoUxTable(def) || !isPosMesitaConfigured()) {
+    return getDemoTableState(token);
+  }
+
+  const current = await getDemoTableState(token);
+  const pulled = await pullPosOrdenIntoDemoState(token, def, current, opts);
+  if (!pulled.changed) return current;
+
+  return mutateDemoState(token, (draft) => {
+    draft.items = pulled.state.items.map((it) => ({ ...it }));
+    draft.posOrdenId = pulled.state.posOrdenId ?? draft.posOrdenId;
+    draft.posMesaId = def.posMesaId;
+  });
 }
 
 export async function renameDemoGuest(

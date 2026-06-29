@@ -1,15 +1,17 @@
 import { successResponse } from "@/lib/api-utils";
-import { getDemoTableState } from "@/lib/demo-table-store";
+import { getDemoTableState, refreshDemoStateFromPos } from "@/lib/demo-table-store";
 import { DEMO_TABLE_DEFINITIONS } from "@/lib/demo-table-catalog/definitions";
-import { listAllTables, listInvoices } from "@/lib/demo-pos";
+import { listActivities, listAllTables, listInvoices } from "@/lib/demo-pos";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
   const states = await Promise.all(
     DEMO_TABLE_DEFINITIONS.map((d) =>
-      getDemoTableState(d.token).catch(() => null)
-    )
+      refreshDemoStateFromPos(d.token).catch(() =>
+        getDemoTableState(d.token).catch(() => null),
+      ),
+    ),
   );
 
   // today's payments across all tables
@@ -82,6 +84,15 @@ export async function GET(): Promise<Response> {
     createdAt: p.createdAt,
   }));
 
+  const recentGuestJoins = (await listActivities(8))
+    .filter((a) => a.type === "guest_joined")
+    .slice(0, 5)
+    .map((a) => ({
+      tableName: a.tableName,
+      guestName: a.guestName,
+      createdAt: a.createdAt,
+    }));
+
   const tables = visibleTables.map((t) => ({
     id: t.id,
     name: t.name,
@@ -105,6 +116,7 @@ export async function GET(): Promise<Response> {
       },
       hourlyActivity,
       recentConfirmations,
+      recentGuestJoins,
       tables,
       demoMode: true,
     },

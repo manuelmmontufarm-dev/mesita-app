@@ -119,13 +119,6 @@ export const DEMO_TABLE_DEFINITIONS: DemoTableDefinition[] = [
     table: { name: "2" },
     posMesaId: "mesa-02",
     items: MESA_2_ITEMS,
-    seed: {
-      paidItemIds: ["fritada"],
-      itemPaidUnits: {
-        fritada: 1,
-        empanada: 1,
-      },
-    },
     scenarioDescription:
       "Pagos parciales — prueba % progreso y gracias parcial sin cerrar mesa.",
     operatorNotes: [

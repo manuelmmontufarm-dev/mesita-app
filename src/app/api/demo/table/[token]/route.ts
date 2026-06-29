@@ -3,7 +3,9 @@ import {
   DemoGuestNotFoundError,
   getDemoTableState,
   joinDemoTable,
+  patchDemoTablePosLinks,
   recordDemoPayment,
+  refreshDemoStateFromPos,
   releaseDemoItem,
   renameDemoGuest,
   resetDemoTableState,
@@ -13,8 +15,17 @@ import {
   type DemoSplitMode,
 } from "@/lib/demo-table-store";
 import { resolveDemoTableToken } from "@/lib/demo-table-catalog";
-import { registerDemoPosInvoice, registerDemoPosActivity } from "@/lib/demo-pos";
+import {
+  isDemoPosBillingEnabled,
+  registerDemoPosInvoice,
+  registerDemoPosActivity,
+} from "@/lib/demo-pos";
 import { registerPaymentInPosMesita } from "@/lib/pos-mesita/client";
+import {
+  isDemoUxTable,
+  isDemoTableFullyPaid,
+  syncDemoJoinToPos,
+} from "@/lib/pos-mesita/sync";
 import { errorResponse, successResponse } from "@/lib/api-utils";
 import { z } from "zod";
 
@@ -76,7 +87,8 @@ export async function GET(
   context: { params: Promise<{ token: string }> }
 ): Promise<Response> {
   const { token } = await context.params;
-  return successResponse(await getDemoTableState(token), 200);
+  const state = await refreshDemoStateFromPos(token);
+  return successResponse(state, 200);
 }
 
 export async function POST(
@@ -90,6 +102,8 @@ export async function POST(
     if (!parsed.success) return errorResponse("Invalid demo action", 400);
 
     const body = parsed.data;
+    const billingEnabled = await isDemoPosBillingEnabled();
+
     if (body.action === "join") {
       const before = await getDemoTableState(token).catch(() => null);
       const hadGuests = (before?.guests.length ?? 0) > 0;
@@ -102,6 +116,16 @@ export async function POST(
       if (def) {
         const tableName = `Mesa ${def.table.name}`;
         const isNewGuest = joined.guest.joinedAt === joined.guest.updatedAt;
+
+        if (billingEnabled && isNewGuest && !hadGuests && !isDemoUxTable(def)) {
+          try {
+            const links = await syncDemoJoinToPos(def, joined.state);
+            await patchDemoTablePosLinks(token, links);
+          } catch (err) {
+            console.error("[pos-mesita] join sync failed:", err);
+          }
+        }
+
         if (isNewGuest) {
           if (!hadGuests) {
             registerDemoPosActivity({
@@ -121,7 +145,8 @@ export async function POST(
         }
       }
 
-      return successResponse(joined, 200);
+      const refreshed = await refreshDemoStateFromPos(token, { force: true });
+      return successResponse({ ...joined, state: refreshed }, 200);
     }
     if (body.action === "rename") {
       return successResponse(await renameDemoGuest(token, body.guestId, body.name), 200);
@@ -133,7 +158,9 @@ export async function POST(
       );
     }
     if (body.action === "claim") {
-      return successResponse(await claimDemoItem(token, body.guestId, body.itemId), 200);
+      await claimDemoItem(token, body.guestId, body.itemId);
+      const state = await refreshDemoStateFromPos(token, { force: true });
+      return successResponse(state, 200);
     }
     if (body.action === "release") {
       return successResponse(await releaseDemoItem(token, body.guestId, body.itemId), 200);
@@ -145,6 +172,7 @@ export async function POST(
       );
     }
     if (body.action === "pay") {
+      const stateBeforePay = await refreshDemoStateFromPos(token, { force: true });
       const state = await recordDemoPayment(token, {
         guestId: body.guestId,
         guestName: body.guestName,
@@ -163,6 +191,8 @@ export async function POST(
 
       const def = resolveDemoTableToken(token);
       const payment = state.payments[0];
+      let posWarning: string | undefined;
+
       if (def && payment) {
         registerDemoPosInvoice({
           tableToken: token,
@@ -187,24 +217,40 @@ export async function POST(
           amount: payment.amount,
         }).catch(() => {});
 
-        registerPaymentInPosMesita({
-          tableName: `Mesa ${def.table.name}`,
-          guestName: payment.guestName,
-          amount: payment.amount,
-          ref: payment.ref,
-          method: payment.method,
-          items: body.itemIds
-            .map((itemId) => {
-              const item = def.items.find((i) => i.id === itemId);
-              if (!item) return null;
-              const qty = body.itemUnits?.[itemId] ?? item.qty;
-              return { name: item.name, qty, unitPrice: item.unitPrice };
-            })
-            .filter((x): x is { name: string; qty: number; unitPrice: number } => x !== null),
-        }).catch((err) => console.error("[pos-mesita] sync failed:", err));
+        if (billingEnabled) {
+          const posResult = await registerPaymentInPosMesita({
+            tableName: `Mesa ${def.table.name}`,
+            guestName: payment.guestName,
+            amount: payment.amount,
+            ref: payment.ref,
+            method: payment.method,
+            posMesaId: def.posMesaId,
+            posOrdenId: state.posOrdenId ?? stateBeforePay.posOrdenId,
+            isDemoUx: isDemoUxTable(def),
+            tableFullyPaid: isDemoTableFullyPaid(state),
+            items: body.itemIds
+              .map((itemId) => {
+                const item = state.items.find((i) => i.id === itemId);
+                if (!item) return null;
+                const qty = body.itemUnits?.[itemId] ?? item.qty;
+                return { name: item.name, qty, unitPrice: item.unitPrice };
+              })
+              .filter((x): x is { name: string; qty: number; unitPrice: number } => x !== null),
+          });
+          if (!posResult.ok) {
+            posWarning = posResult.error ?? "No se pudo registrar en POS";
+            console.error("[pos-mesita] sync failed:", posWarning);
+          } else if (posResult.ordenId) {
+            await patchDemoTablePosLinks(token, {
+              posOrdenId: posResult.ordenId ?? state.posOrdenId,
+              posDocumentoId: posResult.documentoId,
+              posMesaId: def.posMesaId,
+            });
+          }
+        }
       }
 
-      return successResponse(state, 200);
+      return successResponse({ ...state, posWarning }, 200);
     }
 
     return successResponse(await resetDemoTableState(token), 200);

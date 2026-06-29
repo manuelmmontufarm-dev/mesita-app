@@ -49,6 +49,23 @@ export interface PosMesitaProducto {
   precio: number;
 }
 
+export interface PosMesitaOrdenDetalle {
+  id: string;
+  nombre: string;
+  cantidad: number;
+  precio: number;
+  productoId?: string | null;
+  producto_id?: string | null;
+}
+
+export interface PosMesitaOrden {
+  id: string;
+  mesaId?: string;
+  mesa_id?: string;
+  estado: string;
+  detalles?: PosMesitaOrdenDetalle[];
+}
+
 function baseUrl(): string {
   return (process.env.POS_MESITA_API_URL ?? DEFAULT_BASE).replace(/\/$/, "");
 }
@@ -183,6 +200,38 @@ export async function listPosProductos(): Promise<PosMesitaProducto[]> {
   return data.results ?? [];
 }
 
+function normalizeOrdenDetalle(d: PosMesitaOrdenDetalle) {
+  return {
+    id: d.id,
+    nombre: d.nombre,
+    cantidad: typeof d.cantidad === "number" ? d.cantidad : Number(d.cantidad),
+    precio: typeof d.precio === "number" ? d.precio : Number(d.precio),
+    productoId: d.productoId ?? d.producto_id ?? null,
+  };
+}
+
+export async function getPosOrden(ordenId: string): Promise<PosMesitaOrden> {
+  const raw = await posFetch<PosMesitaOrden>(`/orden/${ordenId}/`);
+  return {
+    ...raw,
+    detalles: (raw.detalles ?? []).map(normalizeOrdenDetalle),
+  };
+}
+
+export async function findActivePosOrdenForMesa(
+  mesaId: string,
+): Promise<PosMesitaOrden | null> {
+  const data = await posFetch<{ results: PosMesitaOrden[] }>(
+    `/orden/?mesa_id=${encodeURIComponent(mesaId)}&estado=A&result_size=1`,
+  );
+  const orden = data.results?.[0];
+  if (!orden) return null;
+  return {
+    ...orden,
+    detalles: (orden.detalles ?? []).map(normalizeOrdenDetalle),
+  };
+}
+
 export function todayEcPosDate(): string {
   return new Date().toLocaleDateString("es-EC", {
     day: "2-digit",
@@ -204,7 +253,7 @@ export function extractMesaName(doc: PosMesitaDocumento): string {
   return match?.[0] ?? "POS";
 }
 
-/** Registra un pago del app como FAC + cobro en el POS Mesita. */
+/** Registra un pago del app en el POS Mesita (PRE/orden vinculada). */
 export async function registerPaymentInPosMesita(input: {
   tableName: string;
   guestName: string;
@@ -212,60 +261,14 @@ export async function registerPaymentInPosMesita(input: {
   ref: string;
   method?: string;
   items?: Array<{ name: string; qty: number; unitPrice: number }>;
-}): Promise<{ ok: boolean; documentoId?: string; error?: string }> {
-  if (!isPosMesitaConfigured()) {
-    return { ok: false, error: "POS_MESITA_API_KEY not configured" };
-  }
-
-  try {
-    const detalles =
-      input.items && input.items.length > 0
-        ? input.items.map((item) => {
-            const line = Math.round(item.qty * item.unitPrice * 100) / 100;
-            return {
-              cantidad: item.qty,
-              precio: item.unitPrice,
-              porcentaje_iva: 15,
-              base_gravable: line,
-              base_cero: 0,
-              base_no_gravable: 0,
-            };
-          })
-        : undefined;
-
-    const subtotalFromItems = detalles
-      ? detalles.reduce((s, d) => s + d.cantidad * d.precio, 0)
-      : input.amount / 1.15;
-    const subtotal15 = Math.round(subtotalFromItems * 100) / 100;
-    const iva = Math.round((input.amount - subtotal15) * 100) / 100;
-
-    const doc = await posFetch<PosMesitaDocumento>("/documento/", {
-      method: "POST",
-      json: {
-        tipo_documento: "FAC",
-        fecha_emision: todayEcPosDate(),
-        descripcion: `Pago MesitaQR — ${input.tableName} — ${input.guestName}`,
-        subtotal_15: subtotal15,
-        iva: iva > 0 ? iva : Math.round(subtotal15 * 0.15 * 100) / 100,
-        total: input.amount,
-        ...(detalles ? { detalles } : {}),
-        cobros: [
-          {
-            forma_cobro: input.method === "EF" ? "EF" : "TC",
-            monto: input.amount,
-            referencia: `MESITAQR:${input.ref}`,
-            procesador: "MesitaQR",
-            detalle: input.guestName,
-          },
-        ],
-      },
-    });
-
-    return { ok: true, documentoId: doc.id };
-  } catch (e) {
-    console.error("[pos-mesita] register payment failed:", e);
-    return { ok: false, error: e instanceof Error ? e.message : "Error" };
-  }
+  posMesaId?: string;
+  posOrdenId?: string;
+  posDocumentoId?: string;
+  isDemoUx?: boolean;
+  tableFullyPaid?: boolean;
+}): Promise<{ ok: boolean; documentoId?: string; ordenId?: string; error?: string }> {
+  const { registerPaymentInPosMesita: register } = await import("./sync");
+  return register(input);
 }
 
 export function cobroViaMesita(

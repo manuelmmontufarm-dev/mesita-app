@@ -33,12 +33,13 @@ interface DashboardData {
   };
   hourlyActivity: number[];
   recentConfirmations: Confirmation[];
+  recentGuestJoins?: Array<{ tableName: string; guestName?: string; createdAt: string }>;
   tables: TableRow[];
   demoMode?: boolean;
 }
 
 const STATUS = {
-  paying: { label: "Pagando", bg: "rgba(91,107,140,.14)", color: "#4a5a78" },
+  paying: { label: "Pagando con Mesita", bg: "rgba(47,179,126,.14)", color: "#1f6b4c" },
   open:   { label: "Abierta", bg: "rgba(232,106,51,.13)", color: "#c45a1a" },
   closed: { label: "Cerrada", bg: "rgba(27,25,22,.08)",   color: "#6B7280" },
 } as const;
@@ -105,11 +106,23 @@ function KpiCard({ label, value, dark }: { label: string; value: string; dark?: 
 
 interface ToastProps {
   tableName: string;
-  amount: number;
+  amount?: number;
   onDismiss: () => void;
 }
 
-function PaymentToast({ tableName, amount, onDismiss }: ToastProps) {
+function PaymentToast({
+  tableName,
+  amount,
+  guestName,
+  kind,
+  onDismiss,
+}: ToastProps & { kind: "payment" | "guest"; guestName?: string }) {
+  const title =
+    kind === "guest"
+      ? `${guestName ?? "Alguien"} entró a ${tableName}`
+      : `${tableName} pagó · ${formatCurrency(amount ?? 0)}`;
+  const subtitle =
+    kind === "guest" ? "Pagando con Mesita" : "Pago confirmado";
   return (
     <div
       style={{
@@ -146,10 +159,10 @@ function PaymentToast({ tableName, amount, onDismiss }: ToastProps) {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13.5, fontWeight: 600, color: "#F5F4F2", marginBottom: 3 }}>
-          {tableName} pagó · {formatCurrency(amount)}
+          {title}
         </div>
         <div style={{ fontSize: 12, color: "#9CA3AF" }}>
-          Lista para liberar
+          {subtitle}
         </div>
       </div>
       <button
@@ -183,11 +196,17 @@ export function PanelDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
   const [staleAsOf, setStaleAsOf] = useState<Date | null>(null);
-  const [toast, setToast] = useState<{ tableName: string; amount: number } | null>(null);
+  const [toast, setToast] = useState<{
+    kind: "payment" | "guest";
+    tableName: string;
+    amount?: number;
+    guestName?: string;
+  } | null>(null);
 
   const lastGoodAtRef = useRef<Date | null>(null);
   const mountedRef = useRef(true);
   const lastPaymentKeyRef = useRef<string | null>(null);
+  const lastGuestKeyRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -202,9 +221,26 @@ export function PanelDashboard() {
         if (newest) {
           const key = `${newest.createdAt ?? ""}-${newest.amount}-${newest.tableName}`;
           if (lastPaymentKeyRef.current && key !== lastPaymentKeyRef.current) {
-            setToast({ tableName: newest.tableName, amount: newest.amount });
+            setToast({
+              kind: "payment",
+              tableName: newest.tableName,
+              amount: newest.amount,
+            });
           }
           lastPaymentKeyRef.current = key;
+        }
+
+        const newestGuest = incoming.recentGuestJoins?.[0];
+        if (newestGuest) {
+          const gkey = `${newestGuest.createdAt ?? ""}-${newestGuest.tableName}-${newestGuest.guestName ?? ""}`;
+          if (lastGuestKeyRef.current && gkey !== lastGuestKeyRef.current) {
+            setToast({
+              kind: "guest",
+              tableName: newestGuest.tableName,
+              guestName: newestGuest.guestName,
+            });
+          }
+          lastGuestKeyRef.current = gkey;
         }
 
         setData(incoming);
@@ -227,7 +263,7 @@ export function PanelDashboard() {
   useEffect(() => {
     mountedRef.current = true;
     load();
-    const id = setInterval(load, 8_000);
+    const id = setInterval(load, 1_000);
     return () => { mountedRef.current = false; clearInterval(id); };
   }, [load]);
 
@@ -349,8 +385,10 @@ export function PanelDashboard() {
       {/* Toast notification */}
       {toast && (
         <PaymentToast
+          kind={toast.kind}
           tableName={toast.tableName}
           amount={toast.amount}
+          guestName={toast.guestName}
           onDismiss={() => setToast(null)}
         />
       )}

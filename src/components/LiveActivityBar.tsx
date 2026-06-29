@@ -18,7 +18,7 @@ function activityMessage(a: Activity): string {
     return `${a.tableName} se abrió · ${a.guestCount ?? 1} comensal${(a.guestCount ?? 1) !== 1 ? "es" : ""}`;
   }
   if (a.type === "guest_joined") {
-    return `${a.guestName ?? "Alguien"} entró a ${a.tableName} · ${a.guestCount ?? "?"} en la mesa`;
+    return `${a.guestName ?? "Alguien"} entró a ${a.tableName} · pagando con Mesita`;
   }
   return `${a.tableName} · pago ${formatCurrency(a.amount ?? 0)}`;
 }
@@ -59,7 +59,7 @@ export function LiveActivityBar() {
 
   useEffect(() => {
     load();
-    const id = setInterval(load, 5_000);
+    const id = setInterval(load, 3_000);
     return () => clearInterval(id);
   }, [load]);
 

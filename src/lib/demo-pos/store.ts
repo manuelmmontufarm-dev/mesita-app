@@ -4,7 +4,7 @@ import { DEMO_TABLE_DEFINITIONS } from "@/lib/demo-table-catalog/definitions";
 import {
   computeDemoDisplayAmount,
 } from "@/lib/demo-bill-math";
-import { getDemoTableState } from "@/lib/demo-table-store";
+import { getDemoTableState, refreshDemoStateFromPos } from "@/lib/demo-table-store";
 import { DEMO_BASE_URL } from "@/lib/demo-url";
 import {
   checkPosMesitaHealth,
@@ -131,6 +131,11 @@ async function mutateConfig(
   return writeConfig(draft);
 }
 
+export async function isDemoPosBillingEnabled(): Promise<boolean> {
+  const c = await readConfig();
+  return Boolean(c.settings?.posMesita?.enabled && c.settings?.posMesita?.syncBilling);
+}
+
 export function demoPayUrl(slug: string): string {
   const base = DEMO_BASE_URL;
   return slug === "default" ? `${base}/pay/demo` : `${base}/pay/demo/${slug}`;
@@ -142,7 +147,7 @@ export function listQrTables(): DemoPosQrTable[] {
     token: def.token,
     name: `Mesa ${def.table.name}`,
     payUrl: demoPayUrl(def.slug),
-    posExternalId: `T-${def.table.name.padStart(3, "0")}`,
+    posExternalId: def.posMesaId,
     live: true as const,
     scenarioDescription: def.scenarioDescription,
   }));
@@ -154,8 +159,7 @@ function tableStatus(
   allPaid: boolean,
 ): "open" | "paying" | "closed" {
   if (allPaid) return "closed";
-  if (hasPayments) return "paying";
-  if (hasGuests) return "open";
+  if (hasGuests || hasPayments) return "paying";
   return "closed";
 }
 
@@ -165,8 +169,14 @@ export async function listAllTables(): Promise<DemoPosTableRow[]> {
     DEMO_TABLE_DEFINITIONS.map(async (def, i) => {
       const qr = listQrTables()[i];
       const restaurant = def.restaurant;
-      const state = await getDemoTableState(def.token).catch(() => null);
-      const amounts = computeDemoDisplayAmount(def.items, restaurant, state);
+      const state = await refreshDemoStateFromPos(def.token).catch(() =>
+        getDemoTableState(def.token).catch(() => null),
+      );
+      const amounts = computeDemoDisplayAmount(
+        state?.items ?? [],
+        state?.restaurant ?? restaurant,
+        state,
+      );
 
       if (!state) {
         return {
@@ -672,14 +682,17 @@ export async function getReports(opts?: {
   const liveReports: DemoPosReport[] = await Promise.all(
     DEMO_TABLE_DEFINITIONS.map(async (def) => {
       const tableName = `Mesa ${def.table.name}`;
-      const state = await getDemoTableState(def.token).catch(() => null);
+      const state = await refreshDemoStateFromPos(def.token).catch(() =>
+        getDemoTableState(def.token).catch(() => null),
+      );
+      const items = state?.items ?? [];
       const { billTotal, paidAmount } = computeDemoDisplayAmount(
-        def.items,
+        items,
         def.restaurant,
         state,
       );
 
-      const liveConsumptions: DemoPosReportConsumption[] = def.items.map((item) => ({
+      const liveConsumptions: DemoPosReportConsumption[] = items.map((item) => ({
         id: `live-${item.id}`,
         name: item.name,
         qty: item.qty,
