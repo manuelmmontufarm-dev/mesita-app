@@ -185,86 +185,195 @@ export async function generateQRPdf(
 }
 
 /**
- * Multi-page A4 PDF — one page per demo table definition.
- * Header → QR → URL → scenario → items → operator notes (bottom).
+ * Multi-page A4 PDF — one page per demo table.
+ * Branded "La Doña Pepa" design: dark-green header, cream background,
+ * large QR, two-column menu, orange accents.
  */
 export async function generateDemoTableQrPdfPack(
   definitions: DemoTableDefinition[],
 ): Promise<Buffer> {
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
+  const W = pdf.internal.pageSize.getWidth();   // 210 mm
+  const H = pdf.internal.pageSize.getHeight();  // 297 mm
+
+  // Brand palette
+  const C = {
+    greenDark:   "#14794B",
+    greenAccent: "#2fb37e",
+    orange:      "#E86A33",
+    cream:       "#FFFDF9",
+    ink:         "#1B1714",
+    muted:       "#6B7280",
+    border:      "#E7DDD2",
+    white:       "#FFFFFF",
+  } as const;
+
+  // Convert hex to [r,g,b] tuple for jsPDF set*Color calls
+  function rgb(hex: string): [number, number, number] {
+    return [
+      parseInt(hex.slice(1, 3), 16),
+      parseInt(hex.slice(3, 5), 16),
+      parseInt(hex.slice(5, 7), 16),
+    ];
+  }
 
   for (let i = 0; i < definitions.length; i++) {
     if (i > 0) pdf.addPage();
     const def = definitions[i];
     const url = buildDemoPayUrl(def.token);
+    const total = def.items.reduce((s, it) => s + it.qty * it.unitPrice, 0);
 
-    // Header
+    // ── CREAM BACKGROUND ────────────────────────────────────────────────────
+    pdf.setFillColor(...rgb(C.cream));
+    pdf.rect(0, 0, W, H, "F");
+
+    // ── HEADER BAND ─────────────────────────────────────────────────────────
+    const headerH = 56;
+    pdf.setFillColor(...rgb(C.greenDark));
+    pdf.rect(0, 0, W, headerH, "F");
+
+    // Thin orange stripe at bottom of header
+    pdf.setFillColor(...rgb(C.orange));
+    pdf.rect(0, headerH - 2, W, 2, "F");
+
+    // Restaurant name
+    pdf.setTextColor(...rgb(C.white));
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(16);
-    pdf.text(def.restaurant.name, pageWidth / 2, 18, { align: "center" });
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(12);
-    pdf.text(`Mesa ${def.table.name}`, pageWidth / 2, 26, { align: "center" });
+    pdf.setFontSize(26);
+    pdf.text(def.restaurant.name, W / 2, 22, { align: "center" });
 
-    // QR
+    // Tagline
+    pdf.setTextColor(180, 230, 200);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10.5);
+    pdf.text(def.restaurant.tagline, W / 2, 31, { align: "center" });
+
+    // Mesa badge — orange pill
+    const badgeLabel = `MESA  ${def.table.name}`;
+    const badgeW = 36;
+    const badgeH = 10;
+    const badgeX = (W - badgeW) / 2;
+    const badgeY = 38;
+    pdf.setFillColor(...rgb(C.orange));
+    pdf.roundedRect(badgeX, badgeY, badgeW, badgeH, 4, 4, "F");
+    pdf.setTextColor(...rgb(C.white));
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(13);
+    pdf.text(badgeLabel, W / 2, badgeY + 7, { align: "center" });
+
+    // ── QR CODE ─────────────────────────────────────────────────────────────
     const qrDataUrl = await QRCode.toDataURL(url, {
-      width: 720,
-      margin: 2,
+      width: 800,
+      margin: 1,
       errorCorrectionLevel: "H",
-      color: { dark: QR_BRAND.dark, light: QR_BRAND.light },
+      color: { dark: C.greenDark, light: C.cream },
     });
-    const qrSize = 100;
-    const qrX = (pageWidth - qrSize) / 2;
-    const qrY = 34;
+
+    const qrSize = 90;
+    const qrX = (W - qrSize) / 2;
+    const qrY = headerH + 8;
+
+    // White card behind QR
+    pdf.setFillColor(...rgb(C.white));
+    pdf.setDrawColor(...rgb(C.border));
+    pdf.setLineWidth(0.4);
+    pdf.roundedRect(qrX - 6, qrY - 6, qrSize + 12, qrSize + 12, 5, 5, "FD");
+
     pdf.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
 
-    // URL (mono-ish)
-    pdf.setFont("courier", "normal");
-    pdf.setFontSize(10);
-    pdf.text(url, pageWidth / 2, qrY + qrSize + 8, { align: "center" });
+    // ── SCAN CTA ────────────────────────────────────────────────────────────
+    const afterQrY = qrY + qrSize + 14;
+    pdf.setTextColor(...rgb(C.ink));
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(15);
+    pdf.text("Escanea para pagar", W / 2, afterQrY, { align: "center" });
 
-    // Scenario
-    pdf.setFont("helvetica", "italic");
-    pdf.setFontSize(10);
-    const scenarioY = qrY + qrSize + 16;
-    const wrappedScenario = pdf.splitTextToSize(
-      def.scenarioDescription,
-      pageWidth - 30,
-    );
-    pdf.text(wrappedScenario, pageWidth / 2, scenarioY, { align: "center" });
-
-    // Items
+    // Instruction subtitle
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(9);
-    let cursorY = scenarioY + 6 + wrappedScenario.length * 4;
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Menú", 20, cursorY);
-    cursorY += 5;
-    pdf.setFont("helvetica", "normal");
-    for (const item of def.items) {
-      const line = `${item.qty} × ${item.name} — $${item.unitPrice.toFixed(2)}`;
-      pdf.text(line, 22, cursorY);
-      cursorY += 4.5;
-    }
+    pdf.setTextColor(...rgb(C.muted));
+    pdf.text("Abre la cámara de tu celular y apunta al código", W / 2, afterQrY + 6, { align: "center" });
 
-    // Operator notes (bottom)
-    if (def.operatorNotes.length > 0) {
-      pdf.setFont("helvetica", "italic");
-      pdf.setFontSize(9);
-      let notesY = pageHeight - 18 - def.operatorNotes.length * 4.5;
-      if (notesY < cursorY + 6) notesY = cursorY + 6;
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Notas para operador:", 20, notesY);
-      notesY += 4.5;
-      pdf.setFont("helvetica", "italic");
-      for (const note of def.operatorNotes) {
-        const wrapped = pdf.splitTextToSize(`• ${note}`, pageWidth - 40);
-        pdf.text(wrapped, 22, notesY);
-        notesY += wrapped.length * 4.5;
-      }
-    }
+    // URL
+    pdf.setFont("courier", "normal");
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(...rgb(C.orange));
+    pdf.text(url, W / 2, afterQrY + 13, { align: "center" });
+
+    // ── DIVIDER ─────────────────────────────────────────────────────────────
+    const divY = afterQrY + 19;
+    pdf.setDrawColor(...rgb(C.border));
+    pdf.setLineWidth(0.4);
+    pdf.line(16, divY, W - 16, divY);
+
+    // ── MENU ITEMS (two columns) ─────────────────────────────────────────────
+    const menuStartY = divY + 9;
+    pdf.setTextColor(...rgb(C.greenDark));
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9.5);
+    pdf.text("Lo que está en la mesa", 16, menuStartY - 3);
+
+    const col1X = 16;
+    const col2X = W / 2 + 4;
+    const colW = W / 2 - 20;
+    const rowH = 6;
+
+    def.items.forEach((item, idx) => {
+      const col = idx % 2;
+      const row = Math.floor(idx / 2);
+      const x = col === 0 ? col1X : col2X;
+      const y = menuStartY + row * rowH;
+
+      const name = `${item.emoji}  ${item.qty > 1 ? `${item.qty}× ` : ""}${item.name}`;
+      const price = `$${(item.qty * item.unitPrice).toFixed(2)}`;
+      const priceX = col === 0 ? col2X - 4 : W - 16;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(...rgb(C.ink));
+      pdf.text(name, x, y, { maxWidth: colW });
+
+      pdf.setTextColor(...rgb(C.muted));
+      pdf.text(price, priceX, y, { align: "right" });
+    });
+
+    const rows = Math.ceil(def.items.length / 2);
+    const totalRowY = menuStartY + rows * rowH + 5;
+
+    // Total row
+    pdf.setDrawColor(...rgb(C.border));
+    pdf.setLineWidth(0.3);
+    pdf.line(16, totalRowY - 3, W - 16, totalRowY - 3);
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9.5);
+    pdf.setTextColor(...rgb(C.greenDark));
+    pdf.text("Total de la mesa", 16, totalRowY + 2);
+    pdf.setFontSize(11);
+    pdf.text(`$${total.toFixed(2)}`, W - 16, totalRowY + 2, { align: "right" });
+
+    // ── FOOTER ──────────────────────────────────────────────────────────────
+    const footerH = 14;
+    const footerY = H - footerH;
+    pdf.setFillColor(...rgb(C.greenDark));
+    pdf.rect(0, footerY, W, footerH, "F");
+
+    // Left: MesitaQR
+    pdf.setTextColor(...rgb(C.white));
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9);
+    pdf.text("MesitaQR", 16, footerY + 9);
+
+    // Center: website
+    pdf.setTextColor(180, 230, 200);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+    pdf.text("mesitaqr.com", W / 2, footerY + 9, { align: "center" });
+
+    // Right: tagline
+    pdf.setTextColor(180, 230, 200);
+    pdf.setFontSize(7.5);
+    pdf.text("Paga desde tu celular, sin hacer fila", W - 16, footerY + 9, { align: "right" });
   }
 
   return Buffer.from(pdf.output("arraybuffer"));

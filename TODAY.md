@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-28 — PDF QR pack rediseñado (La Doña Pepa branded)
+- **Qué:** `src/lib/qr-utils.ts` (`generateDemoTableQrPdfPack`), `docs/demo-qr-pack/demo-tables-qr.pdf`, `docs/demo-qr-pack/manifest.json`.
+- **Por qué:** El PDF anterior era texto plano sin branding. El usuario quería algo bonito con identidad de La Doña Pepa.
+- **Qué hace:** Rediseño completo — fondo crema, banda header verde oscuro, franja naranja, badge de mesa, QR en tarjeta blanca, menú en dos columnas con emojis y precios, total y footer con MesitaQR. URLs apuntan a `mesitademo-two.vercel.app`. 5 páginas (Mesa 12, 1, 2, 3, 4).
+
 ### 2026-06-28 — Fix login: redirect directo al panel + errores claros
 - **Qué:** `src/app/dashboard/page.tsx`, `src/app/(auth)/login/page.tsx`.
 - **Por qué:** Al hacer login, `/dashboard` chequeaba la sesión y mandaba de vuelta a `/login` si fallaba — loop infinito. El error de credenciales incorrectas y el de servidor caían en el mismo mensaje genérico.
