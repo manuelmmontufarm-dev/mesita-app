@@ -186,3 +186,26 @@ export async function getTodayEntries(limit = 8): Promise<TodayEntry[]> {
 }
 
 export const changelogRepositoryUrl = `https://github.com/${GITHUB_REPO}/commits/main`;
+export const changelogRevalidateSeconds = 900;
+
+export function getLastUpdatedFromDays(days: DailyChanges[]): string | null {
+  let latest: string | null = null;
+  for (const day of days) {
+    for (const entry of day.entries) {
+      if (!latest || entry.committedAt > latest) latest = entry.committedAt;
+    }
+  }
+  return latest;
+}
+
+export function formatLastUpdated(iso: string): string {
+  return new Intl.DateTimeFormat("es-EC", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: ECUADOR_TIME_ZONE,
+  }).format(new Date(iso));
+}

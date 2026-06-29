@@ -1,17 +1,12 @@
 import {
-  Activity,
   ArrowDown,
   ArrowUpRight,
-  CheckCircle2,
-  Clock3,
   Code2,
   CreditCard,
-  Database,
   LayoutDashboard,
   MonitorSmartphone,
   Newspaper,
   QrCode,
-  ReceiptText,
   RefreshCw,
   ScanLine,
   Server,
@@ -22,267 +17,125 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ChangelogPreview } from "@/components/changes/ChangelogPreview";
+import { DEMO_TABLE_DEFINITIONS } from "@/lib/demo-table-catalog/definitions";
 
 const mesitaBase = "https://mesitademo-two.vercel.app";
 const posBase = "https://mesita-pos.vercel.app";
 
-type AccessLink = {
+type CompactLink = {
   title: string;
-  description: string;
   href: string;
-  host: string;
   icon: LucideIcon;
-  featured?: boolean;
 };
 
-type AccessGroup = {
-  title: string;
-  description: string;
-  links: AccessLink[];
-};
-
-const groups: AccessGroup[] = [
-  {
-    title: "Abrir rápido",
-    description: "Las tres pantallas principales del ecosistema Mesita.",
-    links: [
-      {
-        title: "POS Mesita",
-        description: "Punto de venta: mesas, órdenes y cobros.",
-        href: `${posBase}/index.html`,
-        host: "Vercel",
-        icon: MonitorSmartphone,
-        featured: true,
-      },
-      {
-        title: "App del cliente",
-        description: "Experiencia de pago con QR en modo demo.",
-        href: `${mesitaBase}/pay/demo`,
-        host: "Vercel",
-        icon: CreditCard,
-        featured: true,
-      },
-      {
-        title: "Dashboard del dueño",
-        description: "Resumen operativo y métricas del restaurante.",
-        href: `${mesitaBase}/dashboard/owner/panel`,
-        host: "Vercel",
-        icon: LayoutDashboard,
-        featured: true,
-      },
-    ],
-  },
-  {
-    title: "Operación del restaurante",
-    description: "Accesos directos a las secciones administrativas.",
-    links: [
-      {
-        title: "Mesas",
-        description: "Estado y configuración de mesas.",
-        href: `${mesitaBase}/dashboard/owner/mesas`,
-        host: "Vercel",
-        icon: Store,
-      },
-      {
-        title: "Menú",
-        description: "Categorías, platos y precios.",
-        href: `${mesitaBase}/dashboard/owner/menu`,
-        host: "Vercel",
-        icon: UtensilsCrossed,
-      },
-      {
-        title: "Personal",
-        description: "Equipo y accesos del restaurante.",
-        href: `${mesitaBase}/dashboard/owner/personal`,
-        host: "Vercel",
-        icon: Users,
-      },
-      {
-        title: "Configuración",
-        description: "Integraciones y ajustes generales.",
-        href: `${mesitaBase}/dashboard/owner/configuracion`,
-        host: "Vercel",
-        icon: Settings,
-      },
-      {
-        title: "Restaurante",
-        description: "Información del establecimiento.",
-        href: `${mesitaBase}/dashboard/owner/restaurant`,
-        host: "Vercel",
-        icon: Store,
-      },
-      {
-        title: "Reembolsos",
-        description: "Consulta y gestión de devoluciones.",
-        href: `${mesitaBase}/dashboard/owner/reembolsos`,
-        host: "Vercel",
-        icon: CreditCard,
-      },
-    ],
-  },
-  {
-    title: "Demo y herramientas",
-    description: "Links útiles para pruebas, QR y desarrollo.",
-    links: [
-      {
-        title: "QR de la demo",
-        description: "Página para abrir o imprimir el QR.",
-        href: `${mesitaBase}/pay/demo/qr`,
-        host: "Vercel",
-        icon: QrCode,
-      },
-      {
-        title: "Mesa 1",
-        description: "Acceso directo al flujo de una mesa demo.",
-        href: `${mesitaBase}/pay/demo/mesa-1`,
-        host: "Vercel",
-        icon: CreditCard,
-      },
-      {
-        title: "Bitácora de cambios",
-        description: "Qué mejoró cada día, explicado desde GitHub.",
-        href: `${mesitaBase}/cambios`,
-        host: "Mesita",
-        icon: Newspaper,
-      },
-      {
-        title: "Proyecto en Vercel",
-        description: "Deployments, logs y configuración del proyecto.",
-        href: "https://vercel.com/manuel-montufar-s-projects/mesitademo",
-        host: "Vercel",
-        icon: LayoutDashboard,
-      },
-      {
-        title: "Código en GitHub",
-        description: "Repositorio principal de Mesita.",
-        href: "https://github.com/manuelmmontufarm-dev/mesita-app",
-        host: "GitHub",
-        icon: Code2,
-      },
-    ],
-  },
+const quickLinks: CompactLink[] = [
+  { title: "POS Mesita", href: `${posBase}/index.html`, icon: MonitorSmartphone },
+  { title: "App cliente", href: `${mesitaBase}/pay/demo`, icon: CreditCard },
+  { title: "Dashboard", href: `${mesitaBase}/dashboard/owner/panel`, icon: LayoutDashboard },
+  { title: "Mesas", href: `${mesitaBase}/dashboard/owner/mesas`, icon: Store },
+  { title: "Menú", href: `${mesitaBase}/dashboard/owner/menu`, icon: UtensilsCrossed },
+  { title: "Personal", href: `${mesitaBase}/dashboard/owner/personal`, icon: Users },
+  { title: "Configuración", href: `${mesitaBase}/dashboard/owner/configuracion`, icon: Settings },
+  { title: "QR demo", href: `${mesitaBase}/pay/demo/qr`, icon: QrCode },
+  { title: "GitHub", href: "https://github.com/manuelmmontufarm-dev/mesita-app", icon: Code2 },
 ];
+
+const mesaLinks: CompactLink[] = DEMO_TABLE_DEFINITIONS.map((def) => ({
+  title: `Mesa ${def.table.name}`,
+  href: def.slug === "default" ? `${mesitaBase}/pay/demo` : `${mesitaBase}/pay/demo/${def.slug}`,
+  icon: QrCode,
+}));
 
 const systemNodes = [
   {
     eyebrow: "Operación",
     title: "POS Mesita",
-    description: "El mesero administra mesas y órdenes. El POS conserva los documentos fiscales y cobros.",
+    description: "Mesas, órdenes y cobros.",
     href: `${posBase}/index.html`,
     icon: MonitorSmartphone,
-    cardClass: "border-violet-300/20 bg-violet-400/10",
+    cardClass: "border-violet-300/30 bg-violet-400/10 hover:border-violet-300/50 hover:bg-violet-400/15",
     iconClass: "bg-violet-300/15 text-violet-200",
     badgeClass: "text-violet-200/60",
   },
   {
     eyebrow: "Orquestación",
     title: "Motor Mesita",
-    description: "La API conecta la mesa, los comensales, el pago y el POS sin exponer credenciales al cliente.",
+    description: "API entre mesa, cliente y POS.",
     href: `${mesitaBase}/dashboard/owner/configuracion`,
     icon: Server,
-    cardClass: "border-emerald-300/25 bg-emerald-400/10",
+    cardClass: "border-emerald-300/30 bg-emerald-400/10 hover:border-emerald-300/50 hover:bg-emerald-400/15",
     iconClass: "bg-emerald-300/15 text-emerald-200",
     badgeClass: "text-emerald-200/60",
   },
   {
     eyebrow: "Experiencia",
     title: "App QR del cliente",
-    description: "Cada persona abre la cuenta, elige qué pagar, divide consumos, agrega propina y confirma.",
+    description: "Pago, división y propina por persona.",
     href: `${mesitaBase}/pay/demo`,
     icon: ScanLine,
-    cardClass: "border-orange-300/20 bg-orange-400/10",
+    cardClass: "border-orange-300/30 bg-orange-400/10 hover:border-orange-300/50 hover:bg-orange-400/15",
     iconClass: "bg-orange-300/15 text-orange-200",
     badgeClass: "text-orange-200/60",
   },
 ] as const;
 
-const paymentSteps = [
-  {
-    title: "El cliente paga",
-    description: "Mesita valida el monto, los ítems seleccionados y el estado compartido de la mesa.",
-    icon: CreditCard,
-  },
-  {
-    title: "Se registra el evento",
-    description: "La actividad y el avance de la cuenta quedan disponibles para los otros comensales.",
-    icon: Activity,
-  },
-  {
-    title: "El POS recibe el cobro",
-    description: "La integración crea el documento y registra la referencia del pago Mesita.",
-    icon: ReceiptText,
-  },
-  {
-    title: "El dueño ve el resultado",
-    description: "Dashboard, mesas y reportes reflejan el pago sin volver a digitarlo.",
-    icon: CheckCircle2,
-  },
-];
-
-const syncCadence = [
-  {
-    value: "Inmediato",
-    title: "Mesa compartida",
-    description: "Selecciones, personas y pagos se guardan al confirmar cada acción.",
-  },
-  {
-    value: "Cada 5 s",
-    title: "Actividad en vivo",
-    description: "El dashboard busca nuevas entradas, aperturas de mesa y pagos.",
-  },
-  {
-    value: "Cada 10 s",
-    title: "Estado de mesas",
-    description: "La vista de operación refresca ocupación, total y estado de cobro.",
-  },
-  {
-    value: "Cada 12 s",
-    title: "Documentos del POS",
-    description: "Reportes y reembolsos consultan facturas y cobros sincronizados.",
-  },
-];
+function CompactLinkGrid({ links }: { links: CompactLink[] }) {
+  return (
+    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5">
+      {links.map((link) => {
+        const Icon = link.icon;
+        return (
+          <a
+            key={link.href}
+            href={link.href}
+            target="_blank"
+            rel="noreferrer"
+            className="group flex items-center gap-2 rounded-xl border border-black/8 bg-white px-3 py-2.5 text-sm font-medium shadow-sm transition active:scale-[0.98] hover:border-black/15 hover:shadow-md"
+          >
+            <Icon className="h-4 w-4 shrink-0 text-black/40 group-hover:text-black/70" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate">{link.title}</span>
+            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-black/25 group-hover:text-black/60" aria-hidden="true" />
+          </a>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function AccesosPage() {
   return (
     <main className="min-h-screen bg-[#f5f5f0] text-[#171714]">
-      <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-16">
-        <header className="mb-12 border-b border-black/10 pb-10">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-black/60 shadow-sm">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Central de accesos
-          </div>
-          <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-end">
-            <div>
-              <p className="mb-2 text-sm font-medium text-black/50">Mesita</p>
-              <h1 className="max-w-3xl text-4xl font-semibold leading-[1.05] tracking-[-0.04em] sm:text-6xl">
-                Todo el restaurante,
-                <br />
-                sin buscar mil links.
-              </h1>
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        <header className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55 shadow-sm">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Central de accesos
             </div>
-            <p className="max-w-sm text-sm leading-6 text-black/55 md:text-right">
-              Enlaces canónicos de producción. Los accesos abren en una pestaña nueva para que esta página siempre quede disponible.
-            </p>
+            <h1 className="text-2xl font-semibold tracking-[-0.03em] sm:text-3xl">Mesita · demo en vivo</h1>
           </div>
+          <p className="max-w-xs text-xs leading-5 text-black/45 sm:text-right">
+            Toca cualquier tarjeta para abrir. Esta página queda aquí.
+          </p>
         </header>
 
-        <section className="mb-16 overflow-hidden rounded-[2rem] bg-[#171714] px-5 py-7 text-white shadow-xl sm:px-8 sm:py-10">
-          <div className="mb-8 flex flex-col justify-between gap-4 border-b border-white/10 pb-7 sm:flex-row sm:items-end">
+        {/* 1 — Ecosistema */}
+        <section className="mb-6 overflow-hidden rounded-[1.5rem] bg-[#171714] px-4 py-5 text-white shadow-xl sm:mb-8 sm:rounded-[1.75rem] sm:px-6 sm:py-7">
+          <div className="mb-5 flex flex-col justify-between gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-end">
             <div>
-              <div className="mb-3 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-emerald-300/70">
-                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+              <div className="mb-2 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-300/70">
+                <RefreshCw className="h-3 w-3" aria-hidden="true" />
                 Un solo ecosistema
               </div>
-              <h2 className="max-w-2xl text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
-                Así se conecta todo
-              </h2>
+              <h2 className="text-2xl font-semibold tracking-[-0.03em] sm:text-3xl">Así se conecta todo</h2>
+              <p className="mt-1.5 text-xs text-emerald-300/80 sm:text-sm">↓ Toca una tarjeta para abrirla</p>
             </div>
-            <p className="max-w-md text-sm leading-6 text-white/50 sm:text-right">
-              Ninguna pantalla trabaja aislada. Mesita mueve la información entre operación, cliente y administración.
+            <p className="max-w-xs text-xs leading-5 text-white/45 sm:text-right">
+              Operación, cliente y administración comparten el mismo estado.
             </p>
           </div>
 
-          <div className="grid items-stretch gap-3 lg:grid-cols-[1fr_auto_1.08fr_auto_1fr]">
+          <div className="grid items-stretch gap-2.5 lg:grid-cols-[1fr_auto_1.08fr_auto_1fr]">
             {systemNodes.map((node, index) => {
               const Icon = node.icon;
               return (
@@ -291,30 +144,33 @@ export default function AccesosPage() {
                     href={node.href}
                     target="_blank"
                     rel="noreferrer"
-                    className={`group flex min-h-56 flex-col justify-between rounded-2xl border p-5 transition hover:-translate-y-0.5 hover:bg-white/[0.08] ${node.cardClass}`}
+                    className={`group flex cursor-pointer flex-col justify-between rounded-xl border-2 p-4 shadow-sm transition duration-150 active:scale-[0.98] sm:p-4 ${node.cardClass}`}
                   >
-                    <div className="flex items-start justify-between">
-                      <span className={`rounded-xl p-2.5 ${node.iconClass}`}>
-                        <Icon className="h-5 w-5" aria-hidden="true" />
+                    <div className="flex items-start justify-between gap-2">
+                      <span className={`rounded-lg p-2 ${node.iconClass}`}>
+                        <Icon className="h-4 w-4" aria-hidden="true" />
                       </span>
-                      <ArrowUpRight className="h-4 w-4 text-white/25 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white" />
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/70 transition group-hover:bg-white/20 group-hover:text-white">
+                        Abrir
+                        <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+                      </span>
                     </div>
-                    <div>
-                      <p className={`mb-2 text-[10px] font-bold uppercase tracking-[0.16em] ${node.badgeClass}`}>
+                    <div className="mt-4">
+                      <p className={`mb-1 text-[9px] font-bold uppercase tracking-[0.14em] ${node.badgeClass}`}>
                         {node.eyebrow}
                       </p>
-                      <h3 className="text-xl font-semibold tracking-tight">{node.title}</h3>
-                      <p className="mt-2 text-sm leading-5 text-white/50">{node.description}</p>
+                      <h3 className="text-base font-semibold tracking-tight sm:text-lg">{node.title}</h3>
+                      <p className="mt-1 text-xs leading-4 text-white/50 sm:text-sm sm:leading-5">{node.description}</p>
                     </div>
                   </a>
 
                   {index < systemNodes.length - 1 && (
-                    <div className="flex items-center justify-center py-1 text-center lg:px-1 lg:py-0">
+                    <div className="flex items-center justify-center py-0.5 text-center lg:px-1 lg:py-0">
                       <div>
-                        <span className="hidden text-xl text-emerald-300/70 lg:block">↔</span>
-                        <ArrowDown className="mx-auto h-5 w-5 text-emerald-300/70 lg:hidden" aria-hidden="true" />
-                        <span className="mt-1 block text-[9px] font-bold uppercase tracking-[0.12em] text-white/30">
-                          {index === 0 ? "API segura" : "estado vivo"}
+                        <span className="hidden text-lg text-emerald-300/70 lg:block">↔</span>
+                        <ArrowDown className="mx-auto h-4 w-4 text-emerald-300/70 lg:hidden" aria-hidden="true" />
+                        <span className="mt-0.5 block text-[8px] font-bold uppercase tracking-[0.1em] text-white/30">
+                          {index === 0 ? "API" : "vivo"}
                         </span>
                       </div>
                     </div>
@@ -324,168 +180,61 @@ export default function AccesosPage() {
             })}
           </div>
 
-          <div className="mx-auto flex w-fit flex-col items-center py-4">
-            <div className="h-7 w-px bg-gradient-to-b from-emerald-300/70 to-emerald-300/10" />
-            <ArrowDown className="h-4 w-4 text-emerald-300/70" aria-hidden="true" />
+          <div className="mx-auto flex w-fit flex-col items-center py-2">
+            <div className="h-4 w-px bg-gradient-to-b from-emerald-300/70 to-emerald-300/10" />
+            <ArrowDown className="h-3.5 w-3.5 text-emerald-300/70" aria-hidden="true" />
           </div>
 
           <a
             href={`${mesitaBase}/dashboard/owner/panel`}
             target="_blank"
             rel="noreferrer"
-            className="group mx-auto flex max-w-2xl flex-col gap-4 rounded-2xl border border-sky-300/20 bg-sky-400/10 p-5 transition hover:-translate-y-0.5 hover:bg-sky-400/15 sm:flex-row sm:items-center"
+            className="group mx-auto flex max-w-2xl cursor-pointer items-center gap-3 rounded-xl border-2 border-sky-300/30 bg-sky-400/10 p-4 transition active:scale-[0.98] hover:border-sky-300/50 hover:bg-sky-400/15"
           >
-            <span className="w-fit rounded-xl bg-sky-300/15 p-3 text-sky-200">
-              <LayoutDashboard className="h-5 w-5" aria-hidden="true" />
+            <span className="rounded-lg bg-sky-300/15 p-2.5 text-sky-200">
+              <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
             </span>
-            <div className="flex-1">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-sky-200/60">Lectura central</p>
-              <h3 className="mt-1 text-lg font-semibold">Dashboard del dueño</h3>
-              <p className="mt-1 text-sm leading-5 text-white/50">
-                Reúne mesas, actividad, facturas, pagos, propinas y reportes provenientes de Mesita y del POS.
-              </p>
+            <div className="min-w-0 flex-1">
+              <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-sky-200/60">Lectura central</p>
+              <h3 className="text-base font-semibold">Dashboard del dueño</h3>
+              <p className="mt-0.5 text-xs text-white/45">Mesas, pagos, facturas y reportes en un solo lugar.</p>
             </div>
-            <ArrowUpRight className="h-5 w-5 text-white/25 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white" />
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase text-white/70 transition group-hover:bg-white/20">
+              Abrir
+              <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+            </span>
           </a>
-
-          <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-            <div className="mb-5 flex items-center gap-3">
-              <span className="rounded-lg bg-white/10 p-2 text-white/70">
-                <Database className="h-4 w-4" aria-hidden="true" />
-              </span>
-              <div>
-                <p className="text-sm font-semibold">Quién es responsable de cada dato</p>
-                <p className="text-xs text-white/40">Una fuente clara evita duplicados y descuadres.</p>
-              </div>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-xl bg-white/[0.04] p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-violet-200/65">POS</p>
-                <p className="mt-2 text-sm leading-5 text-white/55">Órdenes, documentos fiscales y cobros registrados.</p>
-              </div>
-              <div className="rounded-xl bg-white/[0.04] p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-200/65">App QR</p>
-                <p className="mt-2 text-sm leading-5 text-white/55">Personas, selección de consumos, división y propina.</p>
-              </div>
-              <div className="rounded-xl bg-white/[0.04] p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-sky-200/65">Dashboard</p>
-                <p className="mt-2 text-sm leading-5 text-white/55">Visualiza y opera; combina el estado en vivo con documentos del POS.</p>
-              </div>
-            </div>
-          </div>
         </section>
 
-        <section className="mb-16">
-          <div className="mb-6 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-black/40">Ejemplo real</p>
-              <h2 className="text-2xl font-semibold tracking-[-0.03em] sm:text-3xl">Qué ocurre cuando alguien paga</h2>
-            </div>
-            <p className="max-w-sm text-sm leading-6 text-black/50 sm:text-right">Un pago recorre todo el sistema sin repetir trabajo en caja.</p>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-4">
-            {paymentSteps.map((step, index) => {
-              const Icon = step.icon;
-              return (
-                <div key={step.title} className="relative rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
-                  <div className="mb-8 flex items-center justify-between">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#171714] text-xs font-semibold text-white">{index + 1}</span>
-                    <Icon className="h-5 w-5 text-black/30" aria-hidden="true" />
-                  </div>
-                  <h3 className="text-base font-semibold tracking-tight">{step.title}</h3>
-                  <p className="mt-2 text-sm leading-5 text-black/50">{step.description}</p>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="mb-16 rounded-3xl border border-black/10 bg-white p-5 shadow-sm sm:p-7">
-          <div className="mb-6 flex items-start gap-3">
-            <span className="rounded-xl bg-[#f0f0ea] p-2.5 text-black/60">
-              <Clock3 className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight">Cómo se mantiene actualizado</h2>
-              <p className="mt-1 text-sm text-black/50">Cada vista refresca según la velocidad que necesita.</p>
-            </div>
-          </div>
-          <div className="grid gap-px overflow-hidden rounded-2xl border border-black/10 bg-black/10 sm:grid-cols-2 lg:grid-cols-4">
-            {syncCadence.map((item) => (
-              <div key={item.title} className="bg-[#fafaf7] p-5">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">{item.value}</p>
-                <h3 className="mt-3 text-sm font-semibold">{item.title}</h3>
-                <p className="mt-1.5 text-xs leading-5 text-black/50">{item.description}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
+        {/* 2 — Bitácora */}
         <ChangelogPreview />
 
-        <div className="space-y-14">
-          {groups.map((group) => (
-            <section key={group.title}>
-              <div className="mb-5 flex flex-col justify-between gap-1 sm:flex-row sm:items-end">
-                <h2 className="text-xl font-semibold tracking-tight">{group.title}</h2>
-                <p className="text-sm text-black/50">{group.description}</p>
-              </div>
+        {/* 3 — Resto compacto */}
+        <section className="mt-6 rounded-2xl border border-black/10 bg-white p-4 shadow-sm sm:p-5">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold tracking-tight">Más accesos</h2>
+            <span className="text-[10px] text-black/40">abren en pestaña nueva</span>
+          </div>
+          <CompactLinkGrid links={quickLinks} />
+        </section>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {group.links.map((link) => {
-                  const Icon = link.icon;
-                  return (
-                    <a
-                      key={link.href}
-                      href={link.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`group relative flex min-h-44 flex-col justify-between overflow-hidden rounded-2xl border p-5 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
-                        link.featured
-                          ? "border-[#171714] bg-[#171714] text-white shadow-md"
-                          : "border-black/10 bg-white text-[#171714] shadow-sm"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <span
-                          className={`rounded-xl p-2.5 ${
-                            link.featured ? "bg-white/10" : "bg-[#f0f0ea]"
-                          }`}
-                        >
-                          <Icon className="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <ArrowUpRight className="h-5 w-5 opacity-45 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100" />
-                      </div>
+        <section className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm sm:p-5">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold tracking-tight">QR de mesas demo</h2>
+            <a
+              href="/cambios"
+              className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-900"
+            >
+              <Newspaper className="h-3 w-3" aria-hidden="true" />
+              Bitácora
+            </a>
+          </div>
+          <CompactLinkGrid links={mesaLinks} />
+        </section>
 
-                      <div>
-                        <span
-                          className={`mb-2 inline-block text-[10px] font-bold uppercase tracking-[0.16em] ${
-                            link.featured ? "text-white/45" : "text-black/40"
-                          }`}
-                        >
-                          {link.host}
-                        </span>
-                        <h3 className="text-lg font-semibold tracking-tight">{link.title}</h3>
-                        <p
-                          className={`mt-1 text-sm leading-5 ${
-                            link.featured ? "text-white/60" : "text-black/50"
-                          }`}
-                        >
-                          {link.description}
-                        </p>
-                      </div>
-                    </a>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
-
-        <footer className="mt-16 flex flex-col justify-between gap-2 border-t border-black/10 pt-6 text-xs text-black/40 sm:flex-row">
-          <span>Mesita · accesos de producción</span>
-          <span>Dominio canónico: mesitademo-two.vercel.app</span>
+        <footer className="mt-8 flex justify-between gap-2 border-t border-black/10 pt-4 text-[10px] text-black/35">
+          <span>Mesita · accesos</span>
+          <span>mesitademo-two.vercel.app</span>
         </footer>
       </div>
     </main>

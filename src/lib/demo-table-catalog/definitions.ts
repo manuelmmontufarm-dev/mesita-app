@@ -12,6 +12,8 @@ export interface DemoTableDefinition {
     serviceEnabled: boolean;
   };
   table: { name: string };
+  /** POS mesa id (e.g. mesa-01, mesa-12). */
+  posMesaId: string;
   items: DemoFoodItem[];
   seed?: {
     paidItemIds?: string[];
@@ -88,6 +90,7 @@ export const DEMO_TABLE_DEFINITIONS: DemoTableDefinition[] = [
     token: "demo",
     restaurant: { ...DONA_PEPA },
     table: { name: "12" },
+    posMesaId: "mesa-12",
     items: DEFAULT_ITEMS,
     scenarioDescription: "Baseline — escenario actual de `/pay/demo`.",
     operatorNotes: [
@@ -100,6 +103,7 @@ export const DEMO_TABLE_DEFINITIONS: DemoTableDefinition[] = [
     token: "demo-mesa-1",
     restaurant: { ...DONA_PEPA },
     table: { name: "1" },
+    posMesaId: "mesa-01",
     items: MESA_1_ITEMS,
     scenarioDescription:
       "Mesa limpia — prueba join + split by item + pay desde cero.",
@@ -113,6 +117,7 @@ export const DEMO_TABLE_DEFINITIONS: DemoTableDefinition[] = [
     token: "demo-mesa-2",
     restaurant: { ...DONA_PEPA },
     table: { name: "2" },
+    posMesaId: "mesa-02",
     items: MESA_2_ITEMS,
     seed: {
       paidItemIds: ["fritada"],
@@ -133,6 +138,7 @@ export const DEMO_TABLE_DEFINITIONS: DemoTableDefinition[] = [
     token: "demo-mesa-3",
     restaurant: { ...DONA_PEPA },
     table: { name: "3" },
+    posMesaId: "mesa-03",
     items: MESA_3_ITEMS,
     scenarioDescription:
       "Cuenta larga — prueba scroll bill, dock, recibo, performance sync.",
@@ -146,6 +152,7 @@ export const DEMO_TABLE_DEFINITIONS: DemoTableDefinition[] = [
     token: "demo-mesa-4",
     restaurant: { ...DONA_PEPA },
     table: { name: "4" },
+    posMesaId: "mesa-04",
     items: MESA_4_ITEMS,
     scenarioDescription:
       "Modo Todo — cuenta ≥$50, factura obligatoria, cierre mesa.",

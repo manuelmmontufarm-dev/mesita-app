@@ -26,6 +26,8 @@ export interface DemoFoodItem {
   qty: number;
   unitPrice: number;
   posExternalId?: string;
+  /** POS orden_detalles id when synced from Mesita POS. */
+  posDetalleId?: string;
 }
 
 export interface DemoGuest {
@@ -96,6 +98,10 @@ export interface DemoTableState {
   resetSeq: number;
   version: number;
   updatedAt: string;
+  /** Linked POS orden (tenant_demo). */
+  posOrdenId?: string;
+  posDocumentoId?: string;
+  posMesaId?: string;
 }
 
 type DemoStore = Map<string, DemoTableState>;
