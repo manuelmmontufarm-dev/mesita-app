@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-28 — Auto-login al registrarse
+- **Qué:** `src/app/(auth)/register/page.tsx`.
+- **Por qué:** Al crear cuenta el usuario era redirigido a `/login` y tenía que volver a ingresar sus credenciales — flujo innecesariamente lento.
+- **Qué hace:** Tras un registro exitoso, llama `signIn("credentials", ...)` con el mismo email/contraseña en el mismo paso; si funciona va directo al panel (`/dashboard/owner/panel`). Si el auto-login falla por alguna razón, cae al `/login` como antes.
+
 ### 2026-06-28 — Dashboard público sin auth (modo demo)
 - **Qué:** `src/middleware.ts`, `src/lib/api-utils.ts`.
 - **Por qué:** El dashboard estaba bloqueado por auth; el usuario quiere verlo y trabajar en él en Vercel sin necesitar login.

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,12 +50,26 @@ export default function RegisterPage() {
       });
 
       if (response.ok) {
-        toast({
-          title: "Cuenta creada / Account created",
-          description: "Por favor inicia sesión / Please sign in",
-          variant: "default",
+        const result = await signIn("credentials", {
+          email: data.email,
+          password: data.password,
+          redirect: false,
         });
-        router.push("/login");
+
+        if (result?.ok) {
+          toast({
+            title: "¡Bienvenido!",
+            description: "Cuenta creada. Entrando al panel...",
+          });
+          router.push("/dashboard/owner/panel");
+        } else {
+          // Account created but auto-login failed — fall back to login page
+          toast({
+            title: "Cuenta creada",
+            description: "Inicia sesión para continuar",
+          });
+          router.push("/login");
+        }
       } else if (response.status === 409) {
         toast({
           title: "Error",
@@ -155,7 +170,7 @@ export default function RegisterPage() {
               disabled={isLoading}
               className="w-full h-12 text-base bg-zinc-900 hover:bg-zinc-700 text-white font-medium"
             >
-              {isLoading ? "Creando..." : "Crear cuenta / Create account"}
+              {isLoading ? "Creando tu cuenta..." : "Crear cuenta"}
             </Button>
           </form>
         </Form>
