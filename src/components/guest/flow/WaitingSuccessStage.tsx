@@ -440,7 +440,7 @@ export function WaitingSuccessStage({
   const remainingTotal = computeTotals(
     Math.max(0, remainingSub),
     config,
-    0,
+    state.tip,
   ).total;
   const paidPct = useMemo(
     () =>
@@ -487,12 +487,12 @@ export function WaitingSuccessStage({
         people,
         derived.remainingSub,
       );
-      return computeTotals(shareSub, config, 0).total;
+      return computeTotals(shareSub, config, state.tip).total;
     }
     const itemAmt = computeTotals(
       memberSubtotal(items, claims, id),
       config,
-      0,
+      state.tip,
     ).total;
     if (mode === "todo") return id === youId ? derived.totals.total : itemAmt;
     return itemAmt;

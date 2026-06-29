@@ -19,7 +19,6 @@ import { measureExpandedPayStackHeight } from "@/lib/guest-billing/bill-shell-sc
 import { useCollapsiblePayDock } from "@/hooks/useCollapsiblePayDock";
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
 import {
-  billSubtotal,
   computeTotals,
   fmt,
   freeUnits,
@@ -89,14 +88,14 @@ function PersonItemLine({
   );
 }
 
-function PersonCard({ member, claims, config, typedName, paid, paidItemIds, items }: {
+function PersonCard({ member, claims, config, tip, typedName, paid, paidItemIds, items }: {
   member: TableMember; claims: Flow["state"]["claims"]; config: RestaurantConfig;
-  typedName: string; paid: boolean; paidItemIds: readonly string[]; items: readonly BillItem[];
+  tip: number; typedName: string; paid: boolean; paidItemIds: readonly string[]; items: readonly BillItem[];
 }) {
   const expanded = useMemo(() => expandRepeatedItems(items), [items]);
   const claimed = expanded.filter((it) => unitsOf(claims, it.id, member.id) > 0);
   const sub = memberSubtotal(items, claims, member.id);
-  const owed = computeTotals(sub, config, 0).total;
+  const owed = computeTotals(sub, config, tip).total;
   return (
     <div className="person surfx" data-testid={`confirm-person-${member.id}`}>
       <div className="person-head">
@@ -144,7 +143,7 @@ function PersonasEnMesa({
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {others.map((m) => (
           <PersonCard key={m.id} member={m} claims={claims} config={config}
-            typedName={state.name} paid={state.paidIds.includes(m.id)}
+            tip={state.tip} typedName={state.name} paid={state.paidIds.includes(m.id)}
             paidItemIds={state.paidItemIds} items={items} />
         ))}
       </div>
@@ -198,7 +197,6 @@ function ConfirmYoursCard({
   const myItems = expanded.filter(
     (it) => itemOwed(it, claims, youId) > 0 && !state.paidItemIds.includes(it.id),
   );
-  const fullSub = billSubtotal(items);
   const paidSub = paidSubtotal(items, state.paidItemIds);
   return (
     <div className="confirm-card confirm-card-lg surfx" data-testid="confirm-card-lotuyo">
@@ -245,7 +243,13 @@ function ConfirmYoursCard({
       )}
       {mode === "todo" && (
         <p className="confirm-todo-note">
-          {paidSub > 0.01 ? `Ya se pagó ${fmt(paidSub)} — cubres lo que falta.` : `Cuenta completa (${fmt(computeTotals(fullSub, config, 0).total)} con imp.).`}
+          {paidSub > 0.01
+            ? `Ya se pagó ${fmt(paidSub)} — cubres lo que falta.`
+            : mode === "todo"
+              ? `Cuenta completa — ${fmt(derived.totals.total)} inc. imp. y prop.`
+              : mode === "equal"
+                ? `Tu parte equitativa — ${fmt(derived.totals.total)} inc. imp. y prop.`
+                : "Tus platos pedidos."}
         </p>
       )}
       <div className="confirm-yours-breakdown c-sum-rows">

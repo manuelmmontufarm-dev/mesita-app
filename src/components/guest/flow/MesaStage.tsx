@@ -105,7 +105,7 @@ function PersonCard({
     (it) => unitsOf(state.claims, it.id, member.id) > 0,
   );
   const sub = memberSubtotal(items, state.claims, member.id);
-  const owed = computeTotals(sub, config, 0).total;
+  const owed = computeTotals(sub, config, state.tip).total;
   return (
     <div className="person surfx">
       <div className="person-head">
@@ -163,10 +163,10 @@ export interface MesaStageProps {
 
 export function MesaStage({ flow, items, members, config }: MesaStageProps) {
   const { state } = flow;
-  const { mode, people, paidIds, paidItemIds, claims } = state;
+  const { mode, people, paidIds, paidItemIds, claims, tip } = state;
 
   const fullSub = billSubtotal(items);
-  const mesaTotal = computeTotals(fullSub, config, 0).total;
+  const mesaTotal = computeTotals(fullSub, config, tip).total;
   const paidSub = paidSubtotal(items, paidItemIds);
 
   /* ── "por igual" / "todo" — coverage view ──────────────────── */
@@ -176,12 +176,12 @@ export function MesaStage({ flow, items, members, config }: MesaStageProps) {
     const perPerson = computeTotals(
       remainingSub / Math.max(1, people),
       config,
-      0,
+      tip,
     ).total;
 
     const memberAmt = (id: string): number => {
       if (mode === "equal") return perPerson;
-      return computeTotals(memberSubtotal(items, claims, id), config, 0).total;
+      return computeTotals(memberSubtotal(items, claims, id), config, tip).total;
     };
     const pctPaid =
       fullSub > 0 ? Math.min(100, Math.round((paidSub / fullSub) * 100)) : 0;
@@ -246,9 +246,9 @@ export function MesaStage({ flow, items, members, config }: MesaStageProps) {
           {equal && <div className="big">{fmt(perPerson)}</div>}
           <div className="s">
             {equal
-              ? `Lo que falta (${fmt(remainingSub)}) se reparte entre ${people} ${
+              ? `${fmt(computeTotals(remainingSub, config, tip).total)} se reparte entre ${people} ${
                   people === 1 ? "persona" : "personas"
-                }. No importa quién pidió qué.`
+                } (inc. imp. + prop.).`
               : "Una persona cubre todo lo que falta de la cuenta de un solo."}
           </div>
         </div>
