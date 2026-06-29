@@ -239,7 +239,7 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     return { ...base, derived: derivedFromDisplayClaims };
   }, [liveSession, liveFlow, flow, derivedFromDisplayClaims]);
 
-  const youMember = members.find((m) => m.isYou);
+  const youMember = useMemo(() => members.find((m) => m.isYou), [members]);
   const seededName = useRef(false);
   const lastResetSeq = useRef<number | null>(null);
   const trustLocalClaims = useRef(true);

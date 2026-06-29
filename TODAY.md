@@ -52,6 +52,53 @@ Reglas de oro:
 
 ## 🟢 En qué estamos ahora
 
+### 2026-06-29 — DB: schema merge (Juan) + indexes para 50 restaurantes
+
+**Qué:** `prisma/schema.prisma`, `prisma/migrations/20260629000000_scale_and_merge/migration.sql`.
+
+**Por qué:** Auditoría del repo de Juan (github.com/jdonoso1/MesitaQR). Su schema tenía dos mejoras que faltaban en el nuestro: `directUrl` y el índice `kushkiTransactionId`. Además se aprovechó para endurecer el schema para escala (50 restaurantes).
+
+**Decisión arquitectónica:** **Una sola base de datos** para POS + dashboard + app. El dashboard lee exactamente lo que el POS/app escribe (`bills`, `payments`, `tables`). Dos bases de datos requerirían sync — innecesario y peligroso en datos financieros.
+
+**Qué hace:**
+- `directUrl = env("DIRECT_URL")` en datasource — Prisma CLI (migrate/db push) siempre usa la conexión directa (no el pooler PgBouncer). Sin esto las migraciones en Vercel/Supabase pueden fallar silenciosamente.
+- `Restaurant.slug` (nullable, unique) — routing limpio `/app/la-dona-pepa` sin depender del name.
+- `Restaurant.timezone` (default `America/Guayaquil`) — boundary de día para reportes. Sin esto `GROUP BY DATE(createdAt)` da resultados incorrectos para restaurantes en zona horaria diferente.
+- `Restaurant.currency` (default `USD`) — explícito para futura expansión a otros países.
+- `Bill`: índice `(restaurantId, status, createdAt)` reemplaza `(restaurantId, status)`. El tercer campo es gratis para queries que no filtran por fecha, y desbloquea dashboard date-range sin second scan.
+- `Bill`: índice nuevo `(restaurantId, createdAt)` — reportes de ingresos diarios/mensuales (todo el dashboard lo usa).
+- `Bill`: índice nuevo `(tableId, status)` — POS hot path: "¿hay una cuenta abierta en esta mesa?" (corre en cada scan de QR).
+- `Payment`: índice `(kushkiTransactionId)` — webhook de Kushki buscaba por ticket sin índice → table scan. Tomado de Juan's migration `20260612000000`.
+- `Payment`: índice `(guestSessionId)` — joins desde BillGuestSession → Payment.
+- Variable de entorno requerida: añadir `DIRECT_URL` al `.env` / Vercel env vars.
+
+**Para correr:** `npx prisma migrate deploy` (producción) o `npx prisma db push` (desarrollo).
+
+---
+
+### 2026-06-29 — Performance: Redis singleton + intervalos + optimizaciones build
+
+**Qué:** `src/lib/demo-table-store.ts`, `src/app/api/demo/table/[token]/events/route.ts`, `src/hooks/useDemoTableSession.ts`, `next.config.js`, `src/components/guest/flow/BillStage.tsx`, `src/components/guest/flow/GuestBillFlow.tsx`.
+
+**Por qué:** La app se sentía lenta. Auditoría reveló 4 fuentes de carga innecesaria:
+1. `getRedis()` creaba una nueva instancia de `Redis` en cada llamada (sin singleton) — overhead de configuración HTTP en cada operación.
+2. El SSE server-side hacía `GET` a Redis cada 500ms por cada cliente conectado (3 clientes = 6 GETs/s solo para SSE). El SSE solo *envía* cuando la versión cambia, así que el check puede ser más espaciado.
+3. El poll del cliente corría a 500ms sin SSE / 800ms con SSE. Con el SSE mejorado, el poll puede ser 700ms/1000ms sin impacto perceptible.
+4. Paquetes de Radix UI no tenían `optimizePackageImports` en el build — se importaban namespaces completos aunque solo se usaban algunos componentes.
+
+**Qué hace:**
+- **Redis singleton**: `getRedis()` cachea la instancia en un módulo-level `_redis` — una sola construcción de cliente por proceso serverless. También añade TTL de 7 días a todos los `redis.set(...)` para evitar crecimiento ilimitado en Upstash.
+- **SSE interval**: 500ms → 1500ms. El SSE solo pushea cuando `state.version` cambia; el check más largo reduce Redis GETs ~3× sin afectar latencia percibida (el client poll de 1000ms es el fast-path).
+- **Client poll**: `SYNC_INTERVAL_MS` 500 → 700ms (1000ms con SSE, 700ms sin SSE). El equipo anterior rechazó 1500ms por lag perceptible; 1000ms es el punto medio validado.
+- **Rename debounce**: 80ms → 300ms. Antes enviaba un POST casi en cada tecla; `flushRename()` garantiza el sync antes del pago, así que el debounce puede ser más generoso sin afectar corrección.
+- **next.config.js `optimizePackageImports`**: Radix UI (`@radix-ui/react-*`) + `lucide-react` ahora hacen tree-shaking por sub-componente en lugar de importar el namespace completo.
+- **BillStage.tsx memos**: `paidSub`, `myItemCount`, `tipPresets` y `payerDisplayName` ahora están en `useMemo`. Antes se recalculaban en cada render (incluyendo los renders forzados por el poll cada 700–1000ms).
+- **GuestBillFlow.tsx**: `youMember` (`.find()` sobre `members`) ahora en `useMemo(…, [members])`.
+
+**Nota arquitectónica (no corregida, para seguimiento):** `useGuestPaymentFlow` retorna un objeto literal fresco en cada render (las funciones `setName`, `setMode`, etc. son arrow functions inline sin `useCallback`). Esto hace que `liveFlow` y `activeFlow` en `GuestBillFlow` se recomputen en cada render, causando re-renders de todos los stages en cada ciclo de poll. Corrección correcta: envolver las funciones del hook en `useCallback`. Tarea pendiente para próxima sesión.
+
+---
+
 - **Estado actual:** el proyecto es un **demo funcional del flujo del cliente**
   (escanear QR → ver la cuenta → pagar). Se subió por primera vez el 2026-06-15 y
   enseguida se hicieron arreglos para que **despliegue bien en Vercel**.

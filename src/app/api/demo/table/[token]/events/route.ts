@@ -23,9 +23,12 @@ export async function GET(
       };
 
       await send();
+      // 1500ms: SSE only pushes when version changes so reducing the check
+      // interval from 500ms cuts Redis reads 3× with no perceptible UX change
+      // (client poll at 700–1000ms provides the fast-path for cross-device sync).
       const interval = setInterval(() => {
         void send();
-      }, 500);
+      }, 1500);
       const heartbeat = setInterval(() => {
         controller.enqueue(encoder.encode(`event: ping\ndata: {}\n\n`));
       }, 15_000);

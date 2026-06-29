@@ -112,12 +112,18 @@ function getMemoryStore(): DemoStore {
   return globalStore.__mesitaDemoTables;
 }
 
+let _redis: Redis | null | undefined;
 function getRedis(): Redis | null {
+  if (_redis !== undefined) return _redis;
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    _redis = null;
     return null;
   }
-  return Redis.fromEnv();
+  _redis = Redis.fromEnv();
+  return _redis;
 }
+/** TTL for demo state in Redis — 7 days. Keeps Redis from growing unbounded. */
+const REDIS_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -255,7 +261,7 @@ async function saveState(token: string, state: DemoTableState): Promise<DemoTabl
   getMemoryStore().set(token, state);
   const redis = getRedis();
   if (redis) {
-    await redis.set(REDIS_KEY(token), state);
+    await redis.set(REDIS_KEY(token), state, { ex: REDIS_TTL_SECONDS });
   }
   return state;
 }
@@ -289,7 +295,7 @@ async function tryCommitDemoState(
     const key = REDIS_KEY(token);
     const remote = await redis.get<DemoTableState>(key);
     if (!remote || remote.version !== expectedVersion) return false;
-    await redis.set(key, draft);
+    await redis.set(key, draft, { ex: REDIS_TTL_SECONDS });
     getMemoryStore().set(token, draft);
     return true;
   }
@@ -373,7 +379,7 @@ export async function resetDemoTableState(token: string): Promise<DemoTableState
   getMemoryStore().set(token, state);
   const redis = getRedis();
   if (redis) {
-    await redis.set(REDIS_KEY(token), state);
+    await redis.set(REDIS_KEY(token), state, { ex: REDIS_TTL_SECONDS });
   }
   return state;
 }

@@ -6,14 +6,21 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // In serverless (Vercel) point DATABASE_URL at the PgBouncer transaction-mode
+  // pooler (port 6543, ?pgbouncer=true) and DIRECT_URL at the session pooler
+  // (port 5432). Prisma CLI (migrate/db pull/push) always uses DIRECT_URL.
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // Restaurant: Core tenant entity
 model Restaurant {
   id              String           @id @default(uuid())
   name            String           @unique
+  // URL-safe slug for dashboard/POS routing (e.g. "la-dona-pepa").
+  // Nullable for backwards-compat; fill on creation going forward.
+  slug            String?          @unique
   logo            String?          @db.Text
   address         String?          @db.Text
   status          RestaurantStatus @default(PENDING)
@@ -23,6 +30,10 @@ model Restaurant {
   contactEmail    String?
   phone           String?
   invoiceSequence Int              @default(0)
+  // IANA timezone — drives day-boundary for reports and end-of-day exports.
+  timezone        String           @default("America/Guayaquil")
+  // ISO 4217 currency code. Ecuador is USD; kept explicit for future expansion.
+  currency        String           @default("USD")
 
   // Fiscal / SRI fields (Ecuador e-invoicing via Dátil)
   razonSocial           String?  @db.Text
@@ -162,8 +173,14 @@ model Bill {
   guestSessions BillGuestSession[]
   itemClaims    BillItemClaim[]
 
-  @@index([restaurantId, status])
-  @@index([tableId])
+  // (restaurantId, status, createdAt) — dashboard: filter by status + date range.
+  // Replaces the narrower (restaurantId, status) — the extra column is free for
+  // queries that only filter on status, and unlocks date-range without a second scan.
+  @@index([restaurantId, status, createdAt])
+  // (restaurantId, createdAt) — dashboard end-of-day / revenue reports: all bills in a date window.
+  @@index([restaurantId, createdAt])
+  // (tableId, status) — POS "get open bill for this table" (hot path, runs on every QR scan).
+  @@index([tableId, status])
   @@map("bills")
 }
 
@@ -289,50 +306,52 @@ model BillItemClaim {
 
 // Payment: Records of payments via Kushki with idempotency key
 model Payment {
-  id                  String        @id @default(uuid())
-  billId              String
-  bill                Bill          @relation(fields: [billId], references: [id], onDelete: Cascade)
-  restaurantId        String
-  restaurant          Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  amount              Decimal       @db.Decimal(10, 2)
-  voluntaryTip        Decimal?      @db.Decimal(10, 2)
-  kushkiTransactionId String
-  idempotencyKey      String        @unique
-  status              PaymentStatus
-  splitMode           SplitMode?
-  guestSessionId      String?
-  guestSession        BillGuestSession? @relation(fields: [guestSessionId], references: [id], onDelete: SetNull)
-  equalSplitPeople    Int?
+  id                    String            @id @default(uuid())
+  billId                String
+  bill                  Bill              @relation(fields: [billId], references: [id], onDelete: Cascade)
+  restaurantId          String
+  restaurant            Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  amount                Decimal           @db.Decimal(10, 2)
+  voluntaryTip          Decimal?          @db.Decimal(10, 2)
+  kushkiTransactionId   String
+  idempotencyKey        String            @unique
+  status                PaymentStatus
+  splitMode             SplitMode?
+  guestSessionId        String?
+  guestSession          BillGuestSession? @relation(fields: [guestSessionId], references: [id], onDelete: SetNull)
+  equalSplitPeople      Int?
   // Guest invoicing snapshot — frozen on the Payment so we don't depend on a join (SRI $50 rule)
-  guestIdentificacion String?
-  guestEmail          String?
-  guestNombre         String?
-  guestTipo           String? // "CEDULA" | "RUC" | "PASAPORTE" | "CONSUMIDOR_FINAL"
-  posRegisteredAt     DateTime?
+  guestIdentificacion   String?
+  guestEmail            String?
+  guestNombre           String?
+  guestTipo             String? // "CEDULA" | "RUC" | "PASAPORTE" | "CONSUMIDOR_FINAL"
+  posRegisteredAt       DateTime?
   posRegisteredByUserId String?
-  posRegistrationNote String?       @db.Text
+  posRegistrationNote   String?           @db.Text
   paymentItems          PaymentBillItem[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 
   @@index([restaurantId, createdAt])
   @@index([restaurantId, posRegisteredAt])
   @@index([billId])
   @@index([guestSessionId])
+  // Kushki webhook looks payments up by ticket number — must not table-scan.
+  @@index([kushkiTransactionId])
   @@map("payments")
 }
 
 model PaymentBillItem {
-  id         String   @id @default(uuid())
-  paymentId String
-  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  id         String    @id @default(uuid())
+  paymentId  String
+  payment    Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   billItemId String?
   billItem   BillItem? @relation(fields: [billItemId], references: [id], onDelete: SetNull)
   name       String
-  units      Decimal  @default(1) @db.Decimal(10, 3)
-  unitPrice  Decimal  @db.Decimal(10, 2)
-  amount     Decimal  @db.Decimal(10, 2)
-  createdAt  DateTime @default(now())
+  units      Decimal   @default(1) @db.Decimal(10, 3)
+  unitPrice  Decimal   @db.Decimal(10, 2)
+  amount     Decimal   @db.Decimal(10, 2)
+  createdAt  DateTime  @default(now())
 
   @@index([paymentId])
   @@index([billItemId])

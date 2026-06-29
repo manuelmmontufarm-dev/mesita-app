@@ -598,15 +598,18 @@ export function BillStage({
   );
 
   const fullSub = useMemo(() => billSubtotal(items), [items]);
-  const paidSub = paidSubtotal(items, paidItemIds);
+  const paidSub = useMemo(() => paidSubtotal(items, paidItemIds), [items, paidItemIds]);
   const someonePaid = paidItemIds.length > 0;
 
-  const myItemCount = items.filter(
-    (it) =>
-      unitsOf(displayClaims, it.id, flow.youId) > 0 && !paidItemIds.includes(it.id),
-  ).length;
+  const myItemCount = useMemo(
+    () =>
+      items.filter(
+        (it) => unitsOf(displayClaims, it.id, flow.youId) > 0 && !paidItemIds.includes(it.id),
+      ).length,
+    [items, displayClaims, flow.youId, paidItemIds],
+  );
 
-  const tipPresets = config.tipPresets.filter((p) => p > 0);
+  const tipPresets = useMemo(() => config.tipPresets.filter((p) => p > 0), [config.tipPresets]);
   const tipIsPreset = tipPresets.includes(tip);
   const showOtherTip = otherTip || !tipIsPreset;
 
@@ -646,11 +649,14 @@ export function BillStage({
     [displayMembers, flow.youId, state.name, members],
   );
 
-  const payerDisplayName =
-    state.name.trim() ||
-    youMember.seatLabel ||
-    members.find((m) => m.id === flow.youId)?.seatLabel ||
-    guestLabel(Math.max(1, members.findIndex((m) => m.id === flow.youId) + 1));
+  const payerDisplayName = useMemo(
+    () =>
+      state.name.trim() ||
+      youMember.seatLabel ||
+      members.find((m) => m.id === flow.youId)?.seatLabel ||
+      guestLabel(Math.max(1, members.findIndex((m) => m.id === flow.youId) + 1)),
+    [state.name, youMember.seatLabel, members, flow.youId],
+  );
 
   return (
     <>
