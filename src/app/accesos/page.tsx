@@ -9,6 +9,7 @@ import {
   Database,
   LayoutDashboard,
   MonitorSmartphone,
+  Newspaper,
   QrCode,
   ReceiptText,
   RefreshCw,
@@ -20,6 +21,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { ChangelogPreview } from "@/components/changes/ChangelogPreview";
 
 const mesitaBase = "https://mesitademo-two.vercel.app";
 const posBase = "https://mesita-pos.vercel.app";
@@ -137,6 +139,14 @@ const groups: AccessGroup[] = [
         icon: CreditCard,
       },
       {
+        title: "Bitácora de cambios",
+        description: "Qué mejoró cada día, explicado desde GitHub.",
+        href: `${mesitaBase}/cambios`,
+        host: "Mesita",
+        icon: Newspaper,
+        featured: true,
+      },
+      {
         title: "Proyecto en Vercel",
         description: "Deployments, logs y configuración del proyecto.",
         href: "https://vercel.com/manuel-montufar-s-projects/mesitademo",
@@ -236,16 +246,25 @@ const syncCadence = [
 export default function AccesosPage() {
   return (
     <main className="min-h-screen bg-[#f5f5f0] text-[#171714]">
-      <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-16">
-        <header className="mb-12 border-b border-black/10 pb-10">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-black/60 shadow-sm">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Central de accesos
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-16">
+        <header className="mb-8 border-b border-black/10 pb-8 sm:mb-12 sm:pb-10">
+          <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-black/60 shadow-sm">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Central de accesos
+            </div>
+            <a
+              href="/cambios"
+              className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-600/20 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100"
+            >
+              <Newspaper className="h-3.5 w-3.5" aria-hidden="true" />
+              Bitácora de cambios
+            </a>
           </div>
-          <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-end">
+          <div className="grid gap-5 md:grid-cols-[1fr_auto] md:items-end md:gap-6">
             <div>
               <p className="mb-2 text-sm font-medium text-black/50">Mesita</p>
-              <h1 className="max-w-3xl text-4xl font-semibold leading-[1.05] tracking-[-0.04em] sm:text-6xl">
+              <h1 className="max-w-3xl text-[2.15rem] font-semibold leading-[1.05] tracking-[-0.04em] sm:text-5xl lg:text-6xl">
                 Todo el restaurante,
                 <br />
                 sin buscar mil links.
@@ -257,7 +276,9 @@ export default function AccesosPage() {
           </div>
         </header>
 
-        <section className="mb-16 overflow-hidden rounded-[2rem] bg-[#171714] px-5 py-7 text-white shadow-xl sm:px-8 sm:py-10">
+        <ChangelogPreview />
+
+        <section className="mb-12 overflow-hidden rounded-[1.75rem] bg-[#171714] px-4 py-6 text-white shadow-xl sm:mb-16 sm:rounded-[2rem] sm:px-8 sm:py-10">
           <div className="mb-8 flex flex-col justify-between gap-4 border-b border-white/10 pb-7 sm:flex-row sm:items-end">
             <div>
               <div className="mb-3 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-emerald-300/70">
@@ -282,7 +303,7 @@ export default function AccesosPage() {
                     href={node.href}
                     target="_blank"
                     rel="noreferrer"
-                    className={`group flex min-h-56 flex-col justify-between rounded-2xl border p-5 transition hover:-translate-y-0.5 hover:bg-white/[0.08] ${node.cardClass}`}
+                    className={`group flex min-h-0 flex-col justify-between rounded-2xl border p-4 transition hover:-translate-y-0.5 hover:bg-white/[0.08] sm:min-h-56 sm:p-5 ${node.cardClass}`}
                   >
                     <div className="flex items-start justify-between">
                       <span className={`rounded-xl p-2.5 ${node.iconClass}`}>
@@ -375,7 +396,7 @@ export default function AccesosPage() {
             <p className="max-w-sm text-sm leading-6 text-black/50 sm:text-right">Un pago recorre todo el sistema sin repetir trabajo en caja.</p>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {paymentSteps.map((step, index) => {
               const Icon = step.icon;
               return (
