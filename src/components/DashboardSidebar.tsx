@@ -24,6 +24,11 @@ const ICON = {
       <rect x="9" y="9" width="5.5" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
     </svg>
   ),
+  estadisticas: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path d="M3 12V8.5M6.5 12V5.5M10 12V7M13.5 12V3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  ),
   mesas: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
       <rect x="2" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.4" />
@@ -64,6 +69,7 @@ const ICON = {
 
 const navItems: NavItem[] = [
   { label: "Panel", href: "/dashboard/owner/panel", icon: ICON.panel, live: true },
+  { label: "Estadísticas", href: "/dashboard/owner/estadisticas", icon: ICON.estadisticas, live: true },
   { label: "Mesas", href: "/dashboard/owner/mesas", icon: ICON.mesas },
   { label: "Menú", href: "/dashboard/owner/menu", icon: ICON.menu },
   { label: "Personal", href: "/dashboard/owner/personal", icon: ICON.personal },

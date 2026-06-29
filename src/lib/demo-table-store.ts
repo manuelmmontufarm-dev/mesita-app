@@ -153,8 +153,7 @@ function createState(token: string): DemoTableState {
     serviceEnabled: true,
   };
   const tableName = def?.table.name ?? "12";
-  const mirrorPos =
-    isPosMirroredTable(def) && Boolean(process.env.POS_MESITA_API_KEY?.trim());
+  const mirrorPos = isPosMirroredTable(def);
   const items = mirrorPos
     ? []
     : def?.items
