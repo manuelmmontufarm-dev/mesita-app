@@ -40,11 +40,17 @@ export default function LoginPage() {
       });
 
       if (result?.ok) {
-        router.push("/dashboard");
-      } else {
+        router.push("/dashboard/owner/panel");
+      } else if (result?.error === "CredentialsSignin") {
         toast({
           title: "Credenciales incorrectas",
           description: "Verifica tu correo y contraseña.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "No se pudo iniciar sesión",
+          description: "Problema de conexión con el servidor. Intenta de nuevo.",
           variant: "destructive",
         });
       }

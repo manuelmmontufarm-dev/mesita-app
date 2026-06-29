@@ -79,6 +79,11 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-28 — Fix login: redirect directo al panel + errores claros
+- **Qué:** `src/app/dashboard/page.tsx`, `src/app/(auth)/login/page.tsx`.
+- **Por qué:** Al hacer login, `/dashboard` chequeaba la sesión y mandaba de vuelta a `/login` si fallaba — loop infinito. El error de credenciales incorrectas y el de servidor caían en el mismo mensaje genérico.
+- **Qué hace:** `/dashboard` ya no chequea sesión — redirige directo a `/dashboard/owner/panel` (server redirect, sin JS). Login redirige directo al panel tras éxito; distingue `CredentialsSignin` (mail/pass malo) de error de servidor.
+
 ### 2026-06-28 — Auto-login al registrarse
 - **Qué:** `src/app/(auth)/register/page.tsx`.
 - **Por qué:** Al crear cuenta el usuario era redirigido a `/login` y tenía que volver a ingresar sus credenciales — flujo innecesariamente lento.
