@@ -42,20 +42,6 @@ import { Ic, LogoMark, NamePill, useBumpOnChange } from "./_shared";
 
 type Flow = ReturnType<typeof useGuestPaymentFlow>;
 
-/* ── smooth-scroll helper (some webviews ignore behavior:smooth) ── */
-
-function smoothScrollTo(el: HTMLElement, to: number, ms = 440) {
-  const start = el.scrollTop;
-  const max = el.scrollHeight - el.clientHeight;
-  const target = Math.max(0, Math.min(to, max));
-  const t0 = Date.now();
-  const ease = (p: number) => 1 - Math.pow(1 - p, 3);
-  const id = setInterval(() => {
-    const p = Math.min(1, (Date.now() - t0) / ms);
-    el.scrollTop = start + (target - start) * ease(p);
-    if (p >= 1) clearInterval(id);
-  }, 16);
-}
 
 /* ── SummaryRow ────────────────────────────────────────────────── */
 
@@ -358,19 +344,11 @@ export function ConfirmStage({
 
   const tryPay = () => {
     if (needsAck && !acked) {
-      const c = scrollRef.current;
       const a = ackRef.current;
       if (a) {
-        if (receiptPeekActive) {
-          a.scrollIntoView({ behavior: "smooth", block: "center" });
-        } else if (c) {
-          const to =
-            c.scrollTop +
-            a.getBoundingClientRect().top -
-            c.getBoundingClientRect().top -
-            90;
-          smoothScrollTo(c, Math.max(0, to));
-        }
+        // block: "start" pins the checkbox near the top of the scrollport,
+        // guaranteeing it clears the dock on any phone size.
+        a.scrollIntoView({ behavior: "smooth", block: "start" });
       }
       setNudge(true);
       setTimeout(() => setNudge(false), 700);

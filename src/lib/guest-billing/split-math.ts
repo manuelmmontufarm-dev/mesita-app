@@ -50,7 +50,7 @@ export function equalShareSubtotal(
   people: number,
   remainingSub: number,
 ): number {
-  const splitCount = Math.max(2, Math.round(people));
+  const splitCount = Math.max(1, Math.round(people));
   const share = round2(fullSub / splitCount);
   return Math.min(remainingSub, share);
 }

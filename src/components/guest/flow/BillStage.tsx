@@ -755,20 +755,21 @@ export function BillStage({
                   <small>
                     {someonePaid
                       ? `${fmt(derived.remainingSub)} restante ÷ ${people}`
-                      : `${fmt(fullSub)} ÷ ${people} personas`}
+                      : `${fmt(fullSub)} ÷ ${people} ${people === 1 ? "persona" : "personas"}`}
                   </small>
                 </div>
                 <Stepper
                   value={people}
-                  min={2}
+                  min={1}
                   max={20}
                   onChange={(v) => flow.setPeople(v)}
                 />
               </div>
             </div>
             <div className="mode-info-banner">
-              Dividido en partes iguales entre <strong>{people}</strong> ·{" "}
-              <strong>{fmt(derived.totals.total)}</strong> c/u
+              {people === 1
+                ? <>Pagas la cuenta completa · <strong>{fmt(derived.totals.total)}</strong></>
+                : <>Dividido en partes iguales entre <strong>{people}</strong> · <strong>{fmt(derived.totals.total)}</strong> c/u</>}
             </div>
             <EqualShareVisual
               members={displayMembers}
@@ -846,7 +847,7 @@ export function BillStage({
           <div className="totals-fused-row">
             <span>
               {mode === "equal"
-                ? `Tu parte · 1 de ${people}`
+                ? people === 1 ? "Subtotal · cuenta completa" : `Tu parte · 1 de ${people}`
                 : mode === "todo"
                   ? "Subtotal · cuenta completa"
                   : `Subtotal · ${myItemCount} plato${myItemCount !== 1 ? "s" : ""}`}

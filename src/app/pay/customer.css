@@ -2009,10 +2009,10 @@ html.has-receipt-peek .cust-app[data-stage="bill"] .receipt-drawer.peek .rcpt-pe
 }
 .cust-app[data-stage="confirm"] .flow-scroll {
   padding-bottom: calc(
-    var(--confirm-dock-pad, 160px) + env(safe-area-inset-bottom, 0px)
+    var(--confirm-dock-pad, 220px) + env(safe-area-inset-bottom, 0px)
   );
   scroll-padding-bottom: calc(
-    var(--confirm-dock-pad, 160px) + env(safe-area-inset-bottom, 0px)
+    var(--confirm-dock-pad, 220px) + env(safe-area-inset-bottom, 0px)
   );
 }
 .flow-scroll::-webkit-scrollbar { width: 0; }
@@ -4320,33 +4320,37 @@ html.has-receipt-peek .cust-app[data-stage="payment"] .flow-scroll {
   justify-content: center;
   text-align: center;
   gap: 2px;
-  padding: 0 12px;
+  padding: 0 14px;
   pointer-events: none;
+  overflow: hidden;
 }
 .ws-mesa-ring-pct {
-  font-size: 38px;
+  font-size: clamp(22px, 9vw, 36px);
   font-weight: 760;
   letter-spacing: -0.035em;
   color: var(--c-ink);
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  white-space: nowrap;
   /* Optical centering — tabular numerals sit ~1px high inside their box. */
   transform: translateY(1px);
 }
 .ws-mesa-ring-lbl {
-  font-size: 12px;
+  font-size: clamp(9px, 2.8vw, 12px);
   font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--c-ink-2);
+  white-space: nowrap;
 }
 .ws-mesa-ring-amt {
   margin-top: 4px;
-  font-size: 14px;
+  font-size: clamp(11px, 3.5vw, 14px);
   font-weight: 650;
   color: var(--c-ink-2);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
+  white-space: nowrap;
 }
 .ws-celebrate {
   display: flex;

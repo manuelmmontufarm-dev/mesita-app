@@ -372,7 +372,7 @@ export function deriveTotals(
   );
   const effectivePaidSub = Math.max(paidFromItems, paidFromReceipts);
   const remainingSub = Math.max(0, fullSub - effectivePaidSub);
-  const splitCount = Math.max(2, Math.round(state.people));
+  const splitCount = Math.max(1, Math.round(state.people));
   const paidPeople = state.paidIds.length;
   const remainingPeople = Math.max(1, state.people - paidPeople);
   const myUnpaidSub = items.reduce(
