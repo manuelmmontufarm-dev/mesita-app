@@ -24,6 +24,7 @@ export interface PosMesitaDocumento {
   estado: string;
   descripcion: string | null;
   total: number;
+  subtotal_15?: number;
   iva: number;
   servicio: number;
   fecha_emision: string;
@@ -38,6 +39,7 @@ export interface PosMesitaDocumento {
     created_at: string;
   }>;
   orden?: {
+    id?: string;
     mesa?: { id: string; nombre: string } | null;
   } | null;
   created_at: string;
@@ -167,6 +169,27 @@ export interface ListPosDocumentosOpts {
   limit?: number;
   fechaEmision?: string;
   page?: number;
+}
+
+export async function listPosDocumentosForOrden(
+  ordenId: string,
+): Promise<PosMesitaDocumento[]> {
+  try {
+    const data = await posFetch<{ results: PosMesitaDocumento[] }>(
+      `/documento/?orden_id=${encodeURIComponent(ordenId)}&result_size=50`,
+    );
+    if (data.results?.length) return data.results;
+  } catch {
+    /* API may not filter — fallback below */
+  }
+
+  const docs = await listPosDocumentos({ limit: 80, page: 1 });
+  return docs.filter((d) => {
+    const oid =
+      d.orden?.id ??
+      (d as { orden_id?: string }).orden_id;
+    return oid === ordenId;
+  });
 }
 
 export async function listPosDocumentos(

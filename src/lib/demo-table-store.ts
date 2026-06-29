@@ -476,7 +476,8 @@ export async function refreshDemoStateFromPos(
   const def = resolveDemoTableToken(token);
   if (!def) return getDemoTableState(token);
 
-  const { isDemoUxTable, pullPosOrdenIntoDemoState } = await import("@/lib/pos-mesita/sync");
+  const { isDemoUxTable, pullPosOrdenIntoDemoState, pullPosPaymentsIntoDemoState } =
+    await import("@/lib/pos-mesita/sync");
   const { isPosMesitaConfigured } = await import("@/lib/pos-mesita/client");
 
   if (isDemoUxTable(def) || !isPosMesitaConfigured()) {
@@ -485,18 +486,43 @@ export async function refreshDemoStateFromPos(
 
   const current = await getDemoTableState(token);
   const pulled = await pullPosOrdenIntoDemoState(token, def, current, opts);
-  if (!pulled.changed) return current;
+  let nextState = pulled.changed ? pulled.state : current;
+  let anyChanged = pulled.changed;
+
+  if (pulled.posOrdenId ?? nextState.posOrdenId) {
+    const paidPull = await pullPosPaymentsIntoDemoState(
+      nextState,
+      pulled.posOrdenId ?? nextState.posOrdenId,
+    );
+    if (paidPull.changed) {
+      nextState = paidPull.state;
+      anyChanged = true;
+    }
+  }
+
+  if (!anyChanged) return current;
 
   const { buildItemIdMigrationMap, remapDemoItemReferences } = await import(
     "@/lib/pos-mesita/remap-item-refs"
   );
-  const idMap = buildItemIdMigrationMap(current.items, pulled.state.items);
+  const idMap = buildItemIdMigrationMap(current.items, nextState.items);
 
   return mutateDemoState(token, (draft) => {
-    draft.items = pulled.state.items.map((it) => ({ ...it }));
-    draft.posOrdenId = pulled.state.posOrdenId ?? draft.posOrdenId;
+    draft.items = nextState.items.map((it) => ({ ...it }));
+    draft.payments = nextState.payments.map((p) => ({ ...p, itemIds: [...p.itemIds] }));
+    draft.paidItemIds = [...nextState.paidItemIds];
+    draft.itemPaidUnits = { ...nextState.itemPaidUnits };
+    draft.claims = { ...nextState.claims };
+    if (nextState.claimShares) draft.claimShares = { ...nextState.claimShares };
+    else delete draft.claimShares;
+    draft.posOrdenId = nextState.posOrdenId ?? draft.posOrdenId;
     draft.posMesaId = def.posMesaId;
+    if (!nextState.posOrdenId) {
+      draft.posOrdenId = undefined;
+      draft.posDocumentoId = undefined;
+    }
     remapDemoItemReferences(draft, idMap);
+    if (anyChanged) draft.version += 1;
   });
 }
 

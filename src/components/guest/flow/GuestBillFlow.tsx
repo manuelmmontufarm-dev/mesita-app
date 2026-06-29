@@ -292,14 +292,11 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
   }, [serverSync?.resetSeq]);
 
   useEffect(() => {
-    if (items.length === 0) return;
     const closed =
       demoTableProgress?.tableClosed === true ||
       serverSync?.tableClosed === true;
     if (!closed) return;
     const { stage } = flow.state;
-    // Bill: keep the completed-dock CTA so guests can browse items after close.
-    // Every other stage → cuenta completada / resumen de mesa.
     if (stage === "bill") return;
     if (stage === "success") return;
     flow.finishWaiting();
@@ -308,7 +305,6 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     demoTableProgress?.tableClosed,
     serverSync?.tableClosed,
     serverSync?.version,
-    items.length,
     flow.state.stage,
   ]);
 

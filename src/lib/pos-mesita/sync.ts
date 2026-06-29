@@ -12,7 +12,7 @@ import {
 } from "./client";
 import { mergePosDetallesIntoItems } from "./merge-from-pos";
 
-const POS_PULL_MIN_MS = 500;
+const POS_PULL_MIN_MS = 300;
 const lastPosPullAt = new Map<string, number>();
 
 interface OpenOrdenResult {
@@ -138,7 +138,9 @@ export async function syncDemoItemsToPos(
 export function isDemoTableFullyPaid(state: DemoTableState): boolean {
   const billSub = state.items.reduce((s, it) => s + it.qty * it.unitPrice, 0);
   const paidSub = state.payments.reduce((s, p) => s + p.subtotal, 0);
-  if (state.items.length === 0) return false;
+  if (state.items.length === 0) {
+    return state.payments.length > 0 && paidSub > 0.009;
+  }
   return (
     state.items.every((it) => state.paidItemIds.includes(it.id)) ||
     paidSub >= billSub - 0.02
@@ -319,6 +321,55 @@ function shouldPullPosNow(token: string, force: boolean): boolean {
   return true;
 }
 
+function isActivePosOrden(orden: { estado?: string }): boolean {
+  const st = (orden.estado ?? "A").toUpperCase();
+  return st === "A" || st === "P";
+}
+
+function resetSessionForClosedOrden(): Partial<DemoTableState> {
+  return {
+    items: [],
+    claims: {},
+    claimShares: undefined,
+    paidItemIds: [],
+    itemPaidUnits: {},
+    payments: [],
+    posOrdenId: undefined,
+    posDocumentoId: undefined,
+  };
+}
+
+/**
+ * Pull POS cobros/documentos linked to the active orden.
+ */
+export async function pullPosPaymentsIntoDemoState(
+  state: DemoTableState,
+  ordenId?: string,
+): Promise<{ state: DemoTableState; changed: boolean }> {
+  if (!ordenId || !isPosMesitaConfigured()) {
+    return { state, changed: false };
+  }
+
+  const { listPosDocumentosForOrden } = await import("./client");
+  const { mergePosCobrosIntoPayments } = await import("./pull-pos-payments");
+
+  const docs = await listPosDocumentosForOrden(ordenId).catch(() => []);
+  if (!docs.length) return { state, changed: false };
+
+  const merged = mergePosCobrosIntoPayments(state, docs);
+  if (!merged.changed) return { state, changed: false };
+
+  return {
+    state: {
+      ...state,
+      payments: merged.payments,
+      paidItemIds: merged.paidItemIds,
+      itemPaidUnits: merged.itemPaidUnits,
+    },
+    changed: true,
+  };
+}
+
 /**
  * Pull active POS orden líneas into demo Redis state (mesas 1–4 only).
  */
@@ -332,16 +383,36 @@ export async function pullPosOrdenIntoDemoState(
     return { state, changed: false };
   }
   if (!shouldPullPosNow(token, Boolean(opts.force))) {
-    return { state, changed: false };
+    return { state, changed: false, posOrdenId: state.posOrdenId };
   }
 
   let ordenId = state.posOrdenId;
   let orden = ordenId ? await getPosOrden(ordenId).catch(() => null) : null;
 
+  if (orden && !isActivePosOrden(orden)) {
+    orden = null;
+    ordenId = undefined;
+  }
+
   if (!orden) {
     orden = await findActivePosOrdenForMesa(def.posMesaId).catch(() => null);
     ordenId = orden?.id;
   }
+
+  if (orden && !isActivePosOrden(orden)) {
+    orden = null;
+    ordenId = undefined;
+  }
+
+  const hadLinkedOrden = Boolean(state.posOrdenId);
+  const ordenClosed = hadLinkedOrden && !ordenId;
+  const billSub = state.items.reduce((s, it) => s + it.qty * it.unitPrice, 0);
+  const paidSub = state.payments.reduce((s, p) => s + p.subtotal, 0);
+  const fullyPaidSession =
+    ordenClosed &&
+    state.items.length > 0 &&
+    (state.paidItemIds.length >= state.items.length ||
+      paidSub >= billSub - 0.05);
 
   if (!orden || !ordenId) {
     const merged = mergePosDetallesIntoItems(state.items, [], {
@@ -352,12 +423,30 @@ export async function pullPosOrdenIntoDemoState(
       merged.changed ||
       state.posOrdenId != null ||
       state.items.some((it) => !state.paidItemIds.includes(it.id));
-    if (!cleared) return { state, changed: false };
+
+    if (!cleared && !ordenClosed) return { state, changed: false };
+
+    if (ordenClosed && fullyPaidSession) {
+      return {
+        state: {
+          ...state,
+          items: [],
+          claims: {},
+          claimShares: undefined,
+          posOrdenId: undefined,
+          posDocumentoId: undefined,
+        },
+        changed: true,
+      };
+    }
+
+    const reset = ordenClosed ? resetSessionForClosedOrden() : {};
 
     return {
       state: {
         ...state,
-        items: merged.items,
+        ...reset,
+        items: ordenClosed ? [] : merged.items,
         posOrdenId: undefined,
         posMesaId: def.posMesaId,
       },

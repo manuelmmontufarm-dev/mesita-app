@@ -51,8 +51,8 @@ const RESET_SEQ_KEY = (token: string) => `mesita:demo-reset-seq:${token}`;
 /** Device-scoped (NOT token-scoped) — survives nav/refresh/QR. Idempotency key for join. */
 const DEVICE_ID_KEY = "mesita:device-id";
 
-/** Poll interval: 1s — POS ↔ app sync. */
-const SYNC_INTERVAL_MS = 1_000;
+/** Poll interval: 800ms — POS ↔ app sync. */
+const SYNC_INTERVAL_MS = 800;
 
 export interface UseDemoTableSessionResult {
   state: TableSessionState | null;

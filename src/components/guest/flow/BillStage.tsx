@@ -592,14 +592,22 @@ export function BillStage({
     [derived.remainingSub, config, tip],
   );
 
-  const paidTotalWithTax = useMemo(
-    () => computeTotals(paidSubtotal(items, paidItemIds), config, tip).total,
-    [items, paidItemIds, config, tip],
-  );
-
   const fullSub = useMemo(() => billSubtotal(items), [items]);
   const paidSub = useMemo(() => paidSubtotal(items, paidItemIds), [items, paidItemIds]);
-  const someonePaid = paidItemIds.length > 0;
+  const paymentsTotal = useMemo(
+    () => paidSummaries.reduce((s, p) => s + (p.amount > 0 ? p.amount : 0), 0),
+    [paidSummaries],
+  );
+  const someonePaid =
+    paidItemIds.length > 0 || paidSummaries.length > 0 || paymentsTotal > 0.009;
+
+  const paidTotalWithTax = useMemo(() => {
+    const fromItems = computeTotals(paidSubtotal(items, paidItemIds), config, tip).total;
+    if (paymentsTotal > 0.009) {
+      return Math.max(fromItems, paymentsTotal);
+    }
+    return fromItems;
+  }, [items, paidItemIds, config, tip, paymentsTotal]);
 
   const myItemCount = useMemo(
     () =>
@@ -810,22 +818,44 @@ export function BillStage({
 
         {/* Items */}
         <div className="bill-items-list" data-testid="bill-items-list">
-          {sortedItems.map((it) => (
-            <BillItemRow
-              key={it.id}
-              item={it}
-              flow={flow}
-              members={displayMembers}
-              mode={mode}
-              paid={isItemPaid(paidItemIds, it.id)}
-              displayClaims={displayClaims}
-              pendingClaims={pendingClaims}
-              paidByName={itemPayerNames[it.id]}
-            />
-          ))}
+          {items.length === 0 ? (
+            <div className="pos-precuenta-wait" data-testid="pos-precuenta-wait">
+              <div className="pos-precuenta-wait-icon" aria-hidden="true">
+                🍽️
+              </div>
+              <p className="pos-precuenta-wait-title">
+                Tu mesero aún no ingresa tu pedido
+              </p>
+              <p className="pos-precuenta-wait-sub">
+                En cuanto aparezca en la precuenta del restaurante, lo verás aquí al
+                instante.
+              </p>
+              {paidSummaries.length > 0 && (
+                <p className="pos-precuenta-wait-paid">
+                  {paidSummaries.length === 1
+                    ? "1 pago ya registrado en esta mesa"
+                    : `${paidSummaries.length} pagos ya registrados en esta mesa`}
+                </p>
+              )}
+            </div>
+          ) : (
+            sortedItems.map((it) => (
+              <BillItemRow
+                key={it.id}
+                item={it}
+                flow={flow}
+                members={displayMembers}
+                mode={mode}
+                paid={isItemPaid(paidItemIds, it.id)}
+                displayClaims={displayClaims}
+                pendingClaims={pendingClaims}
+                paidByName={itemPayerNames[it.id]}
+              />
+            ))
+          )}
         </div>
 
-        {mode === "item" && myItemCount === 0 && (
+        {mode === "item" && items.length > 0 && myItemCount === 0 && (
           <div className="bill-empty-hint" data-testid="bill-empty-hint">
             <Ic.bell s={14} />
             Toca los platos que pediste para reclamarlos.

@@ -3594,6 +3594,38 @@ html.has-receipt-peek .cust-app[data-stage="bill"] .receipt-drawer.peek .rcpt-pe
 }
 .bill-empty-hint > svg { color: var(--accent-strong); flex: 0 0 auto; }
 
+/* ── POS precuenta vacía (mesas 1–4) ─────────────────────── */
+.pos-precuenta-wait {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  text-align: center;
+  padding: 28px 18px 24px;
+  border-radius: 16px;
+  background: rgba(47, 179, 126, 0.06);
+  border: 1px dashed rgba(47, 179, 126, 0.28);
+}
+.pos-precuenta-wait-icon { font-size: 32px; line-height: 1; }
+.pos-precuenta-wait-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-900);
+}
+.pos-precuenta-wait-sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--on-light-mut);
+  max-width: 280px;
+}
+.pos-precuenta-wait-paid {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f6b4c;
+}
+
 /* ── Error stage (amable, con retry) ─────────────────────── */
 .err-stage {
   flex: 1; display: flex; flex-direction: column;
