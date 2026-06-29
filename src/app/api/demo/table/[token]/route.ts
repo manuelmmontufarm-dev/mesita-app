@@ -13,7 +13,7 @@ import {
   type DemoSplitMode,
 } from "@/lib/demo-table-store";
 import { resolveDemoTableToken } from "@/lib/demo-table-catalog";
-import { registerDemoPosInvoice } from "@/lib/demo-pos";
+import { registerDemoPosInvoice, registerDemoPosActivity } from "@/lib/demo-pos";
 import { errorResponse, successResponse } from "@/lib/api-utils";
 import { z } from "zod";
 
@@ -90,10 +90,36 @@ export async function POST(
 
     const body = parsed.data;
     if (body.action === "join") {
+      const before = await getDemoTableState(token).catch(() => null);
+      const hadGuests = (before?.guests.length ?? 0) > 0;
       const joined = await joinDemoTable(token, {
         guestId: body.guestId,
         deviceId: body.deviceId,
       });
+
+      const def = resolveDemoTableToken(token);
+      if (def) {
+        const tableName = `Mesa ${def.table.name}`;
+        const isNewGuest = joined.guest.joinedAt === joined.guest.updatedAt;
+        if (isNewGuest) {
+          if (!hadGuests) {
+            registerDemoPosActivity({
+              type: "table_opened",
+              tableName,
+              tableToken: token,
+              guestCount: joined.state.guests.length,
+            }).catch(() => {});
+          }
+          registerDemoPosActivity({
+            type: "guest_joined",
+            tableName,
+            tableToken: token,
+            guestName: joined.guest.name,
+            guestCount: joined.state.guests.length,
+          }).catch(() => {});
+        }
+      }
+
       return successResponse(joined, 200);
     }
     if (body.action === "rename") {
@@ -151,6 +177,14 @@ export async function POST(
           mode: payment.mode,
           createdAt: payment.createdAt,
         }).catch((err) => console.error("[demo-pos] invoice register failed:", err));
+
+        registerDemoPosActivity({
+          type: "payment",
+          tableName: `Mesa ${def.table.name}`,
+          tableToken: token,
+          guestName: payment.guestName,
+          amount: payment.amount,
+        }).catch(() => {});
       }
 
       return successResponse(state, 200);

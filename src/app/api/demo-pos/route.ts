@@ -5,7 +5,10 @@ import {
   createMenuItem,
   deleteExtraTable,
   deleteMenuItem,
+  getDemoPosConfigStatus,
   getMenu,
+  getReports,
+  listActivities,
   listAllTables,
   listInvoices,
   listQrTables,
@@ -28,6 +31,15 @@ export async function GET(request: Request): Promise<Response> {
   }
   if (view === "invoices") {
     return successResponse({ invoices: await listInvoices() }, 200);
+  }
+  if (view === "reports") {
+    return successResponse({ reports: await getReports() }, 200);
+  }
+  if (view === "activity") {
+    return successResponse({ activities: await listActivities() }, 200);
+  }
+  if (view === "config") {
+    return successResponse(getDemoPosConfigStatus(), 200);
   }
 
   const [tables, menu, invoices] = await Promise.all([

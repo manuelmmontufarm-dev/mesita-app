@@ -38,6 +38,8 @@ function StatusBadge({ configured, enabled }: { configured: boolean; enabled?: b
 export default function ConfiguracionPage() {
   const { toast } = useToast();
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [demoConfig, setDemoConfig] = useState<Record<string, unknown> | null>(null);
   const [savingFiscal, setSavingFiscal] = useState(false);
   const [savingKushki, setSavingKushki] = useState(false);
   const [savingPos, setSavingPos] = useState(false);
@@ -89,12 +91,21 @@ export default function ConfiguracionPage() {
 
   useEffect(() => {
     async function init() {
-      const res = await fetch("/api/auth/session");
-      const s = await res.json();
+      const [sessionRes, demoRes] = await Promise.all([
+        fetch("/api/auth/session"),
+        fetch("/api/demo-pos?view=config"),
+      ]);
+      const s = await sessionRes.json();
       const rid = s?.user?.restaurantId as string | undefined;
-      if (!rid) return;
-      setRestaurantId(rid);
-      loadData(rid);
+      if (demoRes.ok) {
+        const d = await demoRes.json();
+        setDemoConfig(d.data ?? null);
+        if (!rid) setIsDemoMode(true);
+      }
+      if (rid) {
+        setRestaurantId(rid);
+        loadData(rid);
+      }
     }
     init();
   }, [loadData]);
@@ -199,6 +210,105 @@ export default function ConfiguracionPage() {
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+
+  if (isDemoMode && demoConfig) {
+    const cfg = demoConfig as {
+      name: string;
+      enabled: boolean;
+      environment: string;
+      baseUrl: string;
+      endpoints: Record<string, string>;
+      sync: Record<string, string>;
+      lastSyncAt: string;
+      restaurant: { name: string; city: string; ruc: string };
+    };
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold" style={{ color: "var(--ink-900)" }}>Configuración</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--on-light-mut)" }}>
+            Integraciones del restaurante · modo demo
+          </p>
+        </div>
+
+        <Card style={{ borderColor: "rgba(47,179,126,.25)" }}>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle>{cfg.name}</CardTitle>
+                <CardDescription className="mt-1">
+                  Conectado vía API al POS demo de Mesita — menú, mesas y facturación sincronizados
+                </CardDescription>
+              </div>
+              <Badge className="bg-green-100 text-green-800 border-green-200">Activo</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="p-3 rounded-lg" style={{ background: "rgba(27,25,22,.03)" }}>
+                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">Restaurante</p>
+                <p className="font-medium text-zinc-900">{cfg.restaurant.name}</p>
+                <p className="text-zinc-500 text-xs mt-0.5">{cfg.restaurant.city} · RUC {cfg.restaurant.ruc}</p>
+              </div>
+              <div className="p-3 rounded-lg" style={{ background: "rgba(27,25,22,.03)" }}>
+                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">Ambiente</p>
+                <p className="font-medium text-zinc-900">{cfg.environment}</p>
+                <p className="text-zinc-500 text-xs mt-0.5">Última sync: {new Date(cfg.lastSyncAt).toLocaleTimeString("es-EC")}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">API base</p>
+              <code className="text-xs block p-3 rounded-lg bg-zinc-900 text-green-300 font-mono break-all">
+                {cfg.baseUrl}
+              </code>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">Endpoints</p>
+              <div className="space-y-1.5">
+                {Object.entries(cfg.endpoints).map(([key, val]) => (
+                  <div key={key} className="flex gap-3 text-xs font-mono p-2 rounded" style={{ background: "rgba(27,25,22,.03)" }}>
+                    <span className="text-zinc-400 w-16 shrink-0">{key}</span>
+                    <span className="text-zinc-700">{val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">Sincronización</p>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(cfg.sync).map(([key, val]) => (
+                  <Badge key={key} variant="outline" className="text-xs">
+                    {key}: {val}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Kushki Pagos</p>
+                  <p className="text-xs text-zinc-500">Sandbox demo · pagos del app registrados en POS</p>
+                </div>
+                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Sandbox</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Facturación SRI</p>
+                  <p className="text-xs text-zinc-500">Datos demo de La Doña Pepa</p>
+                </div>
+                <Badge className="bg-zinc-100 text-zinc-600 border-zinc-200">Demo</Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

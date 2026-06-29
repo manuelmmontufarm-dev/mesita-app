@@ -3,6 +3,7 @@
 import { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { DashboardSidebar } from "./DashboardSidebar";
+import { LiveActivityBar } from "./LiveActivityBar";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -25,6 +26,7 @@ export function DashboardLayout({
 
       <main className="flex-1 overflow-y-auto" style={{ background: "var(--paper)" }}>
         <div className="max-w-6xl mx-auto p-8">
+          <LiveActivityBar />
           {children}
         </div>
       </main>

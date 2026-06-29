@@ -38,6 +38,44 @@ export interface DemoPosInvoice {
   createdAt: string;
 }
 
+export interface DemoPosActivity {
+  id: string;
+  type: "table_opened" | "guest_joined" | "payment";
+  tableName: string;
+  tableToken: string;
+  guestName?: string;
+  guestCount?: number;
+  amount?: number;
+  createdAt: string;
+}
+
+export interface DemoPosReportPayment {
+  id: string;
+  amount: number;
+  guestName: string;
+  method: string;
+  viaMesita: boolean;
+  ref: string;
+  createdAt: string;
+}
+
+export interface DemoPosReport {
+  id: string;
+  tableName: string;
+  tableToken: string;
+  status: "OPEN" | "PARTIAL" | "PAID" | "CLOSED";
+  total: number;
+  paid: number;
+  mesitaPaid: number;
+  posOnlyPaid: number;
+  paidViaMesita: boolean;
+  live: boolean;
+  posDocumentId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  payments: DemoPosReportPayment[];
+}
+
 export interface DemoPosConfig {
   categories: DemoPosCategory[];
   menuItems: DemoPosMenuItem[];
