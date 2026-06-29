@@ -586,15 +586,15 @@ export function BillStage({
     return [...paid, ...unpaid];
   }, [items, paidItemIds]);
 
-  // Saldo restante de mesa incl. IVA + servicio sin propina (header).
+  // Saldo restante de mesa incl. IVA + servicio + propina actual (header).
   const remainingTotal = useMemo(
-    () => computeTotals(derived.remainingSub, config, 0).total,
-    [derived.remainingSub, config],
+    () => computeTotals(derived.remainingSub, config, tip).total,
+    [derived.remainingSub, config, tip],
   );
 
   const paidTotalWithTax = useMemo(
-    () => computeTotals(paidSubtotal(items, paidItemIds), config, 0).total,
-    [items, paidItemIds, config],
+    () => computeTotals(paidSubtotal(items, paidItemIds), config, tip).total,
+    [items, paidItemIds, config, tip],
   );
 
   const fullSub = useMemo(() => billSubtotal(items), [items]);
@@ -611,8 +611,8 @@ export function BillStage({
   const showOtherTip = otherTip || !tipIsPreset;
 
   const mesaTotal = useMemo(
-    () => computeTotals(fullSub, config, 0).total,
-    [fullSub, config],
+    () => computeTotals(fullSub, config, tip).total,
+    [fullSub, config, tip],
   );
 
   const displayMembers = useMemo(
@@ -754,8 +754,8 @@ export function BillStage({
                   ¿Entre cuántos van?
                   <small>
                     {someonePaid
-                      ? `${fmt(derived.remainingSub)} restante ÷ ${people}`
-                      : `${fmt(fullSub)} ÷ ${people} ${people === 1 ? "persona" : "personas"}`}
+                      ? `${fmt(remainingTotal)} restante`
+                      : `${fmt(mesaTotal)} ÷ ${people} ${people === 1 ? "persona" : "personas"}`}
                   </small>
                 </div>
                 <Stepper
