@@ -9,6 +9,7 @@ import {
   Database,
   LayoutDashboard,
   MonitorSmartphone,
+  Newspaper,
   QrCode,
   ReceiptText,
   RefreshCw,
@@ -20,6 +21,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { ChangelogPreview } from "@/components/changes/ChangelogPreview";
 
 const mesitaBase = "https://mesitademo-two.vercel.app";
 const posBase = "https://mesita-pos.vercel.app";
@@ -135,6 +137,13 @@ const groups: AccessGroup[] = [
         href: `${mesitaBase}/pay/demo/mesa-1`,
         host: "Vercel",
         icon: CreditCard,
+      },
+      {
+        title: "Bitácora de cambios",
+        description: "Qué mejoró cada día, explicado desde GitHub.",
+        href: `${mesitaBase}/cambios`,
+        host: "Mesita",
+        icon: Newspaper,
       },
       {
         title: "Proyecto en Vercel",
@@ -412,6 +421,8 @@ export default function AccesosPage() {
             ))}
           </div>
         </section>
+
+        <ChangelogPreview />
 
         <div className="space-y-14">
           {groups.map((group) => (
