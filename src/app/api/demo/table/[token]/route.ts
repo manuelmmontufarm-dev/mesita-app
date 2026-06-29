@@ -193,6 +193,14 @@ export async function POST(
           amount: payment.amount,
           ref: payment.ref,
           method: payment.method,
+          items: body.itemIds
+            .map((itemId) => {
+              const item = def.items.find((i) => i.id === itemId);
+              if (!item) return null;
+              const qty = body.itemUnits?.[itemId] ?? item.qty;
+              return { name: item.name, qty, unitPrice: item.unitPrice };
+            })
+            .filter((x): x is { name: string; qty: number; unitPrice: number } => x !== null),
         }).catch((err) => console.error("[pos-mesita] sync failed:", err));
       }
 

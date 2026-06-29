@@ -59,6 +59,28 @@ export interface DemoPosReportPayment {
   createdAt: string;
 }
 
+export interface DemoPosReportConsumption {
+  id: string;
+  name: string;
+  qty: number;
+  unitPrice: number;
+  total: number;
+  documentId: string;
+  documentType: string;
+  fecha: string;
+}
+
+export interface DemoPosReportDocument {
+  id: string;
+  tipo: string;
+  estado: string;
+  descripcion: string | null;
+  fecha: string;
+  total: number;
+  consumptions: DemoPosReportConsumption[];
+  payments: DemoPosReportPayment[];
+}
+
 export interface DemoPosReport {
   id: string;
   tableName: string;
@@ -74,6 +96,15 @@ export interface DemoPosReport {
   createdAt: string;
   updatedAt: string;
   payments: DemoPosReportPayment[];
+  consumptions: DemoPosReportConsumption[];
+  documents: DemoPosReportDocument[];
+}
+
+export interface DemoPosReportsPayload {
+  date: string;
+  posConnected: boolean;
+  posError: string | null;
+  reports: DemoPosReport[];
 }
 
 export interface DemoPosConfig {

@@ -145,7 +145,14 @@ export function DemoConfiguracionPanel() {
                 <p className="text-xs font-mono text-zinc-500 break-all">{posStatus.url}</p>
               )}
               {posStatus?.error && (
-                <p className="text-xs text-amber-700">{posStatus.error}</p>
+                <div className="p-3 rounded-lg text-xs" style={{ background: "rgba(242,169,59,.1)", border: "1px solid rgba(242,169,59,.25)" }}>
+                  <p className="text-amber-800 font-medium">{posStatus.error}</p>
+                  <p className="text-amber-700 mt-2">
+                    En Vercel → <strong>POS_MESITA_API_KEY</strong> debe ser exactamente la variable{" "}
+                    <strong>API_KEY</strong> de Railway (servicio pos-mesita-demo).
+                    Clave demo documentada: <code className="font-mono">mesita2024secret</code>
+                  </p>
+                </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

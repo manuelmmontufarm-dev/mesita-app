@@ -35,7 +35,13 @@ export async function GET(request: Request): Promise<Response> {
     return successResponse({ invoices: await listInvoices() }, 200);
   }
   if (view === "reports") {
-    return successResponse({ reports: await getReports() }, 200);
+    const date = url.searchParams.get("date") ?? undefined;
+    const q = url.searchParams.get("q") ?? undefined;
+    const history = url.searchParams.get("history") === "1";
+    return successResponse(
+      await getReports({ date, q, includeHistory: history }),
+      200,
+    );
   }
   if (view === "activity") {
     return successResponse({ activities: await listActivities() }, 200);

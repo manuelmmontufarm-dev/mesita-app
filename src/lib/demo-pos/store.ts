@@ -9,8 +9,12 @@ import { DEMO_BASE_URL } from "@/lib/demo-url";
 import {
   checkPosMesitaHealth,
   cobroViaMesita,
+  extractMesaName,
+  isoToPosDate,
   isPosMesitaConfigured,
   listPosDocumentos,
+  listPosProductos,
+  todayEcPosDate,
   type PosMesitaDocumento,
 } from "@/lib/pos-mesita/client";
 import { buildSeedMenu, SEED_DEMO_TABLES } from "./seed";
@@ -22,7 +26,10 @@ import type {
   DemoPosMenuItem,
   DemoPosQrTable,
   DemoPosReport,
+  DemoPosReportConsumption,
+  DemoPosReportDocument,
   DemoPosReportPayment,
+  DemoPosReportsPayload,
   DemoPosSettings,
   DemoPosTableRow,
 } from "./types";
@@ -469,6 +476,8 @@ const MOCK_REPORTS: DemoPosReport[] = [
       ref: "POS-0042",
       createdAt: new Date(Date.now() - 86_000_000).toISOString(),
     }],
+    consumptions: [],
+    documents: [],
   },
   {
     id: "mock-bill-6",
@@ -493,6 +502,8 @@ const MOCK_REPORTS: DemoPosReport[] = [
       ref: "MQR-20260628-4521",
       createdAt: new Date(Date.now() - 1_800_000).toISOString(),
     }],
+    consumptions: [],
+    documents: [],
   },
 ];
 
@@ -507,10 +518,28 @@ function billStatus(
   return "CLOSED";
 }
 
-function docToReport(doc: PosMesitaDocumento): DemoPosReport {
-  const mesaName =
-    doc.orden?.mesa?.nombre ??
-    (doc.descripcion?.match(/Mesa\s+\d+/i)?.[0] ?? "POS");
+function docDetallesToConsumptions(
+  doc: PosMesitaDocumento,
+  productNames: Map<string, string>,
+): DemoPosReportConsumption[] {
+  return (doc.detalles ?? []).map((d) => ({
+    id: d.id,
+    name: d.producto_id
+      ? (productNames.get(d.producto_id) ?? `Producto ${d.producto_id.slice(0, 6)}`)
+      : "Consumo",
+    qty: d.cantidad,
+    unitPrice: d.precio,
+    total: Math.round(d.cantidad * d.precio * 100) / 100,
+    documentId: doc.id,
+    documentType: doc.tipo_documento,
+    fecha: doc.fecha_emision,
+  }));
+}
+
+function docToDocumentSummary(
+  doc: PosMesitaDocumento,
+  productNames: Map<string, string>,
+): DemoPosReportDocument {
   const payments: DemoPosReportPayment[] = (doc.cobros ?? []).map((c) => ({
     id: c.id,
     amount: c.monto,
@@ -520,6 +549,26 @@ function docToReport(doc: PosMesitaDocumento): DemoPosReport {
     ref: c.referencia ?? "",
     createdAt: c.created_at,
   }));
+  return {
+    id: doc.id,
+    tipo: doc.tipo_documento,
+    estado: doc.estado,
+    descripcion: doc.descripcion,
+    fecha: doc.fecha_emision,
+    total: doc.total,
+    consumptions: docDetallesToConsumptions(doc, productNames),
+    payments,
+  };
+}
+
+function docToReport(
+  doc: PosMesitaDocumento,
+  productNames: Map<string, string>,
+): DemoPosReport {
+  const mesaName = extractMesaName(doc);
+  const document = docToDocumentSummary(doc, productNames);
+  const payments = document.payments;
+  const consumptions = document.consumptions;
   const mesitaPaid = payments
     .filter((p) => p.viaMesita)
     .reduce((s, p) => s + p.amount, 0);
@@ -548,10 +597,78 @@ function docToReport(doc: PosMesitaDocumento): DemoPosReport {
     createdAt: doc.created_at,
     updatedAt: doc.created_at,
     payments,
+    consumptions,
+    documents: [document],
   };
 }
 
-export async function getReports(): Promise<DemoPosReport[]> {
+function mergeReportsByMesa(reports: DemoPosReport[]): DemoPosReport[] {
+  const byMesa = new Map<string, DemoPosReport>();
+
+  for (const r of reports) {
+    const key = r.tableName.toLowerCase();
+    const existing = byMesa.get(key);
+    if (!existing) {
+      byMesa.set(key, { ...r, documents: [...r.documents], consumptions: [...r.consumptions], payments: [...r.payments] });
+      continue;
+    }
+    existing.total = Math.max(existing.total, r.total);
+    existing.paid += r.paid;
+    existing.mesitaPaid += r.mesitaPaid;
+    existing.posOnlyPaid += r.posOnlyPaid;
+    existing.paidViaMesita = existing.paidViaMesita || r.paidViaMesita;
+    existing.live = existing.live || r.live;
+    if (new Date(r.updatedAt) > new Date(existing.updatedAt)) {
+      existing.updatedAt = r.updatedAt;
+      existing.status = r.status;
+    }
+    existing.payments.push(...r.payments);
+    existing.consumptions.push(...r.consumptions);
+    existing.documents.push(...r.documents);
+    if (!existing.posDocumentId && r.posDocumentId) {
+      existing.posDocumentId = r.posDocumentId;
+    }
+  }
+
+  return [...byMesa.values()].map((r) => ({
+    ...r,
+    payments: [...r.payments].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    ),
+    consumptions: [...r.consumptions].sort(
+      (a, b) => b.fecha.localeCompare(a.fecha) || b.documentId.localeCompare(a.documentId),
+    ),
+    documents: [...r.documents].sort(
+      (a, b) => b.fecha.localeCompare(a.fecha) || b.id.localeCompare(a.id),
+    ),
+  }));
+}
+
+function matchesSearch(report: DemoPosReport, q: string): boolean {
+  const needle = q.toLowerCase();
+  if (report.tableName.toLowerCase().includes(needle)) return true;
+  if (report.posDocumentId?.toLowerCase().includes(needle)) return true;
+  if (report.payments.some((p) => p.guestName.toLowerCase().includes(needle) || p.ref.toLowerCase().includes(needle))) {
+    return true;
+  }
+  if (report.consumptions.some((c) => c.name.toLowerCase().includes(needle))) return true;
+  if (report.documents.some((d) => (d.descripcion ?? "").toLowerCase().includes(needle))) return true;
+  return false;
+}
+
+export async function getReports(opts?: {
+  date?: string;
+  q?: string;
+  includeHistory?: boolean;
+}): Promise<DemoPosReportsPayload> {
+  const posDate = opts?.date ? isoToPosDate(opts.date) : todayEcPosDate();
+  const search = opts?.q?.trim() ?? "";
+  const includeHistory = opts?.includeHistory ?? Boolean(search);
+
+  let posConnected = false;
+  let posError: string | null = null;
+  let productNames = new Map<string, string>();
+
   const liveReports: DemoPosReport[] = await Promise.all(
     DEMO_TABLE_DEFINITIONS.map(async (def) => {
       const tableName = `Mesa ${def.table.name}`;
@@ -561,6 +678,17 @@ export async function getReports(): Promise<DemoPosReport[]> {
         def.restaurant,
         state,
       );
+
+      const liveConsumptions: DemoPosReportConsumption[] = def.items.map((item) => ({
+        id: `live-${item.id}`,
+        name: item.name,
+        qty: item.qty,
+        unitPrice: item.unitPrice,
+        total: Math.round(item.qty * item.unitPrice * 100) / 100,
+        documentId: `PRE-2026-${def.table.name.padStart(4, "0")}`,
+        documentType: "PRE",
+        fecha: posDate,
+      }));
 
       if (!state) {
         return {
@@ -578,6 +706,8 @@ export async function getReports(): Promise<DemoPosReport[]> {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           payments: [],
+          consumptions: liveConsumptions,
+          documents: [],
         };
       }
 
@@ -606,6 +736,17 @@ export async function getReports(): Promise<DemoPosReport[]> {
         createdAt: state.guests[0]?.joinedAt ?? state.updatedAt,
         updatedAt: state.updatedAt,
         payments,
+        consumptions: liveConsumptions,
+        documents: payments.length > 0 ? [{
+          id: `live-doc-${def.token}`,
+          tipo: "FAC",
+          estado: paidAmount >= billTotal - 0.05 ? "C" : "P",
+          descripcion: `Cuenta QR ${tableName}`,
+          fecha: posDate,
+          total: billTotal,
+          consumptions: liveConsumptions,
+          payments,
+        }] : [],
       };
     }),
   );
@@ -615,25 +756,74 @@ export async function getReports(): Promise<DemoPosReport[]> {
   let posReports: DemoPosReport[] = [];
   if (isPosMesitaConfigured()) {
     try {
-      posReports = (await listPosDocumentos(40))
-        .map(docToReport)
-        .filter((r) => r.paid > 0 || r.status === "OPEN" || r.status === "PARTIAL");
+      const health = await checkPosMesitaHealth();
+      posConnected = health.ok;
+      if (!health.ok) posError = health.error ?? "Error de conexión";
+
+      if (health.ok) {
+        try {
+          const productos = await listPosProductos();
+          productNames = new Map(productos.map((p) => [p.id, p.nombre]));
+        } catch {
+          /* product names optional */
+        }
+
+        const limit = includeHistory ? 100 : 50;
+        const docs = await listPosDocumentos({
+          limit,
+          fechaEmision: includeHistory ? undefined : posDate,
+          page: 1,
+        });
+        posReports = docs
+          .map((d) => docToReport(d, productNames))
+          .filter((r) => r.paid > 0 || r.status === "OPEN" || r.status === "PARTIAL" || r.consumptions.length > 0);
+      }
     } catch (e) {
+      posError = e instanceof Error ? e.message : "Error de conexión";
       console.error("[demo-pos] POS documentos fetch failed:", e);
     }
+  } else {
+    posError = "POS_MESITA_API_KEY no configurada en Vercel";
   }
 
-  const mock = hasLivePayments ? [] : MOCK_REPORTS;
+  const mock = hasLivePayments ? [] : MOCK_REPORTS.map((m) => ({
+    ...m,
+    consumptions: [],
+    documents: m.payments.length > 0 ? [{
+      id: m.posDocumentId ?? m.id,
+      tipo: "FAC",
+      estado: m.status === "PAID" ? "C" : "P",
+      descripcion: m.tableName,
+      fecha: posDate,
+      total: m.total,
+      consumptions: [],
+      payments: m.payments,
+    }] : [],
+  }));
 
-  // Live QR reports override POS docs for same table name; POS adds external history
   const liveNames = new Set(
-    liveReports.filter((r) => r.paid > 0).map((r) => r.tableName),
+    liveReports.filter((r) => r.paid > 0).map((r) => r.tableName.toLowerCase()),
   );
   const posFiltered = posReports.filter(
-    (r) => !liveNames.has(r.tableName) || !hasLivePayments,
+    (r) => !liveNames.has(r.tableName.toLowerCase()) || !hasLivePayments,
   );
 
-  return [...liveReports.filter((r) => r.live), ...posFiltered, ...mock].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-  );
+  let merged = mergeReportsByMesa([
+    ...liveReports.filter((r) => r.live),
+    ...posFiltered,
+    ...mock,
+  ]);
+
+  if (search) {
+    merged = merged.filter((r) => matchesSearch(r, search));
+  }
+
+  merged.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+  return {
+    date: posDate,
+    posConnected,
+    posError,
+    reports: merged,
+  };
 }
