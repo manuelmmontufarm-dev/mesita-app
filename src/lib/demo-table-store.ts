@@ -60,7 +60,7 @@ export interface DemoPayment {
 }
 
 /** Bump when default demo seed shape changes — migrated in-place, never wipes guests. */
-const DEMO_STATE_VERSION = 7;
+const DEMO_STATE_VERSION = 8;
 
 export class DemoGuestNotFoundError extends Error {
   constructor(public readonly guestId: string) {
@@ -96,6 +96,10 @@ export interface DemoTableState {
   resetSeq: number;
   version: number;
   updatedAt: string;
+  /** Linked POS orden (tenant_demo). */
+  posOrdenId?: string;
+  posDocumentoId?: string;
+  posMesaId?: string;
 }
 
 type DemoStore = Map<string, DemoTableState>;
@@ -368,6 +372,11 @@ export async function getDemoTableState(token: string): Promise<DemoTableState> 
 
 export async function resetDemoTableState(token: string): Promise<DemoTableState> {
   const prev = await loadState(token);
+  const def = resolveDemoTableToken(token);
+  if (def && prev?.posOrdenId) {
+    const { resetDemoPosMesa } = await import("@/lib/pos-mesita/sync");
+    await resetDemoPosMesa(def, prev).catch(() => {});
+  }
   // createState now seeds from the catalog (preserves mesa-2 partial payments,
   // empty for the rest). Reset bumps resetSeq + version so SSE clients re-sync.
   const state = createState(token);
@@ -375,6 +384,8 @@ export async function resetDemoTableState(token: string): Promise<DemoTableState
   state.version = (prev?.version ?? 0) + 1;
   state.guests = [];
   state.payments = [];
+  state.posOrdenId = undefined;
+  state.posDocumentoId = undefined;
   state.nextGuestNumber = 1;
   getMemoryStore().set(token, state);
   const redis = getRedis();
@@ -447,6 +458,15 @@ export async function joinDemoTable(
 
   if (!resolvedGuest) throw new Error("joinDemoTable: guest not resolved");
   return { state, guest: resolvedGuest };
+}
+
+export async function patchDemoTablePosLinks(
+  token: string,
+  links: Partial<Pick<DemoTableState, "posOrdenId" | "posDocumentoId" | "posMesaId">>,
+): Promise<DemoTableState> {
+  return mutateDemoState(token, (draft) => {
+    Object.assign(draft, links);
+  });
 }
 
 export async function renameDemoGuest(

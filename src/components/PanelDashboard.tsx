@@ -227,7 +227,7 @@ export function PanelDashboard() {
   useEffect(() => {
     mountedRef.current = true;
     load();
-    const id = setInterval(load, 8_000);
+    const id = setInterval(load, 3_000);
     return () => { mountedRef.current = false; clearInterval(id); };
   }, [load]);
 

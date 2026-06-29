@@ -131,6 +131,11 @@ async function mutateConfig(
   return writeConfig(draft);
 }
 
+export async function isDemoPosBillingEnabled(): Promise<boolean> {
+  const c = await readConfig();
+  return Boolean(c.settings?.posMesita?.enabled && c.settings?.posMesita?.syncBilling);
+}
+
 export function demoPayUrl(slug: string): string {
   const base = DEMO_BASE_URL;
   return slug === "default" ? `${base}/pay/demo` : `${base}/pay/demo/${slug}`;
@@ -142,7 +147,7 @@ export function listQrTables(): DemoPosQrTable[] {
     token: def.token,
     name: `Mesa ${def.table.name}`,
     payUrl: demoPayUrl(def.slug),
-    posExternalId: `T-${def.table.name.padStart(3, "0")}`,
+    posExternalId: def.posMesaId,
     live: true as const,
     scenarioDescription: def.scenarioDescription,
   }));
@@ -628,6 +633,14 @@ function mergeReportsByMesa(reports: DemoPosReport[]): DemoPosReport[] {
     if (!existing.posDocumentId && r.posDocumentId) {
       existing.posDocumentId = r.posDocumentId;
     }
+    existing.demo = existing.demo || r.demo;
+    const seenRefs = new Set<string>();
+    existing.payments = existing.payments.filter((p) => {
+      const key = p.ref || p.id;
+      if (seenRefs.has(key)) return false;
+      seenRefs.add(key);
+      return true;
+    });
   }
 
   return [...byMesa.values()].map((r) => ({
@@ -702,12 +715,13 @@ export async function getReports(opts?: {
           posOnlyPaid: 0,
           paidViaMesita: false,
           live: true,
-          posDocumentId: `PRE-2026-${def.table.name.padStart(4, "0")}`,
+          posDocumentId: def.posMesaId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           payments: [],
           consumptions: liveConsumptions,
           documents: [],
+          demo: def.token === "demo",
         };
       }
 
@@ -732,7 +746,8 @@ export async function getReports(opts?: {
         posOnlyPaid: 0,
         paidViaMesita: paidAmount > 0,
         live: true,
-        posDocumentId: `PRE-2026-${def.table.name.padStart(4, "0")}`,
+        demo: def.token === "demo",
+        posDocumentId: state.posDocumentoId ?? def.posMesaId,
         createdAt: state.guests[0]?.joinedAt ?? state.updatedAt,
         updatedAt: state.updatedAt,
         payments,

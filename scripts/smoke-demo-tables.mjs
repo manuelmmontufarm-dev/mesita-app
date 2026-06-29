@@ -1,15 +1,39 @@
 #!/usr/bin/env node
 /**
- * Smoke test: POST {action:"join",deviceId:"smoke-test"} to each demo token.
- * Prints PASS/FAIL table. Exits non-zero on any FAIL.
- *
- * SMOKE_URL=http://localhost:3000 npm run demo:smoke
+ * Smoke test: demo table join + POS health.
+ * SMOKE_URL=http://localhost:3000 POS_URL=https://mesita-pos.vercel.app npm run demo:smoke
  */
 
 const BASE = process.env.SMOKE_URL ?? "http://localhost:3000";
+const POS = (process.env.POS_URL ?? "https://mesita-pos.vercel.app").replace(/\/$/, "");
 const TOKENS = ["demo", "demo-mesa-1", "demo-mesa-2", "demo-mesa-3", "demo-mesa-4"];
 
 const results = [];
+
+async function checkPosHealth() {
+  const t0 = Date.now();
+  try {
+    const res = await fetch(`${POS}/sistema/api/v1/health/db/`);
+    const ms = Date.now() - t0;
+    const json = await res.json().catch(() => ({}));
+    results.push({
+      token: "pos-health/db",
+      status: res.status,
+      ok: res.ok && json.database === "connected",
+      ms,
+    });
+  } catch (err) {
+    results.push({
+      token: "pos-health/db",
+      status: 0,
+      ok: false,
+      ms: Date.now() - t0,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+await checkPosHealth();
 
 for (const token of TOKENS) {
   const url = `${BASE}/api/demo/table/${token}`;
@@ -18,7 +42,7 @@ for (const token of TOKENS) {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "join", deviceId: "smoke-test" }),
+      body: JSON.stringify({ action: "join", deviceId: `smoke-${token}` }),
     });
     const ms = Date.now() - t0;
     results.push({

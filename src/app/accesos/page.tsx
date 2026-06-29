@@ -1,10 +1,19 @@
 import {
+  Activity,
+  ArrowDown,
   ArrowUpRight,
+  CheckCircle2,
+  Clock3,
   Code2,
   CreditCard,
+  Database,
   LayoutDashboard,
   MonitorSmartphone,
   QrCode,
+  ReceiptText,
+  RefreshCw,
+  ScanLine,
+  Server,
   Settings,
   Store,
   UtensilsCrossed,
@@ -145,6 +154,85 @@ const groups: AccessGroup[] = [
   },
 ];
 
+const systemNodes = [
+  {
+    eyebrow: "Operación",
+    title: "POS Mesita",
+    description: "El mesero administra mesas y órdenes. El POS conserva los documentos fiscales y cobros.",
+    href: `${posBase}/index.html`,
+    icon: MonitorSmartphone,
+    cardClass: "border-violet-300/20 bg-violet-400/10",
+    iconClass: "bg-violet-300/15 text-violet-200",
+    badgeClass: "text-violet-200/60",
+  },
+  {
+    eyebrow: "Orquestación",
+    title: "Motor Mesita",
+    description: "La API conecta la mesa, los comensales, el pago y el POS sin exponer credenciales al cliente.",
+    href: `${mesitaBase}/dashboard/owner/configuracion`,
+    icon: Server,
+    cardClass: "border-emerald-300/25 bg-emerald-400/10",
+    iconClass: "bg-emerald-300/15 text-emerald-200",
+    badgeClass: "text-emerald-200/60",
+  },
+  {
+    eyebrow: "Experiencia",
+    title: "App QR del cliente",
+    description: "Cada persona abre la cuenta, elige qué pagar, divide consumos, agrega propina y confirma.",
+    href: `${mesitaBase}/pay/demo`,
+    icon: ScanLine,
+    cardClass: "border-orange-300/20 bg-orange-400/10",
+    iconClass: "bg-orange-300/15 text-orange-200",
+    badgeClass: "text-orange-200/60",
+  },
+] as const;
+
+const paymentSteps = [
+  {
+    title: "El cliente paga",
+    description: "Mesita valida el monto, los ítems seleccionados y el estado compartido de la mesa.",
+    icon: CreditCard,
+  },
+  {
+    title: "Se registra el evento",
+    description: "La actividad y el avance de la cuenta quedan disponibles para los otros comensales.",
+    icon: Activity,
+  },
+  {
+    title: "El POS recibe el cobro",
+    description: "La integración crea el documento y registra la referencia del pago Mesita.",
+    icon: ReceiptText,
+  },
+  {
+    title: "El dueño ve el resultado",
+    description: "Dashboard, mesas y reportes reflejan el pago sin volver a digitarlo.",
+    icon: CheckCircle2,
+  },
+];
+
+const syncCadence = [
+  {
+    value: "Inmediato",
+    title: "Mesa compartida",
+    description: "Selecciones, personas y pagos se guardan al confirmar cada acción.",
+  },
+  {
+    value: "Cada 5 s",
+    title: "Actividad en vivo",
+    description: "El dashboard busca nuevas entradas, aperturas de mesa y pagos.",
+  },
+  {
+    value: "Cada 10 s",
+    title: "Estado de mesas",
+    description: "La vista de operación refresca ocupación, total y estado de cobro.",
+  },
+  {
+    value: "Cada 12 s",
+    title: "Documentos del POS",
+    description: "Reportes y reembolsos consultan facturas y cobros sincronizados.",
+  },
+];
+
 export default function AccesosPage() {
   return (
     <main className="min-h-screen bg-[#f5f5f0] text-[#171714]">
@@ -168,6 +256,162 @@ export default function AccesosPage() {
             </p>
           </div>
         </header>
+
+        <section className="mb-16 overflow-hidden rounded-[2rem] bg-[#171714] px-5 py-7 text-white shadow-xl sm:px-8 sm:py-10">
+          <div className="mb-8 flex flex-col justify-between gap-4 border-b border-white/10 pb-7 sm:flex-row sm:items-end">
+            <div>
+              <div className="mb-3 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-emerald-300/70">
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                Un solo ecosistema
+              </div>
+              <h2 className="max-w-2xl text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
+                Así se conecta todo
+              </h2>
+            </div>
+            <p className="max-w-md text-sm leading-6 text-white/50 sm:text-right">
+              Ninguna pantalla trabaja aislada. Mesita mueve la información entre operación, cliente y administración.
+            </p>
+          </div>
+
+          <div className="grid items-stretch gap-3 lg:grid-cols-[1fr_auto_1.08fr_auto_1fr]">
+            {systemNodes.map((node, index) => {
+              const Icon = node.icon;
+              return (
+                <div key={node.title} className="contents">
+                  <a
+                    href={node.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`group flex min-h-56 flex-col justify-between rounded-2xl border p-5 transition hover:-translate-y-0.5 hover:bg-white/[0.08] ${node.cardClass}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <span className={`rounded-xl p-2.5 ${node.iconClass}`}>
+                        <Icon className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <ArrowUpRight className="h-4 w-4 text-white/25 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white" />
+                    </div>
+                    <div>
+                      <p className={`mb-2 text-[10px] font-bold uppercase tracking-[0.16em] ${node.badgeClass}`}>
+                        {node.eyebrow}
+                      </p>
+                      <h3 className="text-xl font-semibold tracking-tight">{node.title}</h3>
+                      <p className="mt-2 text-sm leading-5 text-white/50">{node.description}</p>
+                    </div>
+                  </a>
+
+                  {index < systemNodes.length - 1 && (
+                    <div className="flex items-center justify-center py-1 text-center lg:px-1 lg:py-0">
+                      <div>
+                        <span className="hidden text-xl text-emerald-300/70 lg:block">↔</span>
+                        <ArrowDown className="mx-auto h-5 w-5 text-emerald-300/70 lg:hidden" aria-hidden="true" />
+                        <span className="mt-1 block text-[9px] font-bold uppercase tracking-[0.12em] text-white/30">
+                          {index === 0 ? "API segura" : "estado vivo"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mx-auto flex w-fit flex-col items-center py-4">
+            <div className="h-7 w-px bg-gradient-to-b from-emerald-300/70 to-emerald-300/10" />
+            <ArrowDown className="h-4 w-4 text-emerald-300/70" aria-hidden="true" />
+          </div>
+
+          <a
+            href={`${mesitaBase}/dashboard/owner/panel`}
+            target="_blank"
+            rel="noreferrer"
+            className="group mx-auto flex max-w-2xl flex-col gap-4 rounded-2xl border border-sky-300/20 bg-sky-400/10 p-5 transition hover:-translate-y-0.5 hover:bg-sky-400/15 sm:flex-row sm:items-center"
+          >
+            <span className="w-fit rounded-xl bg-sky-300/15 p-3 text-sky-200">
+              <LayoutDashboard className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-sky-200/60">Lectura central</p>
+              <h3 className="mt-1 text-lg font-semibold">Dashboard del dueño</h3>
+              <p className="mt-1 text-sm leading-5 text-white/50">
+                Reúne mesas, actividad, facturas, pagos, propinas y reportes provenientes de Mesita y del POS.
+              </p>
+            </div>
+            <ArrowUpRight className="h-5 w-5 text-white/25 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white" />
+          </a>
+
+          <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+            <div className="mb-5 flex items-center gap-3">
+              <span className="rounded-lg bg-white/10 p-2 text-white/70">
+                <Database className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold">Quién es responsable de cada dato</p>
+                <p className="text-xs text-white/40">Una fuente clara evita duplicados y descuadres.</p>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl bg-white/[0.04] p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-violet-200/65">POS</p>
+                <p className="mt-2 text-sm leading-5 text-white/55">Órdenes, documentos fiscales y cobros registrados.</p>
+              </div>
+              <div className="rounded-xl bg-white/[0.04] p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-orange-200/65">App QR</p>
+                <p className="mt-2 text-sm leading-5 text-white/55">Personas, selección de consumos, división y propina.</p>
+              </div>
+              <div className="rounded-xl bg-white/[0.04] p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-sky-200/65">Dashboard</p>
+                <p className="mt-2 text-sm leading-5 text-white/55">Visualiza y opera; combina el estado en vivo con documentos del POS.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-16">
+          <div className="mb-6 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+            <div>
+              <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-black/40">Ejemplo real</p>
+              <h2 className="text-2xl font-semibold tracking-[-0.03em] sm:text-3xl">Qué ocurre cuando alguien paga</h2>
+            </div>
+            <p className="max-w-sm text-sm leading-6 text-black/50 sm:text-right">Un pago recorre todo el sistema sin repetir trabajo en caja.</p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-4">
+            {paymentSteps.map((step, index) => {
+              const Icon = step.icon;
+              return (
+                <div key={step.title} className="relative rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
+                  <div className="mb-8 flex items-center justify-between">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#171714] text-xs font-semibold text-white">{index + 1}</span>
+                    <Icon className="h-5 w-5 text-black/30" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-base font-semibold tracking-tight">{step.title}</h3>
+                  <p className="mt-2 text-sm leading-5 text-black/50">{step.description}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="mb-16 rounded-3xl border border-black/10 bg-white p-5 shadow-sm sm:p-7">
+          <div className="mb-6 flex items-start gap-3">
+            <span className="rounded-xl bg-[#f0f0ea] p-2.5 text-black/60">
+              <Clock3 className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight">Cómo se mantiene actualizado</h2>
+              <p className="mt-1 text-sm text-black/50">Cada vista refresca según la velocidad que necesita.</p>
+            </div>
+          </div>
+          <div className="grid gap-px overflow-hidden rounded-2xl border border-black/10 bg-black/10 sm:grid-cols-2 lg:grid-cols-4">
+            {syncCadence.map((item) => (
+              <div key={item.title} className="bg-[#fafaf7] p-5">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">{item.value}</p>
+                <h3 className="mt-3 text-sm font-semibold">{item.title}</h3>
+                <p className="mt-1.5 text-xs leading-5 text-black/50">{item.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <div className="space-y-14">
           {groups.map((group) => (
