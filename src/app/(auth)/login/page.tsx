@@ -75,7 +75,34 @@ export default function LoginPage() {
           Accede a tu cuenta de restaurante
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-5">
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              localStorage.setItem("mesita-demo-mode", "true");
+            }
+            router.push("/dashboard/owner/panel");
+          }}
+          className="w-full h-12 rounded-xl text-sm font-semibold transition-opacity hover:opacity-90"
+          style={{
+            background: "var(--ink-900)",
+            color: "var(--on-dark)",
+            border: "none",
+            cursor: "pointer",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          Entrar como demo →
+        </button>
+
+        <p
+          className="text-center text-xs"
+          style={{ color: "var(--on-light-mut)", letterSpacing: "0.04em" }}
+        >
+          — o inicia sesión con tu cuenta —
+        </p>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField

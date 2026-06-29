@@ -5,7 +5,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 
 export default function OwnerLayout({ children }: { children: ReactNode }) {
   return (
-    <DashboardLayout restaurantName="Mi Restaurante">
+    <DashboardLayout restaurantName="La Doña Pepa">
       {children}
     </DashboardLayout>
   );

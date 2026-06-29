@@ -20,11 +20,10 @@ export function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen" style={{ background: "var(--paper)" }}>
       <DashboardSidebar restaurantName={restaurantName} />
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto" style={{ background: "var(--paper)" }}>
         <div className="max-w-6xl mx-auto p-8">
           {children}
         </div>

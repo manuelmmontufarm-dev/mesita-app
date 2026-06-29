@@ -10,7 +10,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             className="text-2xl font-semibold tracking-tight"
             style={{ color: "var(--ink-900)" }}
           >
-            Mesa<span style={{ color: "var(--coral)" }}>QR</span>
+            Mesa<span style={{ color: "var(--emerald)" }}>QR</span>
           </span>
         </div>
 
