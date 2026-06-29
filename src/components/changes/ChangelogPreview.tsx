@@ -47,9 +47,9 @@ export async function ChangelogPreview() {
   return (
     <section
       aria-labelledby="changelog-hero-title"
-      className="mb-16 overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#0d1f17] via-[#171714] to-[#1a2420] text-white shadow-2xl ring-1 ring-emerald-400/20"
+      className="mb-6 overflow-hidden rounded-[1.5rem] bg-gradient-to-br from-[#0d1f17] via-[#171714] to-[#1a2420] text-white shadow-2xl ring-1 ring-emerald-400/20 sm:mb-8 sm:rounded-[1.75rem]"
     >
-      <div className="relative px-5 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
+      <div className="relative px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-9">
         <div
           className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl"
           aria-hidden="true"
@@ -82,7 +82,7 @@ export async function ChangelogPreview() {
 
             <h2
               id="changelog-hero-title"
-              className="max-w-xl text-[2.35rem] font-semibold leading-[1.02] tracking-[-0.045em] sm:text-5xl lg:text-[3.25rem]"
+              className="max-w-xl text-[1.85rem] font-semibold leading-[1.04] tracking-[-0.04em] sm:text-4xl lg:text-[2.75rem]"
             >
               Mesita mejora
               <br />
@@ -94,26 +94,26 @@ export async function ChangelogPreview() {
               <span className="text-white/70">TODAY.md</span> para explicar qué cambió, por qué y qué mejora.
             </p>
 
-            <div className="mt-7 grid grid-cols-3 gap-2 sm:max-w-md sm:gap-3">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-3.5 sm:px-4 sm:py-4">
-                <p className="text-2xl font-semibold tracking-tight sm:text-3xl">{changeCount || "—"}</p>
-                <p className="mt-0.5 text-[10px] leading-tight text-white/40 sm:text-xs">cambios</p>
+            <div className="mt-5 grid grid-cols-3 gap-2 sm:max-w-sm">
+              <div className="rounded-xl border border-white/10 bg-white/[0.05] px-2.5 py-2.5 sm:px-3 sm:py-3">
+                <p className="text-xl font-semibold tracking-tight sm:text-2xl">{changeCount || "—"}</p>
+                <p className="mt-0.5 text-[9px] text-white/40 sm:text-[10px]">cambios</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-3.5 sm:px-4 sm:py-4">
-                <p className="text-2xl font-semibold tracking-tight sm:text-3xl">{days.length || "—"}</p>
-                <p className="mt-0.5 text-[10px] leading-tight text-white/40 sm:text-xs">días</p>
+              <div className="rounded-xl border border-white/10 bg-white/[0.05] px-2.5 py-2.5 sm:px-3 sm:py-3">
+                <p className="text-xl font-semibold tracking-tight sm:text-2xl">{days.length || "—"}</p>
+                <p className="mt-0.5 text-[9px] text-white/40 sm:text-[10px]">días</p>
               </div>
-              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-3.5 sm:px-4 sm:py-4">
-                <p className="text-2xl font-semibold tracking-tight text-emerald-300 sm:text-3xl">
+              <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-2.5 sm:px-3 sm:py-3">
+                <p className="text-xl font-semibold tracking-tight text-emerald-300 sm:text-2xl">
                   {latest?.entries.length ?? "—"}
                 </p>
-                <p className="mt-0.5 text-[10px] leading-tight text-emerald-200/50 sm:text-xs">hoy</p>
+                <p className="mt-0.5 text-[9px] text-emerald-200/50 sm:text-[10px]">hoy</p>
               </div>
             </div>
 
             <Link
               href="/cambios"
-              className="group mt-8 inline-flex w-full items-center justify-center gap-2.5 rounded-2xl bg-emerald-400 px-6 py-4 text-base font-semibold text-[#0d1f17] shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-300 sm:w-auto sm:min-w-[260px]"
+              className="group mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-3.5 text-sm font-semibold text-[#0d1f17] shadow-lg shadow-emerald-900/30 transition active:scale-[0.98] hover:bg-emerald-300 sm:w-auto sm:min-w-[220px]"
             >
               <Newspaper className="h-5 w-5" aria-hidden="true" />
               Abrir bitácora completa
@@ -157,7 +157,7 @@ export async function ChangelogPreview() {
 
               {recentEntries.length > 0 ? (
                 <ul className="divide-y divide-white/[0.07]">
-                  {recentEntries.map((entry) => (
+                  {recentEntries.slice(0, 4).map((entry) => (
                     <li key={entry.sha}>
                       <a
                         href={entry.url}
