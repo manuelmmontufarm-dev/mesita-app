@@ -220,6 +220,13 @@ export default function ConfiguracionPage() {
       endpoints: Record<string, string>;
       sync: Record<string, string>;
       lastSyncAt: string;
+      posMesita?: {
+        name: string;
+        url: string;
+        connected: boolean;
+        configured: boolean;
+        error: string | null;
+      };
       restaurant: { name: string; city: string; ruc: string };
     };
 
@@ -289,6 +296,25 @@ export default function ConfiguracionPage() {
             </div>
 
             <div className="border-t pt-4 space-y-3">
+              {cfg.posMesita && (
+                <div className="p-4 rounded-lg border" style={{ borderColor: cfg.posMesita.connected ? "rgba(47,179,126,.3)" : "rgba(242,169,59,.3)", background: cfg.posMesita.connected ? "rgba(47,179,126,.06)" : "rgba(242,169,59,.06)" }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-900">{cfg.posMesita.name}</p>
+                      <p className="text-xs text-zinc-500 mt-0.5 font-mono break-all">{cfg.posMesita.url}</p>
+                      {cfg.posMesita.error && (
+                        <p className="text-xs text-amber-700 mt-1">{cfg.posMesita.error}</p>
+                      )}
+                    </div>
+                    <Badge className={cfg.posMesita.connected ? "bg-green-100 text-green-800 border-green-200" : "bg-yellow-100 text-yellow-800 border-yellow-200"}>
+                      {cfg.posMesita.connected ? "Conectado" : cfg.posMesita.configured ? "Error" : "Sin API key"}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-2">
+                    Los pagos del app se registran como FAC en el POS vía API. Configura <code className="text-xs">POS_MESITA_API_KEY</code> en Vercel.
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">Kushki Pagos</p>

@@ -105,4 +105,6 @@ export interface DemoPosTableRow {
   status: "open" | "paying" | "closed";
   guestCount: number;
   total: number;
+  billTotal: number;
+  paidAmount: number;
 }

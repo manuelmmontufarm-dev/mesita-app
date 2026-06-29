@@ -14,6 +14,7 @@ import {
 } from "@/lib/demo-table-store";
 import { resolveDemoTableToken } from "@/lib/demo-table-catalog";
 import { registerDemoPosInvoice, registerDemoPosActivity } from "@/lib/demo-pos";
+import { registerPaymentInPosMesita } from "@/lib/pos-mesita/client";
 import { errorResponse, successResponse } from "@/lib/api-utils";
 import { z } from "zod";
 
@@ -185,6 +186,14 @@ export async function POST(
           guestName: payment.guestName,
           amount: payment.amount,
         }).catch(() => {});
+
+        registerPaymentInPosMesita({
+          tableName: `Mesa ${def.table.name}`,
+          guestName: payment.guestName,
+          amount: payment.amount,
+          ref: payment.ref,
+          method: payment.method,
+        }).catch((err) => console.error("[pos-mesita] sync failed:", err));
       }
 
       return successResponse(state, 200);

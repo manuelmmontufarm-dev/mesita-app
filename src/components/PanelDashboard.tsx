@@ -17,6 +17,8 @@ interface TableRow {
   status: "open" | "paying" | "closed";
   guestCount: number;
   total: number;
+  billTotal?: number;
+  paidAmount?: number;
   live?: boolean;
   kind?: "qr" | "demo" | "custom";
 }
@@ -581,7 +583,12 @@ export function PanelDashboard() {
                         {t.guestCount > 0 ? t.guestCount : "—"}
                       </span>
                       <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ink-900)", fontVariantNumeric: "tabular-nums" }}>
-                        {t.total > 0 ? formatCurrency(t.total) : "—"}
+                        {formatCurrency(t.total)}
+                        {(t.paidAmount ?? 0) > 0 && (t.billTotal ?? 0) > (t.paidAmount ?? 0) && t.status !== "closed" && (
+                          <span style={{ fontSize: 11, fontWeight: 400, color: "var(--on-light-mut)", marginLeft: 4 }}>
+                            / {formatCurrency(t.billTotal!)}
+                          </span>
+                        )}
                       </span>
                     </div>
                   </div>

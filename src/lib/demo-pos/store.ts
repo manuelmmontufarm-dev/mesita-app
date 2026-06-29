@@ -1,8 +1,18 @@
 import { Redis } from "@upstash/redis";
 
 import { DEMO_TABLE_DEFINITIONS } from "@/lib/demo-table-catalog/definitions";
+import {
+  computeDemoDisplayAmount,
+} from "@/lib/demo-bill-math";
 import { getDemoTableState } from "@/lib/demo-table-store";
 import { DEMO_BASE_URL } from "@/lib/demo-url";
+import {
+  checkPosMesitaHealth,
+  cobroViaMesita,
+  isPosMesitaConfigured,
+  listPosDocumentos,
+  type PosMesitaDocumento,
+} from "@/lib/pos-mesita/client";
 import { buildSeedMenu, SEED_DEMO_TABLES } from "./seed";
 import type {
   DemoPosActivity,
@@ -110,8 +120,10 @@ export async function listAllTables(): Promise<DemoPosTableRow[]> {
   const qrRows: DemoPosTableRow[] = await Promise.all(
     DEMO_TABLE_DEFINITIONS.map(async (def, i) => {
       const qr = listQrTables()[i];
-      const tableTotal = def.items.reduce((s, it) => s + it.qty * it.unitPrice, 0);
+      const restaurant = def.restaurant;
       const state = await getDemoTableState(def.token).catch(() => null);
+      const amounts = computeDemoDisplayAmount(def.items, restaurant, state);
+
       if (!state) {
         return {
           id: def.token,
@@ -124,11 +136,14 @@ export async function listAllTables(): Promise<DemoPosTableRow[]> {
           kind: "qr",
           status: "closed",
           guestCount: 0,
-          total: tableTotal,
+          total: amounts.displayAmount,
+          billTotal: amounts.billTotal,
+          paidAmount: 0,
         };
       }
       const allPaid =
         state.paidItemIds.length >= state.items.length && state.items.length > 0;
+      const display = computeDemoDisplayAmount(state.items, state.restaurant, state);
       return {
         id: def.token,
         name: qr.name,
@@ -144,7 +159,9 @@ export async function listAllTables(): Promise<DemoPosTableRow[]> {
           allPaid,
         ),
         guestCount: state.guests.length,
-        total: tableTotal,
+        total: display.displayAmount,
+        billTotal: display.billTotal,
+        paidAmount: display.paidAmount,
       };
     }),
   );
@@ -158,6 +175,8 @@ export async function listAllTables(): Promise<DemoPosTableRow[]> {
     status: (["open", "paying", "closed"] as const)[idx % 3],
     guestCount: idx % 3 === 0 ? 2 + (idx % 3) : 0,
     total: 28.5 + idx * 12.4,
+    billTotal: 28.5 + idx * 12.4,
+    paidAmount: 0,
   }));
 
   return [...qrRows, ...demoRows];
@@ -322,25 +341,35 @@ export async function listActivities(limit = 20): Promise<DemoPosActivity[]> {
   return (await readActivities()).slice(0, limit);
 }
 
-export function getDemoPosConfigStatus() {
+export async function getDemoPosConfigStatus() {
   const base = DEMO_BASE_URL;
+  const posHealth = await checkPosMesitaHealth();
+
   return {
     provider: "mesita-pos-demo",
-    name: "Mesita POS (Demo API)",
+    name: "Mesita POS (API Railway)",
     enabled: true,
     apiConfigured: true,
     environment: "DEMO",
     baseUrl: `${base}/api/demo-pos`,
+    posMesita: {
+      name: "POS Mesita Demo",
+      url: posHealth.baseUrl,
+      connected: posHealth.ok,
+      configured: posHealth.configured,
+      error: posHealth.error ?? null,
+    },
     endpoints: {
       menu: "GET /api/demo-pos?view=menu",
       tables: "GET /api/demo-pos?view=tables",
       reports: "GET /api/demo-pos?view=reports",
       billing: "POST /api/demo/table/[token] (pay → POS)",
+      posDocumentos: "GET /documento/ (POS Mesita Railway)",
     },
     sync: {
       menu: "bidirectional",
       tables: "bidirectional",
-      billing: "app → POS → dashboard",
+      billing: "app → POS Mesita → dashboard",
     },
     lastSyncAt: new Date().toISOString(),
     restaurant: {
@@ -413,19 +442,68 @@ function billStatus(
   return "CLOSED";
 }
 
+function docToReport(doc: PosMesitaDocumento): DemoPosReport {
+  const mesaName =
+    doc.orden?.mesa?.nombre ??
+    (doc.descripcion?.match(/Mesa\s+\d+/i)?.[0] ?? "POS");
+  const payments: DemoPosReportPayment[] = (doc.cobros ?? []).map((c) => ({
+    id: c.id,
+    amount: c.monto,
+    guestName: c.detalle ?? "Cliente",
+    method: c.forma_cobro,
+    viaMesita: cobroViaMesita(c),
+    ref: c.referencia ?? "",
+    createdAt: c.created_at,
+  }));
+  const mesitaPaid = payments
+    .filter((p) => p.viaMesita)
+    .reduce((s, p) => s + p.amount, 0);
+  const posOnlyPaid = payments
+    .filter((p) => !p.viaMesita)
+    .reduce((s, p) => s + p.amount, 0);
+  const paid = payments.reduce((s, p) => s + p.amount, 0);
+  const total = doc.total;
+
+  let status: DemoPosReport["status"] = "CLOSED";
+  if (doc.estado === "P") status = paid > 0 ? "PARTIAL" : "OPEN";
+  else if (doc.estado === "C" || doc.estado === "F") status = paid >= total - 0.05 ? "PAID" : "PARTIAL";
+
+  return {
+    id: `pos-${doc.id}`,
+    tableName: mesaName,
+    tableToken: doc.orden?.mesa?.id ?? doc.id,
+    status,
+    total,
+    paid,
+    mesitaPaid,
+    posOnlyPaid,
+    paidViaMesita: mesitaPaid > 0,
+    live: false,
+    posDocumentId: doc.id,
+    createdAt: doc.created_at,
+    updatedAt: doc.created_at,
+    payments,
+  };
+}
+
 export async function getReports(): Promise<DemoPosReport[]> {
   const liveReports: DemoPosReport[] = await Promise.all(
     DEMO_TABLE_DEFINITIONS.map(async (def) => {
       const tableName = `Mesa ${def.table.name}`;
-      const total = def.items.reduce((s, it) => s + it.qty * it.unitPrice, 0) * 1.25;
       const state = await getDemoTableState(def.token).catch(() => null);
+      const { billTotal, paidAmount } = computeDemoDisplayAmount(
+        def.items,
+        def.restaurant,
+        state,
+      );
+
       if (!state) {
         return {
           id: `bill-${def.token}`,
           tableName,
           tableToken: def.token,
           status: "CLOSED" as const,
-          total: Math.round(total * 100) / 100,
+          total: billTotal,
           paid: 0,
           mesitaPaid: 0,
           posOnlyPaid: 0,
@@ -448,19 +526,16 @@ export async function getReports(): Promise<DemoPosReport[]> {
         createdAt: p.createdAt,
       }));
 
-      const mesitaPaid = payments.reduce((s, p) => s + p.amount, 0);
-      const roundedTotal = Math.round(total * 100) / 100;
-
       return {
         id: `bill-${def.token}`,
         tableName,
         tableToken: def.token,
-        status: billStatus(roundedTotal, mesitaPaid, state.guests.length > 0),
-        total: roundedTotal,
-        paid: Math.round(mesitaPaid * 100) / 100,
-        mesitaPaid: Math.round(mesitaPaid * 100) / 100,
+        status: billStatus(billTotal, paidAmount, state.guests.length > 0),
+        total: billTotal,
+        paid: paidAmount,
+        mesitaPaid: paidAmount,
         posOnlyPaid: 0,
-        paidViaMesita: mesitaPaid > 0,
+        paidViaMesita: paidAmount > 0,
         live: true,
         posDocumentId: `PRE-2026-${def.table.name.padStart(4, "0")}`,
         createdAt: state.guests[0]?.joinedAt ?? state.updatedAt,
@@ -471,9 +546,29 @@ export async function getReports(): Promise<DemoPosReport[]> {
   );
 
   const hasLivePayments = liveReports.some((r) => r.payments.length > 0);
+
+  let posReports: DemoPosReport[] = [];
+  if (isPosMesitaConfigured()) {
+    try {
+      posReports = (await listPosDocumentos(40))
+        .map(docToReport)
+        .filter((r) => r.paid > 0 || r.status === "OPEN" || r.status === "PARTIAL");
+    } catch (e) {
+      console.error("[demo-pos] POS documentos fetch failed:", e);
+    }
+  }
+
   const mock = hasLivePayments ? [] : MOCK_REPORTS;
 
-  return [...liveReports, ...mock].sort(
+  // Live QR reports override POS docs for same table name; POS adds external history
+  const liveNames = new Set(
+    liveReports.filter((r) => r.paid > 0).map((r) => r.tableName),
+  );
+  const posFiltered = posReports.filter(
+    (r) => !liveNames.has(r.tableName) || !hasLivePayments,
+  );
+
+  return [...liveReports.filter((r) => r.live), ...posFiltered, ...mock].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   );
 }

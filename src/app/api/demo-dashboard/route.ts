@@ -38,14 +38,17 @@ export async function GET(): Promise<Response> {
   const propinaRate =
     revenueToday > 0 ? (tipTotal / revenueToday) * 100 : 14.2;
 
-  const activeTables = states.filter(
-    (s) => s && s.guests.some((g) => g.status !== "paid")
-  ).length;
   const allTables = await listAllTables();
-  const totalTables = allTables.length;
+  const hasLiveData = allPayments.length > 0;
+  const visibleTables = hasLiveData
+    ? allTables.filter((t) => t.live)
+    : allTables;
+  const activeTables = visibleTables.filter(
+    (t) => t.status === "open" || t.status === "paying",
+  ).length;
+  const totalTables = visibleTables.length;
   const invoices = await listInvoices(20);
 
-  const hasLiveData = allPayments.length > 0;
   const displayRevenue = hasLiveData ? revenueToday : 4820;
   const displayAvgTicket = hasLiveData ? avgTicket : 31.4;
   const displayActiveTables = hasLiveData ? activeTables : 4;
@@ -79,12 +82,14 @@ export async function GET(): Promise<Response> {
     createdAt: p.createdAt,
   }));
 
-  const tables = allTables.map((t) => ({
+  const tables = visibleTables.map((t) => ({
     id: t.id,
     name: t.name,
     status: t.status,
     guestCount: t.guestCount,
     total: t.total,
+    billTotal: t.billTotal,
+    paidAmount: t.paidAmount,
     live: t.live,
     kind: t.kind,
   }));
