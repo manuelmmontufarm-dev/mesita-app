@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { DemoConfiguracionPanel } from "@/components/DemoConfiguracionPanel";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -18,7 +19,7 @@ interface FiscalData {
   establecimientoCodigo: string; puntoEmisionCodigo: string; regimen: string;
   obligadoContabilidad: boolean; contribuyenteEspecial: string; contactEmail: string; phone: string;
 }
-interface KushkiStatus { privateKeyConfigured: boolean; publicKey: string | null; environment: string; enabled: boolean; }
+interface PaymentProviderStatus { privateKeyConfigured: boolean; publicKey: string | null; environment: string; enabled: boolean; }
 interface PosStatus { enabled: boolean; provider: string | null; apiKeyConfigured: boolean; environment: string; tableField: string | null; paymentMethod: string; }
 
 const EMPTY_FISCAL: FiscalData = {
@@ -39,14 +40,13 @@ export default function ConfiguracionPage() {
   const { toast } = useToast();
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
-  const [demoConfig, setDemoConfig] = useState<Record<string, unknown> | null>(null);
   const [savingFiscal, setSavingFiscal] = useState(false);
-  const [savingKushki, setSavingKushki] = useState(false);
+  const [savingPayments, setSavingPayments] = useState(false);
   const [savingPos, setSavingPos] = useState(false);
 
   const [fiscal, setFiscal] = useState<FiscalData>(EMPTY_FISCAL);
-  const [kushkiForm, setKushkiForm] = useState({ privateKey: "", publicKey: "", environment: "SANDBOX" });
-  const [kushkiStatus, setKushkiStatus] = useState<KushkiStatus | null>(null);
+  const [paymentForm, setPaymentForm] = useState({ privateKey: "", publicKey: "", environment: "SANDBOX" });
+  const [paymentStatus, setPaymentStatus] = useState<PaymentProviderStatus | null>(null);
   const [posForm, setPosForm] = useState({ apiKey: "", environment: "SANDBOX", tableField: "", paymentMethod: "EF" });
   const [posStatus, setPosStatus] = useState<PosStatus | null>(null);
 
@@ -73,9 +73,9 @@ export default function ConfiguracionPage() {
       }
       if (iData?.data) {
         const d = iData.data;
-        setKushkiStatus(d.kushki ?? null);
-        if (d.kushki?.publicKey)   setKushkiForm(p => ({ ...p, publicKey: d.kushki.publicKey ?? "" }));
-        if (d.kushki?.environment) setKushkiForm(p => ({ ...p, environment: d.kushki.environment }));
+        setPaymentStatus(d.kushki ?? null);
+        if (d.kushki?.publicKey)   setPaymentForm(p => ({ ...p, publicKey: d.kushki.publicKey ?? "" }));
+        if (d.kushki?.environment) setPaymentForm(p => ({ ...p, environment: d.kushki.environment }));
         if (d.pos) {
           setPosStatus(d.pos);
           setPosForm(p => ({
@@ -98,8 +98,6 @@ export default function ConfiguracionPage() {
       const s = await sessionRes.json();
       const rid = s?.user?.restaurantId as string | undefined;
       if (demoRes.ok) {
-        const d = await demoRes.json();
-        setDemoConfig(d.data ?? null);
         if (!rid) setIsDemoMode(true);
       }
       if (rid) {
@@ -130,40 +128,40 @@ export default function ConfiguracionPage() {
     } finally { setSavingFiscal(false); }
   }
 
-  // ── Kushki save ────────────────────────────────────────────────────────────
+  // ── Botón de pago save ─────────────────────────────────────────────────────
 
-  async function saveKushki(e: React.FormEvent) {
+  async function savePayments(e: React.FormEvent) {
     e.preventDefault();
     if (!restaurantId) return;
-    setSavingKushki(true);
+    setSavingPayments(true);
     try {
-      const payload: Record<string, unknown> = { environment: kushkiForm.environment };
-      if (kushkiForm.privateKey) payload.privateKey = kushkiForm.privateKey;
-      if (kushkiForm.publicKey)  payload.publicKey  = kushkiForm.publicKey;
+      const payload: Record<string, unknown> = { environment: paymentForm.environment };
+      if (paymentForm.privateKey) payload.privateKey = paymentForm.privateKey;
+      if (paymentForm.publicKey)  payload.publicKey  = paymentForm.publicKey;
       const res = await fetch(`/api/restaurant/${restaurantId}/integrations`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kushki: payload }),
       });
       if (res.ok) {
         const d = await res.json();
-        setKushkiStatus(d.data?.kushki ?? null);
-        setKushkiForm(p => ({ ...p, privateKey: "" }));
-        toast({ title: "Kushki configurado", description: "Credenciales guardadas de forma segura" });
+        setPaymentStatus(d.data?.kushki ?? null);
+        setPaymentForm(p => ({ ...p, privateKey: "" }));
+        toast({ title: "Botón de pago configurado" });
       } else { const e = await res.json(); toast({ title: "Error", description: e?.error, variant: "destructive" }); }
-    } finally { setSavingKushki(false); }
+    } finally { setSavingPayments(false); }
   }
 
-  async function toggleKushki(enabled: boolean) {
+  async function togglePayments(enabled: boolean) {
     if (!restaurantId) return;
-    if (enabled && !kushkiStatus?.privateKeyConfigured) {
-      toast({ title: "Configura la Private Key de Kushki primero", variant: "destructive" }); return;
+    if (enabled && !paymentStatus?.privateKeyConfigured) {
+      toast({ title: "Configura las credenciales del botón de pago primero", variant: "destructive" }); return;
     }
     const res = await fetch(`/api/restaurant/${restaurantId}/integrations`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kushki: { enabled } }),
     });
     if (res.ok) {
-      setKushkiStatus(p => p ? { ...p, enabled } : null);
+      setPaymentStatus(p => p ? { ...p, enabled } : null);
       toast({ title: enabled ? "Pagos activados" : "Pagos desactivados" });
     }
   }
@@ -211,129 +209,8 @@ export default function ConfiguracionPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  if (isDemoMode && demoConfig) {
-    const cfg = demoConfig as {
-      name: string;
-      enabled: boolean;
-      environment: string;
-      baseUrl: string;
-      endpoints: Record<string, string>;
-      sync: Record<string, string>;
-      lastSyncAt: string;
-      posMesita?: {
-        name: string;
-        url: string;
-        connected: boolean;
-        configured: boolean;
-        error: string | null;
-      };
-      restaurant: { name: string; city: string; ruc: string };
-    };
-
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold" style={{ color: "var(--ink-900)" }}>Configuración</h1>
-          <p className="text-sm mt-1" style={{ color: "var(--on-light-mut)" }}>
-            Integraciones del restaurante · modo demo
-          </p>
-        </div>
-
-        <Card style={{ borderColor: "rgba(47,179,126,.25)" }}>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <CardTitle>{cfg.name}</CardTitle>
-                <CardDescription className="mt-1">
-                  Conectado vía API al POS demo de Mesita — menú, mesas y facturación sincronizados
-                </CardDescription>
-              </div>
-              <Badge className="bg-green-100 text-green-800 border-green-200">Activo</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div className="p-3 rounded-lg" style={{ background: "rgba(27,25,22,.03)" }}>
-                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">Restaurante</p>
-                <p className="font-medium text-zinc-900">{cfg.restaurant.name}</p>
-                <p className="text-zinc-500 text-xs mt-0.5">{cfg.restaurant.city} · RUC {cfg.restaurant.ruc}</p>
-              </div>
-              <div className="p-3 rounded-lg" style={{ background: "rgba(27,25,22,.03)" }}>
-                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">Ambiente</p>
-                <p className="font-medium text-zinc-900">{cfg.environment}</p>
-                <p className="text-zinc-500 text-xs mt-0.5">Última sync: {new Date(cfg.lastSyncAt).toLocaleTimeString("es-EC")}</p>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">API base</p>
-              <code className="text-xs block p-3 rounded-lg bg-zinc-900 text-green-300 font-mono break-all">
-                {cfg.baseUrl}
-              </code>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">Endpoints</p>
-              <div className="space-y-1.5">
-                {Object.entries(cfg.endpoints).map(([key, val]) => (
-                  <div key={key} className="flex gap-3 text-xs font-mono p-2 rounded" style={{ background: "rgba(27,25,22,.03)" }}>
-                    <span className="text-zinc-400 w-16 shrink-0">{key}</span>
-                    <span className="text-zinc-700">{val}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">Sincronización</p>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(cfg.sync).map(([key, val]) => (
-                  <Badge key={key} variant="outline" className="text-xs">
-                    {key}: {val}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            <div className="border-t pt-4 space-y-3">
-              {cfg.posMesita && (
-                <div className="p-4 rounded-lg border" style={{ borderColor: cfg.posMesita.connected ? "rgba(47,179,126,.3)" : "rgba(242,169,59,.3)", background: cfg.posMesita.connected ? "rgba(47,179,126,.06)" : "rgba(242,169,59,.06)" }}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-zinc-900">{cfg.posMesita.name}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5 font-mono break-all">{cfg.posMesita.url}</p>
-                      {cfg.posMesita.error && (
-                        <p className="text-xs text-amber-700 mt-1">{cfg.posMesita.error}</p>
-                      )}
-                    </div>
-                    <Badge className={cfg.posMesita.connected ? "bg-green-100 text-green-800 border-green-200" : "bg-yellow-100 text-yellow-800 border-yellow-200"}>
-                      {cfg.posMesita.connected ? "Conectado" : cfg.posMesita.configured ? "Error" : "Sin API key"}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-zinc-500 mt-2">
-                    Los pagos del app se registran como FAC en el POS vía API. Configura <code className="text-xs">POS_MESITA_API_KEY</code> en Vercel.
-                  </p>
-                </div>
-              )}
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Kushki Pagos</p>
-                  <p className="text-xs text-zinc-500">Sandbox demo · pagos del app registrados en POS</p>
-                </div>
-                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Sandbox</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Facturación SRI</p>
-                  <p className="text-xs text-zinc-500">Datos demo de La Doña Pepa</p>
-                </div>
-                <Badge className="bg-zinc-100 text-zinc-600 border-zinc-200">Demo</Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  if (isDemoMode) {
+    return <DemoConfiguracionPanel />;
   }
 
   return (
@@ -343,10 +220,14 @@ export default function ConfiguracionPage() {
         <p className="text-zinc-600 mt-2">Integra tu restaurante con el POS, el proveedor de pago y datos fiscales</p>
       </div>
 
+      <div className="p-3 rounded-lg text-xs" style={{ background: "rgba(47,179,126,.08)", color: "#1f6b4c", border: "1px solid rgba(47,179,126,.18)" }}>
+        <strong>¿Qué es Sandbox?</strong> Modo de pruebas: los pagos y facturas no son reales ni van al SRI. Úsalo para probar sin riesgo antes de activar Producción.
+      </div>
+
       <Tabs defaultValue="pos">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="pos">Contífico</TabsTrigger>
-          <TabsTrigger value="kushki">Kushki</TabsTrigger>
+          <TabsTrigger value="payments">Botón de pago</TabsTrigger>
           <TabsTrigger value="fiscal">Datos SRI</TabsTrigger>
         </TabsList>
 
@@ -431,62 +312,63 @@ export default function ConfiguracionPage() {
           </Card>
         </TabsContent>
 
-        {/* ── Kushki ────────────────────────────────────────────────────────── */}
-        <TabsContent value="kushki">
+        {/* ── Botón de pago ─────────────────────────────────────────────────── */}
+        <TabsContent value="payments">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Kushki Pagos</CardTitle>
+                  <CardTitle>Botón de pago Mesita</CardTitle>
                   <CardDescription className="mt-1">
-                    Obtén tus claves desde el portal de <span className="font-medium text-zinc-700">kushkipagos.com</span>
+                    Credenciales para que los comensales paguen desde el QR en la mesa
                   </CardDescription>
                 </div>
-                {kushkiStatus && <StatusBadge configured={kushkiStatus.privateKeyConfigured} enabled={kushkiStatus.enabled} />}
+                {paymentStatus && <StatusBadge configured={paymentStatus.privateKeyConfigured} enabled={paymentStatus.enabled} />}
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <form onSubmit={saveKushki} className="space-y-4">
+              <form onSubmit={savePayments} className="space-y-4">
                 <div>
                   <Label>Ambiente</Label>
-                  <Select value={kushkiForm.environment} onValueChange={v => setKushkiForm({ ...kushkiForm, environment: v })}>
+                  <Select value={paymentForm.environment} onValueChange={v => setPaymentForm({ ...paymentForm, environment: v })}>
                     <SelectTrigger className="mt-1 h-11"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="SANDBOX">Sandbox (pruebas)</SelectItem>
                       <SelectItem value="PRODUCTION">Producción</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-zinc-500 mt-2">Sandbox = pagos de prueba sin cargo real. Producción = cobros reales.</p>
                 </div>
                 <div>
-                  <Label htmlFor="kushkiPublicKey">Public Key (Merchant ID)</Label>
-                  <Input id="kushkiPublicKey" value={kushkiForm.publicKey}
-                    onChange={e => setKushkiForm({ ...kushkiForm, publicKey: e.target.value })}
-                    placeholder="Tu Public Key de Kushki" className="mt-1 h-11" />
+                  <Label htmlFor="paymentPublicKey">Clave pública (Merchant ID)</Label>
+                  <Input id="paymentPublicKey" value={paymentForm.publicKey}
+                    onChange={e => setPaymentForm({ ...paymentForm, publicKey: e.target.value })}
+                    placeholder="Tu clave pública del proveedor de pago" className="mt-1 h-11" />
                   <p className="text-xs text-zinc-500 mt-1">Se usa en el frontend para tokenizar la tarjeta. No es sensible.</p>
                 </div>
                 <div>
-                  <Label htmlFor="kushkiPrivateKey">
-                    Private Key{kushkiStatus?.privateKeyConfigured && <span className="ml-2 text-xs text-green-600 font-normal">✓ configurada</span>}
+                  <Label htmlFor="paymentPrivateKey">
+                    Clave privada{paymentStatus?.privateKeyConfigured && <span className="ml-2 text-xs text-green-600 font-normal">✓ configurada</span>}
                   </Label>
-                  <Input id="kushkiPrivateKey" type="password" value={kushkiForm.privateKey}
-                    onChange={e => setKushkiForm({ ...kushkiForm, privateKey: e.target.value })}
-                    placeholder={kushkiStatus?.privateKeyConfigured ? "Deja vacío para no cambiar" : "Tu Private Key de Kushki"}
+                  <Input id="paymentPrivateKey" type="password" value={paymentForm.privateKey}
+                    onChange={e => setPaymentForm({ ...paymentForm, privateKey: e.target.value })}
+                    placeholder={paymentStatus?.privateKeyConfigured ? "Deja vacío para no cambiar" : "Tu clave privada del proveedor de pago"}
                     className="mt-1 h-11" />
                   <p className="text-xs text-zinc-500 mt-1">Se cifra con AES-256-GCM. Nunca se expone en texto plano.</p>
                 </div>
-                <Button type="submit" disabled={savingKushki || !restaurantId}
+                <Button type="submit" disabled={savingPayments || !restaurantId}
                   className="w-full h-11 bg-zinc-900 hover:bg-zinc-700 text-white">
-                  {savingKushki ? "Guardando..." : "Guardar credenciales Kushki"}
+                  {savingPayments ? "Guardando..." : "Guardar botón de pago"}
                 </Button>
               </form>
-              {kushkiStatus && (
+              {paymentStatus && (
                 <div className="border-t pt-4 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-zinc-900">Activar pagos en vivo</p>
                     <p className="text-xs text-zinc-500">Solo activa en producción tras probar en sandbox</p>
                   </div>
-                  <Switch checked={kushkiStatus.enabled} onCheckedChange={toggleKushki}
-                    disabled={!kushkiStatus.privateKeyConfigured} />
+                  <Switch checked={paymentStatus.enabled} onCheckedChange={togglePayments}
+                    disabled={!paymentStatus.privateKeyConfigured} />
                 </div>
               )}
             </CardContent>

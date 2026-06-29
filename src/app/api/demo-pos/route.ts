@@ -6,12 +6,14 @@ import {
   deleteExtraTable,
   deleteMenuItem,
   getDemoPosConfigStatus,
+  getDemoSettings,
   getMenu,
   getReports,
   listActivities,
   listAllTables,
   listInvoices,
   listQrTables,
+  updateDemoSettings,
   updateExtraTable,
   updateMenuItem,
 } from "@/lib/demo-pos";
@@ -39,7 +41,10 @@ export async function GET(request: Request): Promise<Response> {
     return successResponse({ activities: await listActivities() }, 200);
   }
   if (view === "config") {
-    return successResponse(getDemoPosConfigStatus(), 200);
+    return successResponse(await getDemoPosConfigStatus(), 200);
+  }
+  if (view === "settings") {
+    return successResponse(await getDemoSettings(), 200);
   }
 
   const [tables, menu, invoices] = await Promise.all([
@@ -99,6 +104,10 @@ export async function PATCH(request: Request): Promise<Response> {
   const { entity, id, ...rest } = body as {
     entity?: string;
     id?: string;
+    restaurant?: Record<string, unknown>;
+    posMesita?: Record<string, unknown>;
+    payments?: Record<string, unknown>;
+    fiscal?: Record<string, unknown>;
     name?: string;
     posExternalId?: string | null;
     emoji?: string;
@@ -106,6 +115,16 @@ export async function PATCH(request: Request): Promise<Response> {
     categoryId?: string;
     available?: boolean;
   };
+
+  if (entity === "settings") {
+    const updated = await updateDemoSettings({
+      restaurant: rest.restaurant as never,
+      posMesita: rest.posMesita as never,
+      payments: rest.payments as never,
+      fiscal: rest.fiscal as never,
+    });
+    return successResponse(updated, 200);
+  }
 
   if (!id) return errorResponse("id required", 400);
 

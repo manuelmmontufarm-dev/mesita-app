@@ -23,6 +23,7 @@ import type {
   DemoPosQrTable,
   DemoPosReport,
   DemoPosReportPayment,
+  DemoPosSettings,
   DemoPosTableRow,
 } from "./types";
 
@@ -49,11 +50,43 @@ function redis(): Redis | null {
   return Redis.fromEnv();
 }
 
+function defaultSettings(): DemoPosSettings {
+  return {
+    restaurant: {
+      name: "La Doña Pepa",
+      nombreComercial: "La Doña Pepa",
+      city: "Quito",
+      ruc: "1790123456001",
+      direccion: "Av. República del Salvador, Quito",
+      email: "contacto@ladonapepa.ec",
+      phone: "02-234-5678",
+    },
+    posMesita: {
+      enabled: true,
+      environment: "SANDBOX",
+      syncMenu: true,
+      syncTables: true,
+      syncBilling: true,
+    },
+    payments: {
+      enabled: true,
+      environment: "SANDBOX",
+    },
+    fiscal: {
+      establecimientoCodigo: "001",
+      puntoEmisionCodigo: "001",
+      regimen: "GENERAL",
+      obligadoContabilidad: false,
+    },
+  };
+}
+
 function defaultConfig(): DemoPosConfig {
   const seed = buildSeedMenu();
   return {
     ...seed,
     extraTables: SEED_DEMO_TABLES.map((t) => ({ ...t })),
+    settings: defaultSettings(),
     updatedAt: new Date().toISOString(),
   };
 }
@@ -62,12 +95,16 @@ async function readConfig(): Promise<DemoPosConfig> {
   const r = redis();
   if (r) {
     const raw = await r.get<DemoPosConfig>(CONFIG_KEY);
-    if (raw) return raw;
+    if (raw) {
+      if (!raw.settings) raw.settings = defaultSettings();
+      return raw;
+    }
     const seeded = defaultConfig();
     await r.set(CONFIG_KEY, seeded);
     return seeded;
   }
   if (!mem().config) mem().config = defaultConfig();
+  if (!mem().config!.settings) mem().config!.settings = defaultSettings();
   return mem().config!;
 }
 
@@ -341,23 +378,55 @@ export async function listActivities(limit = 20): Promise<DemoPosActivity[]> {
   return (await readActivities()).slice(0, limit);
 }
 
+export async function getDemoSettings(): Promise<DemoPosSettings> {
+  return (await readConfig()).settings;
+}
+
+export async function updateDemoSettings(
+  patch: Partial<{
+    restaurant: Partial<DemoPosSettings["restaurant"]>;
+    posMesita: Partial<DemoPosSettings["posMesita"]>;
+    payments: Partial<DemoPosSettings["payments"]>;
+    fiscal: Partial<DemoPosSettings["fiscal"]>;
+  }>,
+): Promise<DemoPosSettings> {
+  let updated: DemoPosSettings = defaultSettings();
+  await mutateConfig((d) => {
+    if (!d.settings) d.settings = defaultSettings();
+    if (patch.restaurant) d.settings.restaurant = { ...d.settings.restaurant, ...patch.restaurant };
+    if (patch.posMesita) d.settings.posMesita = { ...d.settings.posMesita, ...patch.posMesita };
+    if (patch.payments) d.settings.payments = { ...d.settings.payments, ...patch.payments };
+    if (patch.fiscal) d.settings.fiscal = { ...d.settings.fiscal, ...patch.fiscal };
+    updated = d.settings;
+  });
+  return updated;
+}
+
 export async function getDemoPosConfigStatus() {
   const base = DEMO_BASE_URL;
   const posHealth = await checkPosMesitaHealth();
+  const settings = await getDemoSettings();
 
   return {
     provider: "mesita-pos-demo",
     name: "Mesita POS (API Railway)",
-    enabled: true,
+    enabled: settings.posMesita.enabled,
     apiConfigured: true,
-    environment: "DEMO",
+    environment: settings.posMesita.environment,
     baseUrl: `${base}/api/demo-pos`,
+    settings,
     posMesita: {
       name: "POS Mesita Demo",
       url: posHealth.baseUrl,
       connected: posHealth.ok,
       configured: posHealth.configured,
       error: posHealth.error ?? null,
+      ...settings.posMesita,
+    },
+    payments: {
+      name: "Botón de pago Mesita",
+      enabled: settings.payments.enabled,
+      environment: settings.payments.environment,
     },
     endpoints: {
       menu: "GET /api/demo-pos?view=menu",
@@ -367,16 +436,12 @@ export async function getDemoPosConfigStatus() {
       posDocumentos: "GET /documento/ (POS Mesita Railway)",
     },
     sync: {
-      menu: "bidirectional",
-      tables: "bidirectional",
-      billing: "app → POS Mesita → dashboard",
+      menu: settings.posMesita.syncMenu ? "bidirectional" : "off",
+      tables: settings.posMesita.syncTables ? "bidirectional" : "off",
+      billing: settings.posMesita.syncBilling ? "app → POS Mesita → dashboard" : "off",
     },
     lastSyncAt: new Date().toISOString(),
-    restaurant: {
-      name: "La Doña Pepa",
-      city: "Quito",
-      ruc: "1790123456001",
-    },
+    restaurant: settings.restaurant,
   };
 }
 

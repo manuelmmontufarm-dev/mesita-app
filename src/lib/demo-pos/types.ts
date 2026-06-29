@@ -80,7 +80,37 @@ export interface DemoPosConfig {
   categories: DemoPosCategory[];
   menuItems: DemoPosMenuItem[];
   extraTables: DemoPosExtraTable[];
+  settings: DemoPosSettings;
   updatedAt: string;
+}
+
+export interface DemoPosSettings {
+  restaurant: {
+    name: string;
+    nombreComercial: string;
+    city: string;
+    ruc: string;
+    direccion: string;
+    email: string;
+    phone: string;
+  };
+  posMesita: {
+    enabled: boolean;
+    environment: "SANDBOX" | "PRODUCTION";
+    syncMenu: boolean;
+    syncTables: boolean;
+    syncBilling: boolean;
+  };
+  payments: {
+    enabled: boolean;
+    environment: "SANDBOX" | "PRODUCTION";
+  };
+  fiscal: {
+    establecimientoCodigo: string;
+    puntoEmisionCodigo: string;
+    regimen: string;
+    obligadoContabilidad: boolean;
+  };
 }
 
 export interface DemoPosQrTable {

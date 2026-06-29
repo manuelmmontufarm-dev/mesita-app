@@ -847,7 +847,7 @@ function PaymentScreen({
   onBack: () => void;
   onPaid: (method: string) => void;
 }) {
-  const [method, setMethod] = useState("Kushki demo");
+  const [method, setMethod] = useState("Tarjeta demo");
   const [scanOpen, setScanOpen] = useState(false);
 
   return (
@@ -873,7 +873,7 @@ function PaymentScreen({
         <section>
           <Label text="Método de pago" />
           <div className={styles.methodGrid}>
-            {["Kushki demo", "Datafast demo", "Diners demo"].map((label) => (
+            {["Tarjeta demo", "Datafast demo", "Diners demo"].map((label) => (
               <button
                 key={label}
                 className={method === label ? styles.methodActive : ""}
