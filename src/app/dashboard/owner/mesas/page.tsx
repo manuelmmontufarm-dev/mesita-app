@@ -7,50 +7,48 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { formatCurrency } from "@/lib/format";
 
-interface TableRow {
+interface ProdTable {
   id: string;
   name: string;
-  token?: string;
-  slug?: string;
-  payUrl?: string;
+  token: string;
   posExternalId: string | null;
-  live: boolean;
-  kind: "qr" | "demo" | "custom";
-  status: "open" | "paying" | "closed";
-  guestCount: number;
-  total: number;
+  createdAt: string;
 }
-
-const STATUS = {
-  open: { label: "Abierta", bg: "rgba(232,106,51,.13)", color: "#c45a1a" },
-  paying: { label: "Pagando con Mesita", bg: "rgba(47,179,126,.14)", color: "#1f6b4c" },
-  closed: { label: "Cerrada", bg: "rgba(27,25,22,.08)", color: "#6B7280" },
-};
-
-const KIND = {
-  qr: { label: "QR en vivo", color: "#1f6b4c", bg: "rgba(47,179,126,.12)" },
-  demo: { label: "Solo demo", color: "#6B7280", bg: "rgba(27,25,22,.06)" },
-  custom: { label: "Personalizada", color: "#4a5a78", bg: "rgba(91,107,140,.12)" },
-};
 
 export default function MesasPage() {
   const { toast } = useToast();
-  const [tables, setTables] = useState<TableRow[]>([]);
+  const [tables, setTables] = useState<ProdTable[]>([]);
+  const [invoiceMode, setInvoiceMode] = useState<string>("DISABLED");
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<ProdTable | null>(null);
   const [newName, setNewName] = useState("");
   const [newPosId, setNewPosId] = useState("");
   const [saving, setSaving] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<TableRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProdTable | null>(null);
+
+  const posRequired = invoiceMode === "POS";
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/demo-pos?view=tables");
-      if (!res.ok) throw new Error("failed");
-      const json = await res.json();
-      setTables(json.data.tables ?? []);
+      const [tablesRes, sessionRes] = await Promise.all([
+        fetch("/api/tables"),
+        fetch("/api/auth/session"),
+      ]);
+      if (!tablesRes.ok) throw new Error("tables");
+      const tablesJson = await tablesRes.json();
+      setTables(tablesJson.data ?? []);
+
+      const session = await sessionRes.json();
+      const rid = session?.user?.restaurantId as string | undefined;
+      if (rid) {
+        const fiscalRes = await fetch(`/api/restaurant/${rid}/fiscal`);
+        if (fiscalRes.ok) {
+          const fiscalJson = await fiscalRes.json();
+          setInvoiceMode(fiscalJson.data?.invoiceMode ?? "DISABLED");
+        }
+      }
     } catch {
       toast({ title: "Error", description: "No se pudieron cargar las mesas", variant: "destructive" });
     } finally {
@@ -58,31 +56,41 @@ export default function MesasPage() {
     }
   }, [toast]);
 
-  useEffect(() => {
-    load();
-    const id = setInterval(load, 3_000);
-    return () => clearInterval(id);
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  async function createTable(e: React.FormEvent) {
+  function openCreate() {
+    setEditTarget(null);
+    setNewName("");
+    setNewPosId("");
+    setDialogOpen(true);
+  }
+
+  function openEdit(t: ProdTable) {
+    setEditTarget(t);
+    setNewName(t.name);
+    setNewPosId(t.posExternalId ?? "");
+    setDialogOpen(true);
+  }
+
+  async function saveTable(e: React.FormEvent) {
     e.preventDefault();
     if (!newName.trim()) return;
+    if (posRequired && !newPosId.trim()) {
+      toast({ title: "Nombre en el POS requerido", description: "Debe coincidir con Contífico", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
-      const res = await fetch("/api/demo-pos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entity: "table", name: newName, posExternalId: newPosId || undefined }),
-      });
-      if (res.ok) {
-        setNewName("");
-        setNewPosId("");
-        setDialogOpen(false);
-        toast({ title: "Mesa creada", description: "Sincronizada con el POS demo" });
-        load();
-      } else {
-        toast({ title: "Error", description: "No se pudo crear la mesa", variant: "destructive" });
-      }
+      const body = { name: newName.trim(), posExternalId: newPosId.trim() || null };
+      const res = editTarget
+        ? await fetch(`/api/tables/${editTarget.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+        : await fetch("/api/tables", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (!res.ok) throw new Error("save");
+      setDialogOpen(false);
+      toast({ title: editTarget ? "Mesa actualizada" : "Mesa creada" });
+      load();
+    } catch {
+      toast({ title: "Error", description: "No se pudo guardar la mesa", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -90,54 +98,90 @@ export default function MesasPage() {
 
   async function confirmDelete() {
     if (!deleteTarget) return;
-    const res = await fetch(`/api/demo-pos?entity=table&id=${deleteTarget.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/tables/${deleteTarget.id}`, { method: "DELETE" });
     if (res.ok) {
       toast({ title: "Mesa eliminada" });
       load();
     } else {
-      toast({ title: "No se puede eliminar", description: "Las mesas QR y de demostración son fijas", variant: "destructive" });
+      toast({ title: "No se pudo eliminar", variant: "destructive" });
     }
     setDeleteTarget(null);
   }
 
-  function copyUrl(url: string) {
-    navigator.clipboard.writeText(url);
-    toast({ title: "Enlace copiado", description: "Pégalo para compartir el QR" });
+  function payUrl(token: string) {
+    const base = (process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin).replace(/\/+$/, "");
+    return `${base}/pay/${token}`;
   }
 
-  const qrTables = tables.filter((t) => t.kind === "qr");
-  const otherTables = tables.filter((t) => t.kind !== "qr");
+  function copyUrl(token: string) {
+    navigator.clipboard.writeText(payUrl(token));
+    toast({ title: "Enlace copiado" });
+  }
+
+  async function downloadQr(tableId: string, format: "png" | "pdf") {
+    const res = await fetch(`/api/qr/${tableId}?format=${format}`);
+    if (!res.ok) {
+      toast({ title: "Error al generar QR", variant: "destructive" });
+      return;
+    }
+    if (format === "png") {
+      const json = await res.json();
+      const a = document.createElement("a");
+      a.href = json.dataUrl;
+      a.download = `mesa-qr.png`;
+      a.click();
+    } else {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mesa-qr.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  }
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--ink-900)", margin: 0 }}>
-            Mesas
-          </h1>
+          <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", margin: 0 }}>Mesas</h1>
           <p style={{ fontSize: 13, color: "var(--on-light-mut)", marginTop: 4 }}>
-            Mesas con QR conectadas al app · demostración con datos simulados
+            Mesas de producción con QR · cada mesa necesita un nombre en el POS para Contífico
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="h-10" style={{ background: "var(--ink-900)", color: "var(--on-dark)" }}>
+            <Button className="h-10" style={{ background: "var(--ink-900)", color: "var(--on-dark)" }} onClick={openCreate}>
               + Nueva mesa
             </Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Nueva mesa en POS</DialogTitle></DialogHeader>
-            <form onSubmit={createTable} className="space-y-4">
+            <DialogHeader>
+              <DialogTitle>{editTarget ? "Editar mesa" : "Nueva mesa"}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={saveTable} className="space-y-4">
               <div>
-                <Label>Nombre</Label>
-                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Mesa 9" className="h-11 mt-2" />
+                <Label>Nombre visible</Label>
+                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Mesa 5" className="h-11 mt-2" required />
               </div>
               <div>
-                <Label>ID en POS <span className="text-muted-foreground font-normal">(opcional)</span></Label>
-                <Input value={newPosId} onChange={(e) => setNewPosId(e.target.value)} placeholder="T-009" className="h-11 mt-2" />
+                <Label>
+                  Nombre en el POS {posRequired ? "" : <span className="text-muted-foreground font-normal">(recomendado)</span>}
+                </Label>
+                <Input
+                  value={newPosId}
+                  onChange={(e) => setNewPosId(e.target.value)}
+                  placeholder="Mesa 5"
+                  className="h-11 mt-2"
+                  required={posRequired}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Debe coincidir exactamente con el nombre de la mesa en Contífico.
+                </p>
               </div>
               <Button type="submit" disabled={saving} className="w-full h-11" style={{ background: "var(--ink-900)", color: "var(--on-dark)" }}>
-                {saving ? "Creando..." : "Crear y sincronizar"}
+                {saving ? "Guardando…" : "Guardar"}
               </Button>
             </form>
           </DialogContent>
@@ -148,86 +192,41 @@ export default function MesasPage() {
         open={!!deleteTarget}
         onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}
         title={`¿Eliminar ${deleteTarget?.name}?`}
-        description="Solo se pueden eliminar mesas personalizadas."
+        description="Se eliminará la mesa y su QR dejará de funcionar."
         confirmLabel="Eliminar"
         variant="destructive"
         onConfirm={confirmDelete}
       />
 
       {loading ? (
+        <div style={{ height: 120, borderRadius: 14, background: "rgba(27,25,22,.06)" }} />
+      ) : tables.length === 0 ? (
+        <p style={{ fontSize: 14, color: "var(--on-light-mut)" }}>No hay mesas. Crea la primera para generar un QR.</p>
+      ) : (
         <div style={{ display: "grid", gap: 10 }}>
-          {[1, 2, 3].map((i) => (
-            <div key={i} style={{ height: 72, borderRadius: 14, background: "rgba(27,25,22,.06)" }} />
+          {tables.map((t) => (
+            <div key={t.id} style={{ padding: "14px 16px", borderRadius: 14, background: "var(--surface)", border: "1px solid rgba(27,25,22,.08)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <div>
+                  <span style={{ fontSize: 15, fontWeight: 600 }}>{t.name}</span>
+                  <span style={{ fontSize: 12, color: "var(--on-light-mut)", marginLeft: 10 }}>
+                    POS: <strong style={{ color: "var(--ink-900)" }}>{t.posExternalId ?? "—"}</strong>
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <Button size="sm" variant="outline" className="h-8" onClick={() => copyUrl(t.token)}>Copiar enlace</Button>
+                  <Button size="sm" variant="outline" className="h-8" onClick={() => downloadQr(t.id, "png")}>QR PNG</Button>
+                  <Button size="sm" variant="outline" className="h-8" onClick={() => downloadQr(t.id, "pdf")}>QR PDF</Button>
+                  <Button size="sm" variant="outline" className="h-8" asChild>
+                    <a href={payUrl(t.token)} target="_blank" rel="noopener noreferrer">Abrir</a>
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8" onClick={() => openEdit(t)}>Editar</Button>
+                  <Button size="sm" variant="ghost" className="h-8 text-destructive" onClick={() => setDeleteTarget(t)}>Eliminar</Button>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
-      ) : (
-        <>
-          <section>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--on-light-mut)", marginBottom: 10 }}>
-              Mesas con QR · en vivo
-            </div>
-            <div style={{ display: "grid", gap: 10 }}>
-              {qrTables.map((t) => {
-                const sc = STATUS[t.status];
-                const kc = KIND.qr;
-                return (
-                  <div key={t.id} style={{ padding: "14px 16px", borderRadius: 14, background: "var(--surface)", border: "1px solid rgba(27,25,22,.08)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontSize: 15, fontWeight: 600, color: "var(--ink-900)" }}>{t.name}</span>
-                        <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 100, background: kc.bg, color: kc.color }}>{kc.label}</span>
-                        <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 100, background: sc.bg, color: sc.color }}>{sc.label}</span>
-                      </div>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        {t.payUrl && (
-                          <>
-                            <Button size="sm" variant="outline" className="h-8" onClick={() => copyUrl(t.payUrl!)}>Copiar enlace</Button>
-                            <Button size="sm" variant="outline" className="h-8" asChild>
-                              <a href={t.payUrl} target="_blank" rel="noopener noreferrer">Abrir app</a>
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 12.5, color: "var(--on-light-mut)" }}>
-                      <span>POS: <strong style={{ color: "var(--ink-900)" }}>{t.posExternalId ?? "—"}</strong> · {t.guestCount} comensales</span>
-                      <span style={{ fontWeight: 600, color: "var(--ink-900)" }}>{formatCurrency(t.total)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          <section>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--on-light-mut)", marginBottom: 10 }}>
-              Demostración · datos simulados
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
-              {otherTables.map((t) => {
-                const sc = STATUS[t.status];
-                const kc = KIND[t.kind];
-                return (
-                  <div key={t.id} style={{ padding: "13px 14px", borderRadius: 14, background: "var(--surface)", border: "1px solid rgba(27,25,22,.07)", opacity: t.kind === "demo" ? 0.92 : 1 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 14, fontWeight: 600 }}>{t.name}</span>
-                      <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 100, background: kc.bg, color: kc.color }}>{kc.label}</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 12, color: "var(--on-light-mut)" }}>
-                      <span style={{ padding: "2px 8px", borderRadius: 100, background: sc.bg, color: sc.color, fontSize: 10, fontWeight: 600 }}>{sc.label}</span>
-                      <span style={{ fontWeight: 600, color: "var(--ink-900)" }}>{formatCurrency(t.total)}</span>
-                    </div>
-                    {t.kind === "custom" && (
-                      <Button size="sm" variant="ghost" className="h-7 mt-2 text-destructive" onClick={() => setDeleteTarget(t)}>
-                        Eliminar
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        </>
       )}
     </div>
   );

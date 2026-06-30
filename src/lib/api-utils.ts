@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import type { Session } from "next-auth";
 import { timingSafeEqual } from "crypto";
+import { prisma } from "@/lib/db";
+import { restaurantBlockMessage } from "@/lib/restaurant-status";
 
 /**
  * Constant-time string comparison (Node runtime).
@@ -37,6 +39,16 @@ export async function requireAuth(): Promise<
 
   if (!session || !session.user) {
     return errorResponse("Unauthorized", 401);
+  }
+
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id: session.user.restaurantId },
+    select: { status: true },
+  });
+
+  const blocked = restaurant ? restaurantBlockMessage(restaurant.status) : null;
+  if (blocked) {
+    return errorResponse(blocked, 403);
   }
 
   return {

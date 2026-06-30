@@ -45,11 +45,19 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
             password: true,
             role: true,
             restaurantId: true,
+            restaurant: { select: { status: true } },
           },
         });
 
         if (!user) {
           return null;
+        }
+
+        if (user.restaurant.status === "PENDING") {
+          throw new Error("RESTAURANT_PENDING");
+        }
+        if (user.restaurant.status === "SUSPENDED") {
+          throw new Error("RESTAURANT_SUSPENDED");
         }
 
         // Compare password using validatePassword utility

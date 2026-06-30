@@ -45,6 +45,8 @@ export default function ConfiguracionPage() {
   const [savingPos, setSavingPos] = useState(false);
 
   const [fiscal, setFiscal] = useState<FiscalData>(EMPTY_FISCAL);
+  const [restaurantSlug, setRestaurantSlug] = useState<string | null>(null);
+  const [restaurantStatus, setRestaurantStatus] = useState<string | null>(null);
   const [paymentForm, setPaymentForm] = useState({ privateKey: "", publicKey: "", environment: "SANDBOX" });
   const [paymentStatus, setPaymentStatus] = useState<PaymentProviderStatus | null>(null);
   const [posForm, setPosForm] = useState({ apiKey: "", environment: "SANDBOX", tableField: "", paymentMethod: "EF" });
@@ -63,6 +65,8 @@ export default function ConfiguracionPage() {
 
       if (fData?.data) {
         const f = fData.data;
+        setRestaurantSlug(f.slug ?? null);
+        setRestaurantStatus(f.status ?? null);
         setFiscal({
           ruc: f.ruc ?? "", razonSocial: f.razonSocial ?? "", nombreComercial: f.nombreComercial ?? "",
           direccionMatriz: f.direccionMatriz ?? "", establecimientoCodigo: f.establecimientoCodigo ?? "001",
@@ -383,6 +387,12 @@ export default function ConfiguracionPage() {
               <CardDescription>Requeridos para emitir facturas electrónicas. La factura siempre se emite con el RUC del restaurante.</CardDescription>
             </CardHeader>
             <CardContent>
+              {(restaurantSlug || restaurantStatus) && (
+                <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+                  {restaurantSlug && <div>Slug: <code className="text-xs">{restaurantSlug}</code></div>}
+                  {restaurantStatus && <div className="mt-1">Estado: <strong>{restaurantStatus}</strong></div>}
+                </div>
+              )}
               <form onSubmit={saveFiscal} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>

@@ -83,7 +83,8 @@ export async function GET(
     const restaurant = await prisma.restaurant.findUnique({
       where: { id },
       select: {
-        id: true, ruc: true, razonSocial: true, nombreComercial: true,
+        id: true, name: true, slug: true, status: true, invoiceMode: true,
+        ruc: true, razonSocial: true, nombreComercial: true,
         direccionMatriz: true, establecimientoCodigo: true, puntoEmisionCodigo: true,
         regimen: true, obligadoContabilidad: true, contribuyenteEspecial: true,
         contactEmail: true, phone: true,

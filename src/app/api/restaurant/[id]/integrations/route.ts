@@ -130,8 +130,10 @@ export async function PATCH(
             return errorResponse("Cannot enable POS: configure the API key first", 422);
           }
           data.posProvider = "CONTIFICO";
+          data.invoiceMode = "POS";
         } else {
           data.posProvider = null;
+          data.invoiceMode = "DISABLED";
         }
       }
     }

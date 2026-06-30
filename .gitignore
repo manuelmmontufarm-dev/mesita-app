@@ -35,3 +35,4 @@ build/
 test-results/
 playwright-report/
 .env*
+tsconfig.tsbuildinfo

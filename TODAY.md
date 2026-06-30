@@ -54,6 +54,12 @@ Reglas de oro:
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-30 — Phase 1 + Phase 2 (partial): mesas producción, gates, POS wiring
+
+- **Qué:** `mesas/page.tsx`, `restaurant-status.ts`, `pos-on-scan.ts`, `auth.ts`, `api-utils.ts`, `guest/bill` route, `integrations` route, `pos-config.ts`, `vercel.json`, tests tables API, `INTEGRATION_PLAN` completion records.
+- **Por qué:** Auditoría: mesas usaba solo demo-pos; ingest no corría (`invoiceMode` nunca POS); activar restaurante no bloqueaba nada.
+- **Qué hace:** Mesas reales con posExternalId + QR PNG/PDF; login/API bloquean PENDING/SUSPENDED; guest bill refresca Contifico al escanear; cron hourly; Contifico toggle pone `invoiceMode=POS`.
+
 ### 2026-06-29 — Phase 0 hardening: admin login, seed modes, slug on register
 
 - **Qué:** `src/app/admin/login/page.tsx`, `src/app/api/admin/session/route.ts`, `src/middleware.ts`, `src/app/admin/*.tsx`, `src/app/api/auth/register/route.ts`, `src/lib/slug.ts`, `prisma/schema.prisma` (PaymentStatus.PENDING), `prisma/seed.ts` (SEED_MODE minimal/full), `package.json`, `.env.example`, `.github/workflows/ci.yml`, `prisma/supabase_deploy.sql` (deprecated banner).

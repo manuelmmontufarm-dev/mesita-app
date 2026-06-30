@@ -1,20 +1,39 @@
 import { errorResponse, successResponse } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
+import { ingestRestaurantOnScan } from "@/lib/pos-on-scan";
+import { isRestaurantOperational } from "@/lib/restaurant-status";
 import { calculateBillBreakdown } from "@/modules/bills";
 import { money, toNumberSafe } from "@/lib/money";
 import { Decimal } from "@prisma/client/runtime/library";
 
-/**
- * PUBLIC GUEST ENDPOINT - No authentication required
- * Fetches the active bill for a table using only the table token
- * Used by the guest-facing /pay/[token] page
- */
-
-// Stable machine-readable marker: the token does not map to any table
-// (deleted table / stale QR). The pay page shows a friendly "QR no activo"
-// state when it sees this exact error string. (Not exported — Next.js route
-// files only allow handler exports.)
 const TABLE_NOT_FOUND = "TABLE_NOT_FOUND";
+
+async function loadTableWithBill(token: string) {
+  return prisma.table.findUnique({
+    where: { token },
+    include: {
+      restaurant: true,
+      bills: {
+        where: { status: { not: "REFUNDED" } },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        include: {
+          items: true,
+          payments: {
+            where: { status: "COMPLETED" },
+            orderBy: { createdAt: "asc" },
+            select: {
+              amount: true,
+              voluntaryTip: true,
+              createdAt: true,
+              splitMode: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
 
 export async function GET(
   _request: Request,
@@ -22,50 +41,45 @@ export async function GET(
 ): Promise<Response> {
   const { token } = await context.params;
   try {
-    // Find table by token - no auth required (guest endpoint per D-07, GUEST-01, GUEST-03)
-    const table = await prisma.table.findUnique({
+    const preview = await prisma.table.findUnique({
       where: { token },
-      include: {
-        restaurant: true,
-        bills: {
-          // Only fetch non-refunded bills, most recent first
-          where: { status: { not: "REFUNDED" } },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-          include: {
-            items: true,
-            payments: {
-              where: { status: "COMPLETED" },
-              orderBy: { createdAt: "asc" },
-              select: {
-                amount: true,
-                voluntaryTip: true,
-                createdAt: true,
-                splitMode: true,
-              },
-            },
-          },
-        },
-      },
+      include: { restaurant: { select: { id: true, name: true, status: true, invoiceMode: true } } },
     });
 
-    // Handle three cases per D-13
-    if (!table) {
-      // Invalid / expired QR token — distinct from "table exists but no bill"
+    if (!preview) {
       return errorResponse(TABLE_NOT_FOUND, 404);
     }
 
-    if (!table.bills || table.bills.length === 0) {
+    if (!isRestaurantOperational(preview.restaurant.status)) {
+      return errorResponse("Este restaurante no está disponible para pagos", 403);
+    }
+
+    if (preview.restaurant.invoiceMode === "POS") {
+      try {
+        await ingestRestaurantOnScan(preview.restaurant.id);
+      } catch (err) {
+        console.error(
+          JSON.stringify({
+            event: "POS_ON_SCAN_REFRESH_FAILED",
+            restaurantId: preview.restaurant.id,
+            token,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        );
+      }
+    }
+
+    const table = await loadTableWithBill(token);
+    if (!table) {
+      return errorResponse(TABLE_NOT_FOUND, 404);
+    }
+
+    if (!table.bills?.length) {
       return errorResponse("No hay cuenta abierta para esta mesa", 404);
     }
 
-    // Table found with active bill
     const bill = table.bills[0];
 
-    // POS is the source of truth for amounts (D-07): when the bill carries
-    // POS-authoritative totals, mirror the four pos* columns verbatim — never
-    // recompute from items. Item-derived math remains the fallback for bills
-    // without POS totals (non-POS restaurants / manually created bills).
     const breakdown =
       bill.posTotal != null
         ? {
@@ -76,9 +90,6 @@ export async function GET(
           }
         : calculateBillBreakdown(bill.items);
 
-    // Completed payments so far (additive — display-only data for the guest).
-    // Payment.amount includes the voluntary tip, so the consumed share of the
-    // bill total is amount - voluntaryTip.
     const payments = bill.payments.map((p) => ({
       amount: Number(p.amount),
       voluntaryTip: p.voluntaryTip != null ? Number(p.voluntaryTip) : null,
@@ -93,14 +104,11 @@ export async function GET(
       bill.posTotal != null ? toNumberSafe(bill.posTotal) : Number(breakdown.total);
     const remainingBalance = Math.max(0, money(authoritativeTotal - paidTowardsBill));
 
-    // Shape response: omit restaurantId from bill and token from table.
-    // Also drop the raw payments relation from the bill object — the trimmed
-    // `payments` array below is the public shape.
     const {
       restaurantId: _rid,
       payments: _rawPayments,
       ...billWithoutRestaurantId
-    } = bill as any;
+    } = bill as Record<string, unknown>;
 
     return successResponse(
       {

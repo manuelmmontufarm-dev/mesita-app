@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/pos/ingest",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

@@ -18,6 +18,12 @@ export const QR_BRAND = {
   ink: "#1B1714",
 } as const;
 
+/** Public pay URL for a production table token (UUID in QR). */
+export function buildProductionPayUrl(token: string): string {
+  const base = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+  return `${base}/pay/${token}`;
+}
+
 /** Build the public `/pay/...` URL for a demo token (`demo` or `demo-{slug}`). */
 export function buildDemoPayUrl(token: string): string {
   const base = DEMO_BASE_URL.replace(/\/+$/, "");

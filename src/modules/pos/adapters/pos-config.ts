@@ -45,7 +45,7 @@ export function buildPosConfig(restaurant: {
     provider: restaurant.posProvider,
     apiKey: decrypt(restaurant.posApiKeyEnc),
     environment: restaurant.posEnvironment,
-    tableField: restaurant.posTableField ?? "referencia",
+    tableField: restaurant.posTableField ?? "descripcion",
     baseUrl: CONTIFICO_BASE_URLS[restaurant.posEnvironment] ?? CONTIFICO_BASE_URLS.production,
     paymentMethod: restaurant.posPaymentMethod ?? "EF",
     tipoPing: restaurant.posTipoPing ?? undefined,
