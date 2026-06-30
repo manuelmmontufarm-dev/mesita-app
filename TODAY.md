@@ -52,6 +52,12 @@ Reglas de oro:
 
 ## 🟢 En qué estamos ahora
 
+### 2026-06-29 — docs: INTEGRATION_PLAN.md — plan de integración completo por fases
+
+- **Qué:** `docs/INTEGRATION_PLAN.md` (archivo nuevo).
+- **Por qué:** Necesitábamos un documento de referencia que explique toda la arquitectura, los flujos de comunicación entre sistemas, el modelo de DB, y los prompts detallados para cada fase de implementación. Sin esto, cada sesión de trabajo arrancaba desde cero.
+- **Qué hace:** Define 9 fases de implementación (Fase 0: DB real → Fase 8: Reembolsos → Fase 9: Hardening), con contexto completo, pasos concretos, checks de funcionalidad, y prompts listos para pegar en Claude Code. Cubre todos los flujos críticos: ingestión del POS, flujo de pago completo (Kushki + cobro Contífico), dashboard en tiempo real, companion page, y la separación demo/producción.
+
 ### 2026-06-29 — DB: schema merge (Juan) + indexes para 50 restaurantes
 
 **Qué:** `prisma/schema.prisma`, `prisma/migrations/20260629000000_scale_and_merge/migration.sql`.
