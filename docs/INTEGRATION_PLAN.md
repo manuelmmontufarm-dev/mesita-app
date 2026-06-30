@@ -597,10 +597,7 @@ Do not change the demo path. Do not touch src/lib/demo-* files.
 |---|---|
 | **Status** | `COMPLETE` |
 | **Completed** | `2026-06-30` |
-| **Code shipped** | `TBD` *(set on push)* |
-
-**What was done:**
-- Rewired `/dashboard/owner/mesas` to production `GET/POST/PATCH/DELETE /api/tables` (was demo-pos only).
+| **Code shipped** | `902a956` — `feat(phase1-2): production mesas, status gates, POS ingest wiring` | to production `GET/POST/PATCH/DELETE /api/tables` (was demo-pos only).
 - Added **Nombre en el POS** field (`posExternalId`), required when `invoiceMode === "POS"`.
 - QR download via `/api/qr/[tableId]` (PNG + PDF) and copy link to `/pay/[token]`.
 - **Restaurant status gates:** login blocks `PENDING`/`SUSPENDED`; `requireAuth()` returns 403 for non-ACTIVE restaurants.
@@ -701,7 +698,7 @@ Do not touch demo tables or Redis code.
 |---|---|
 | **Status** | `PARTIAL` |
 | **Completed** | `2026-06-30` |
-| **Code shipped** | `TBD` *(set on push)* |
+| **Code shipped** | `902a956` — `feat(phase1-2): production mesas, status gates, POS ingest wiring` |
 
 **What was done:**
 - Fixed integrations toggle: enabling Contifico sets `invoiceMode = "POS"` (disabling reverts to `DISABLED`).
