@@ -94,8 +94,7 @@ Reglas de oro:
 - **next.config.js `optimizePackageImports`**: Radix UI (`@radix-ui/react-*`) + `lucide-react` ahora hacen tree-shaking por sub-componente en lugar de importar el namespace completo.
 - **BillStage.tsx memos**: `paidSub`, `myItemCount`, `tipPresets` y `payerDisplayName` ahora están en `useMemo`. Antes se recalculaban en cada render (incluyendo los renders forzados por el poll cada 700–1000ms).
 - **GuestBillFlow.tsx**: `youMember` (`.find()` sobre `members`) ahora en `useMemo(…, [members])`.
-
-**Nota arquitectónica (no corregida, para seguimiento):** `useGuestPaymentFlow` retorna un objeto literal fresco en cada render (las funciones `setName`, `setMode`, etc. son arrow functions inline sin `useCallback`). Esto hace que `liveFlow` y `activeFlow` en `GuestBillFlow` se recomputen en cada render, causando re-renders de todos los stages en cada ciclo de poll. Corrección correcta: envolver las funciones del hook en `useCallback`. Tarea pendiente para próxima sesión.
+- **useGuestPaymentFlow**: callbacks estabilizados con `useCallback` (ver entrada 2026-06-29 fix selección).
 
 ---
 
@@ -125,6 +124,20 @@ Reglas de oro:
 ---
 
 ## 🗂️ Registro de cambios
+
+### 2026-06-29 — Fix: selección de ítems se desmarcaba (multi-dispositivo / multi-tap)
+
+- **Qué:** `src/app/api/demo/table/[token]/route.ts`, `src/hooks/useDemoTableSession.ts`, `src/components/guest/flow/BillStage.tsx`, `src/hooks/useGuestPaymentFlow.ts`, `src/components/guest/flow/GuestBillFlow.tsx`, `src/lib/demo-optimistic-merge.ts`, tests `demo-optimistic-merge.test.ts` + `tests/e2e/demo-rapid-multi-select.spec.ts`.
+- **Por qué:** Al pagar con otra persona, los ítems elegidos parpadeaban y se desmarcaban — especialmente al tocar varios platos seguidos o en mesas 1–4 conectadas al POS.
+- **Qué hace:**
+  - **Claim sin pull POS:** cada `claim` ya no llama `refreshDemoStateFromPos` — el POS no guarda quién eligió qué; el pull remapeaba IDs y borraba claims en vuelo.
+  - **Merge de pending en respuestas POST:** `ingestDemoState` ya no salta el merge optimista cuando `force: true` (solo salta la compuerta de versión) — un claim confirmado no borra el segundo ítem aún en vuelo.
+  - **UI optimista en BillStage:** filas con `pendingOp === "claim"` se mantienen marcadas mientras el POST viaja.
+  - **useGuestPaymentFlow estable:** callbacks envueltos en `useCallback` — corrige re-renders en cada poll (nota del 2026-06-29 performance).
+  - **trustLocalClaims** cableado en `mergeClaimsForDisplay` tras reset de mesa.
+  - **Tests:** Playwright Layer 2 — multi-select rápido + 2 dispositivos con selecciones independientes (8/8 verde).
+
+---
 
 ### 2026-06-28 — PDF QR pack rediseñado (La Doña Pepa branded)
 - **Qué:** `src/lib/qr-utils.ts` (`generateDemoTableQrPdfPack`), `docs/demo-qr-pack/demo-tables-qr.pdf`, `docs/demo-qr-pack/manifest.json`.

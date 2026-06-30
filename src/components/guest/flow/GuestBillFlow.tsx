@@ -213,11 +213,17 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     };
   }, [flow, liveSession]);
 
+  const youMember = useMemo(() => members.find((m) => m.isYou), [members]);
+  const seededName = useRef(false);
+  const lastResetSeq = useRef<number | null>(null);
+  const trustLocalClaims = useRef(true);
+
   const displayClaimsForStages = useMemo(
     () =>
       sessionClaims
         ? mergeClaimsForDisplay(sessionClaims, flow.state.claims, resolvedYouId, {
             paidItemIds: serverSync?.paidItemIds,
+            trustLocal: trustLocalClaims.current,
           })
         : flow.state.claims,
     [sessionClaims, flow.state.claims, resolvedYouId, serverSync?.paidItemIds],
@@ -239,11 +245,6 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
     return { ...base, derived: derivedFromDisplayClaims };
   }, [liveSession, liveFlow, flow, derivedFromDisplayClaims]);
 
-  const youMember = useMemo(() => members.find((m) => m.isYou), [members]);
-  const seededName = useRef(false);
-  const lastResetSeq = useRef<number | null>(null);
-  const trustLocalClaims = useRef(true);
-
   useLayoutEffect(() => {
     if (!serverSync) return;
     flow.syncFromServer({
@@ -251,7 +252,10 @@ export function GuestBillFlow(props: GuestBillFlowProps) {
         serverSync.claims,
         flow.state.claims,
         resolvedYouId,
-        { paidItemIds: serverSync.paidItemIds },
+        {
+          paidItemIds: serverSync.paidItemIds,
+          trustLocal: trustLocalClaims.current,
+        },
       ),
       paidItemIds: serverSync.paidItemIds,
       paidIds: serverSync.paidIds,

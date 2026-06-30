@@ -73,6 +73,17 @@ describe("mergeDemoStateWithPending", () => {
     });
     expect(merged.claims.locro).toBeUndefined();
   });
+
+  it("keeps second pending claim when first claim already on server snapshot", () => {
+    const pending = createPendingDemoOps();
+    pending.claims.set("locro", "claim");
+    pending.claims.set("ceviche", "claim");
+    const incoming = base();
+    incoming.claims.locro = "g1";
+    const merged = mergeDemoStateWithPending(incoming, pending, "g1");
+    expect(merged.claims.locro).toBe("g1");
+    expect(merged.claims.ceviche).toBe("g1");
+  });
 });
 
 describe("pruneResolvedPendingClaims", () => {

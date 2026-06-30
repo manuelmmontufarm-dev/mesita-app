@@ -395,8 +395,10 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       const pending = pendingOps.current;
       const hasPending =
         pending.claims.size > 0 || pending.pendingNames.size > 0;
+      // Always replay in-flight optimistic ops — even after our own POST returns
+      // (force only bypasses the version gate in applyDemo, not pending merge).
       const merged =
-        opts?.force || !hasPending || tableReset
+        !hasPending || tableReset
           ? demo
           : mergeDemoStateWithPending(demo, pending, gid, {
               afterReset: tableReset,

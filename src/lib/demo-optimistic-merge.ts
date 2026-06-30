@@ -189,10 +189,10 @@ export function mergeClaimsForDisplay(
   server: Claims,
   local: Claims,
   youId: MemberId,
-  opts?: { paidItemIds?: readonly string[] },
+  opts?: { paidItemIds?: readonly string[]; trustLocal?: boolean },
 ): Claims {
   const merged = mergeClaimsPreserveLocal(server, local, youId, {
-    trustLocal: true,
+    trustLocal: opts?.trustLocal !== false,
   });
   for (const [itemId, localMap] of Object.entries(local)) {
     const claimants = Object.values(localMap).filter((u) => u > 0.001).length;

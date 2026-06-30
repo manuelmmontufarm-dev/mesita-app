@@ -689,42 +689,99 @@ export function useGuestPaymentFlow(opts: UseGuestPaymentFlowOptions) {
     [state, opts.items, opts.config.ivaRate, opts.onPaid, opts.now, derived.totals, youId],
   );
 
-  return {
-    state,
-    derived,
-    dispatch,
-    youId,
-    setName: (name: string) => dispatch({ type: "name/set", name }),
-    setMode: (mode: SplitMode) => dispatch({ type: "mode/set", mode }),
-    setTip: (tip: number) => dispatch({ type: "tip/set", tip }),
-    setPeople: (people: number) => dispatch({ type: "people/set", people }),
-    setTab: (tab: BillTab) => dispatch({ type: "tab/set", tab }),
-    toggleMine,
-    claimFromMesa,
-    setClaimUnits: (itemId: ItemId, memberId: MemberId, units: number) =>
+  const setName = useCallback(
+    (name: string) => dispatch({ type: "name/set", name }),
+    [],
+  );
+  const setMode = useCallback(
+    (mode: SplitMode) => dispatch({ type: "mode/set", mode }),
+    [],
+  );
+  const setTip = useCallback(
+    (tip: number) => dispatch({ type: "tip/set", tip }),
+    [],
+  );
+  const setPeople = useCallback(
+    (people: number) => dispatch({ type: "people/set", people }),
+    [],
+  );
+  const setTab = useCallback(
+    (tab: BillTab) => dispatch({ type: "tab/set", tab }),
+    [],
+  );
+  const setClaimUnits = useCallback(
+    (itemId: ItemId, memberId: MemberId, units: number) =>
       dispatch({ type: "claim/setUnits", itemId, memberId, units }),
-    replaceClaim: (itemId: ItemId, unitsMap: Record<MemberId, number>) =>
+    [],
+  );
+  const replaceClaim = useCallback(
+    (itemId: ItemId, unitsMap: Record<MemberId, number>) =>
       dispatch({ type: "claim/replace", itemId, unitsMap }),
-    openSharePicker: () => dispatch({ type: "share/openPicker" }),
-    closeSharePicker: () => dispatch({ type: "share/closePicker" }),
-    openShareItem: (itemId: ItemId) => dispatch({ type: "share/openItem", itemId }),
-    closeShareItem: () => dispatch({ type: "share/closeItem" }),
-    loadStart: () => dispatch({ type: "load/start" }),
-    loadSuccess: () => dispatch({ type: "load/success" }),
-    loadError: () => dispatch({ type: "load/error" }),
-    goToBill: () => dispatch({ type: "stage/goBill" }),
-    goToConfirm,
-    confirmPay: () => dispatch({ type: "stage/goPayment" }),
-    submitPayment,
-    goToWaiting: () => dispatch({ type: "stage/goWaiting" }),
-    finishWaiting: () => dispatch({ type: "stage/goSuccess" }),
-    reset: (init: FlowInit) => dispatch({ type: "reset", init }),
-    syncFromServer: (patch: {
+    [],
+  );
+  const openSharePicker = useCallback(
+    () => dispatch({ type: "share/openPicker" }),
+    [],
+  );
+  const closeSharePicker = useCallback(
+    () => dispatch({ type: "share/closePicker" }),
+    [],
+  );
+  const openShareItem = useCallback(
+    (itemId: ItemId) => dispatch({ type: "share/openItem", itemId }),
+    [],
+  );
+  const closeShareItem = useCallback(() => dispatch({ type: "share/closeItem" }), []);
+  const loadStart = useCallback(() => dispatch({ type: "load/start" }), []);
+  const loadSuccess = useCallback(() => dispatch({ type: "load/success" }), []);
+  const loadError = useCallback(() => dispatch({ type: "load/error" }), []);
+  const goToBill = useCallback(() => dispatch({ type: "stage/goBill" }), []);
+  const confirmPay = useCallback(() => dispatch({ type: "stage/goPayment" }), []);
+  const goToWaiting = useCallback(() => dispatch({ type: "stage/goWaiting" }), []);
+  const finishWaiting = useCallback(() => dispatch({ type: "stage/goSuccess" }), []);
+  const reset = useCallback(
+    (init: FlowInit) => dispatch({ type: "reset", init }),
+    [],
+  );
+  const syncFromServer = useCallback(
+    (patch: {
       claims: Claims;
       paidItemIds: ItemId[];
       paidIds: MemberId[];
       people: number;
     }) => dispatch({ type: "sync/fromServer", ...patch }),
+    [],
+  );
+
+  return {
+    state,
+    derived,
+    dispatch,
+    youId,
+    setName,
+    setMode,
+    setTip,
+    setPeople,
+    setTab,
+    toggleMine,
+    claimFromMesa,
+    setClaimUnits,
+    replaceClaim,
+    openSharePicker,
+    closeSharePicker,
+    openShareItem,
+    closeShareItem,
+    loadStart,
+    loadSuccess,
+    loadError,
+    goToBill,
+    goToConfirm,
+    confirmPay,
+    submitPayment,
+    goToWaiting,
+    finishWaiting,
+    reset,
+    syncFromServer,
   };
 }
 

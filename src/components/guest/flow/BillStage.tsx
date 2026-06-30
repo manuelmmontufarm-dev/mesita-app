@@ -190,7 +190,12 @@ export function BillItemRow({
   const isLoading =
     (pendingOp === "claim" && !serverMine) ||
     (pendingOp === "release" && serverMine);
-  const mine = serverMine && !isLoading;
+  // Keep the row selected while a claim POST is in flight — otherwise rapid
+  // multi-select looks like items glitch/deselect between server round-trips.
+  const mine =
+    pendingOp === "release"
+      ? false
+      : serverMine || pendingOp === "claim";
   const isSharedMine = isShared && mine && !paid;
   const canToggle =
     !isSharedMine && (mine || free > 0.001);
