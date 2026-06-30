@@ -93,8 +93,14 @@ export async function GET(
   context: { params: Promise<{ token: string }> }
 ): Promise<Response> {
   const { token } = await context.params;
-  const state = await refreshDemoStateFromPos(token);
-  return successResponse(state, 200);
+  const cached = await getDemoTableState(token);
+  try {
+    const state = await refreshDemoStateFromPos(token);
+    return successResponse(state, 200);
+  } catch (err) {
+    console.warn("[demo-table] POS refresh failed, serving cache:", err);
+    return successResponse(cached, 200);
+  }
 }
 
 export async function POST(

@@ -100,6 +100,39 @@ export function posMesitaKeyFingerprint(): string | null {
   return `…${key.slice(-4)}`;
 }
 
+const POS_FETCH_TIMEOUT_MS = 12_000;
+
+export interface PosMesaSession {
+  mesa: {
+    id: string;
+    nombre: string;
+    estado: string;
+    capacidad?: number;
+    ubicacion?: string;
+  };
+  orden: {
+    id: string;
+    estado: string;
+    comensales: number;
+    detalles: Array<{
+      id: string;
+      nombre: string;
+      cantidad: number;
+      precio: number;
+      producto_id?: string | null;
+    }>;
+  } | null;
+  documento: { id: string; total?: number; subtotal_15?: number; iva?: number; servicio?: number } | null;
+  cobros: PosMesitaDocumento["cobros"];
+  totales: { subtotal: number; iva: number; servicio: number; total: number };
+  saldo: number;
+  fully_paid: boolean;
+}
+
+export async function getPosMesaSession(mesaId: string): Promise<PosMesaSession> {
+  return posFetch<PosMesaSession>(`/mesa/${encodeURIComponent(mesaId)}/session/`);
+}
+
 async function posFetch<T>(
   path: string,
   init?: RequestInit & { json?: unknown },
@@ -113,12 +146,27 @@ async function posFetch<T>(
     ...(init?.json ? { "Content-Type": "application/json" } : {}),
   };
 
-  const res = await fetch(`${baseUrl()}${path}`, {
-    ...init,
-    headers: { ...headers, ...(init?.headers as Record<string, string>) },
-    body: init?.json ? JSON.stringify(init.json) : init?.body,
-    cache: "no-store",
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), POS_FETCH_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: { ...headers, ...(init?.headers as Record<string, string>) },
+      body: init?.json ? JSON.stringify(init.json) : init?.body,
+      cache: "no-store",
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error(`POS Mesita timeout (${POS_FETCH_TIMEOUT_MS}ms): ${path}`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");

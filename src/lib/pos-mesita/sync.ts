@@ -6,14 +6,14 @@ import type { DemoFoodItem, DemoTableState } from "@/lib/demo-table-store";
 import { closeDemoTableAfterFullPayment } from "@/lib/demo-table-store";
 import {
   findActivePosOrdenForMesa,
-  getPosOrden,
+  getPosMesaSession,
   isPosMesitaConfigured,
   todayEcPosDate,
   type PosMesitaDocumento,
 } from "./client";
 import { mergePosDetallesIntoItems } from "./merge-from-pos";
 
-const POS_PULL_MIN_MS = 100;
+const POS_PULL_MIN_MS = 1500;
 const lastPosPullAt = new Map<string, number>();
 
 interface OpenOrdenResult {
@@ -29,17 +29,31 @@ async function posFetch<T>(
   const key = process.env.POS_MESITA_API_KEY?.trim().replace(/^["']|["']$/g, "");
   if (!key) throw new Error("POS_MESITA_API_KEY not configured");
   const base = (process.env.POS_MESITA_API_URL ?? "https://mesita-pos.vercel.app/sistema/api/v1").replace(/\/$/, "");
-  const res = await fetch(`${base}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Token ${key}`,
-      Accept: "application/json",
-      ...(init?.json ? { "Content-Type": "application/json" } : {}),
-      ...(init?.headers as Record<string, string>),
-    },
-    body: init?.json ? JSON.stringify(init.json) : init?.body,
-    cache: "no-store",
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12_000);
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        Authorization: `Token ${key}`,
+        Accept: "application/json",
+        ...(init?.json ? { "Content-Type": "application/json" } : {}),
+        ...(init?.headers as Record<string, string>),
+      },
+      body: init?.json ? JSON.stringify(init.json) : init?.body,
+      cache: "no-store",
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error(`POS timeout: ${path}`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`POS ${res.status}: ${text.slice(0, 200)}`);
@@ -321,11 +335,6 @@ function shouldPullPosNow(token: string, force: boolean): boolean {
   return true;
 }
 
-function isActivePosOrden(orden: { estado?: string }): boolean {
-  const st = (orden.estado ?? "A").toUpperCase();
-  return st === "A" || st === "P";
-}
-
 function resetSessionForClosedOrden(): Partial<DemoTableState> {
   return {
     items: [],
@@ -340,38 +349,8 @@ function resetSessionForClosedOrden(): Partial<DemoTableState> {
 }
 
 /**
- * Pull POS cobros/documentos linked to the active orden.
- */
-export async function pullPosPaymentsIntoDemoState(
-  state: DemoTableState,
-  ordenId?: string,
-): Promise<{ state: DemoTableState; changed: boolean }> {
-  if (!ordenId || !isPosMesitaConfigured()) {
-    return { state, changed: false };
-  }
-
-  const { listPosDocumentosForOrden } = await import("./client");
-  const { mergePosCobrosIntoPayments } = await import("./pull-pos-payments");
-
-  const docs = await listPosDocumentosForOrden(ordenId).catch(() => []);
-  if (!docs.length) return { state, changed: false };
-
-  const merged = mergePosCobrosIntoPayments(state, docs);
-  if (!merged.changed) return { state, changed: false };
-
-  return {
-    state: {
-      ...state,
-      payments: merged.payments,
-      paidItemIds: merged.paidItemIds,
-      itemPaidUnits: merged.itemPaidUnits,
-    },
-    changed: true,
-  };
-}
-
-/**
- * Pull active POS orden líneas into demo Redis state (mesas 1–4 only).
+ * Pull mesa session snapshot into demo Redis (mesas 1–4 only).
+ * One POS API call — fast enough for guest polling on Vercel.
  */
 export async function pullPosOrdenIntoDemoState(
   token: string,
@@ -386,46 +365,27 @@ export async function pullPosOrdenIntoDemoState(
     return { state, changed: false, posOrdenId: state.posOrdenId };
   }
 
-  let ordenId = state.posOrdenId;
-  let orden = ordenId ? await getPosOrden(ordenId).catch(() => null) : null;
-
-  if (orden && !isActivePosOrden(orden)) {
-    orden = null;
-    ordenId = undefined;
+  let session;
+  try {
+    session = await getPosMesaSession(def.posMesaId);
+  } catch (e) {
+    console.warn("[pos-mesita] session pull failed:", e instanceof Error ? e.message : e);
+    return { state, changed: false, posOrdenId: state.posOrdenId };
   }
 
-  if (!orden) {
-    orden = await findActivePosOrdenForMesa(def.posMesaId).catch(() => null);
-    ordenId = orden?.id;
-  }
-
-  if (orden && !isActivePosOrden(orden)) {
-    orden = null;
-    ordenId = undefined;
-  }
-
+  const ordenId = session.orden?.id;
   const hadLinkedOrden = Boolean(state.posOrdenId);
   const ordenClosed = hadLinkedOrden && !ordenId;
+  const mesaLibre = session.mesa?.estado === "L";
   const billSub = state.items.reduce((s, it) => s + it.qty * it.unitPrice, 0);
   const paidSub = state.payments.reduce((s, p) => s + p.subtotal, 0);
   const fullyPaidSession =
-    ordenClosed &&
+    (ordenClosed || mesaLibre) &&
     state.items.length > 0 &&
     (state.paidItemIds.length >= state.items.length ||
       paidSub >= billSub - 0.05);
 
-  if (!orden || !ordenId) {
-    const merged = mergePosDetallesIntoItems(state.items, [], {
-      paidItemIds: state.paidItemIds,
-      itemPaidUnits: state.itemPaidUnits,
-    });
-    const cleared =
-      merged.changed ||
-      state.posOrdenId != null ||
-      state.items.some((it) => !state.paidItemIds.includes(it.id));
-
-    if (!cleared && !ordenClosed) return { state, changed: false };
-
+  if (!session.orden || !ordenId) {
     if (ordenClosed && fullyPaidSession) {
       await closeDemoTableAfterFullPayment(token).catch(() => undefined);
       return {
@@ -444,13 +404,26 @@ export async function pullPosOrdenIntoDemoState(
       };
     }
 
-    const reset = ordenClosed ? resetSessionForClosedOrden() : {};
+    const merged = mergePosDetallesIntoItems(state.items, [], {
+      paidItemIds: state.paidItemIds,
+      itemPaidUnits: state.itemPaidUnits,
+    });
+    const cleared =
+      merged.changed ||
+      state.posOrdenId != null ||
+      (mesaLibre && state.items.length > 0);
+
+    if (!cleared && !ordenClosed) {
+      return { state, changed: false, posOrdenId: state.posOrdenId };
+    }
+
+    const reset = ordenClosed || mesaLibre ? resetSessionForClosedOrden() : {};
 
     return {
       state: {
         ...state,
         ...reset,
-        items: ordenClosed ? [] : merged.items,
+        items: mesaLibre || ordenClosed ? [] : merged.items,
         posOrdenId: undefined,
         posMesaId: def.posMesaId,
       },
@@ -458,26 +431,65 @@ export async function pullPosOrdenIntoDemoState(
     };
   }
 
-  const detalles = (orden.detalles ?? []).filter((d) => d.nombre);
+  const detalles = (session.orden.detalles ?? [])
+    .filter((d) => d.nombre)
+    .map((d) => ({
+      id: d.id,
+      nombre: d.nombre,
+      cantidad: Number(d.cantidad),
+      precio: Number(d.precio),
+      productoId: d.producto_id ?? null,
+    }));
+
   const merged = mergePosDetallesIntoItems(state.items, detalles, {
     paidItemIds: state.paidItemIds,
     itemPaidUnits: state.itemPaidUnits,
   });
 
-  const linksChanged =
-    state.posOrdenId !== ordenId ||
-    state.posMesaId !== def.posMesaId;
-
-  if (!merged.changed && !linksChanged) {
-    return { state, changed: false, posOrdenId: ordenId };
-  }
-
-  const next: DemoTableState = {
+  let next: DemoTableState = {
     ...state,
     items: merged.items,
     posOrdenId: ordenId,
     posMesaId: def.posMesaId,
+    posDocumentoId: session.documento?.id,
   };
+
+  let paymentsChanged = false;
+  if (session.cobros?.length) {
+    const { mergePosCobrosIntoPayments } = await import("./pull-pos-payments");
+    const syntheticDoc: PosMesitaDocumento = {
+      id: session.documento?.id ?? `session-${ordenId}`,
+      tipo_documento: "PRE",
+      estado: "P",
+      descripcion: null,
+      total: session.totales.total,
+      subtotal_15: session.totales.subtotal,
+      iva: session.totales.iva,
+      servicio: session.totales.servicio,
+      fecha_emision: todayEcPosDate(),
+      cobros: session.cobros,
+      created_at: new Date().toISOString(),
+    };
+    const paidMerged = mergePosCobrosIntoPayments(next, [syntheticDoc]);
+    if (paidMerged.changed) {
+      next = {
+        ...next,
+        payments: paidMerged.payments,
+        paidItemIds: paidMerged.paidItemIds,
+        itemPaidUnits: paidMerged.itemPaidUnits,
+      };
+      paymentsChanged = true;
+    }
+  }
+
+  const linksChanged =
+    state.posOrdenId !== ordenId ||
+    state.posMesaId !== def.posMesaId ||
+    state.posDocumentoId !== session.documento?.id;
+
+  if (!merged.changed && !linksChanged && !paymentsChanged) {
+    return { state, changed: false, posOrdenId: ordenId };
+  }
 
   return { state: next, changed: true, posOrdenId: ordenId };
 }
