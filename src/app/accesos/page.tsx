@@ -11,6 +11,7 @@ import {
   ScanLine,
   Server,
   Settings,
+  ShieldCheck,
   Store,
   UtensilsCrossed,
   Users,
@@ -36,6 +37,7 @@ const quickLinks: CompactLink[] = [
   { title: "Menú", href: `${mesitaBase}/dashboard/owner/menu`, icon: UtensilsCrossed },
   { title: "Personal", href: `${mesitaBase}/dashboard/owner/personal`, icon: Users },
   { title: "Configuración", href: `${mesitaBase}/dashboard/owner/configuracion`, icon: Settings },
+  { title: "Admin plataforma", href: `${mesitaBase}/admin`, icon: ShieldCheck },
   { title: "QR demo", href: `${mesitaBase}/pay/demo/qr`, icon: QrCode },
   { title: "GitHub", href: "https://github.com/manuelmmontufarm-dev/mesita-app", icon: Code2 },
 ];
