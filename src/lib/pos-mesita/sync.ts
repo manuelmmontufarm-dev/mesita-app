@@ -3,6 +3,7 @@
  */
 import type { DemoTableDefinition } from "@/lib/demo-table-catalog/definitions";
 import type { DemoFoodItem, DemoTableState } from "@/lib/demo-table-store";
+import { closeDemoTableAfterFullPayment } from "@/lib/demo-table-store";
 import {
   findActivePosOrdenForMesa,
   getPosOrden,
@@ -12,7 +13,7 @@ import {
 } from "./client";
 import { mergePosDetallesIntoItems } from "./merge-from-pos";
 
-const POS_PULL_MIN_MS = 300;
+const POS_PULL_MIN_MS = 100;
 const lastPosPullAt = new Map<string, number>();
 
 interface OpenOrdenResult {
@@ -427,12 +428,16 @@ export async function pullPosOrdenIntoDemoState(
     if (!cleared && !ordenClosed) return { state, changed: false };
 
     if (ordenClosed && fullyPaidSession) {
+      await closeDemoTableAfterFullPayment(token).catch(() => undefined);
       return {
         state: {
           ...state,
           items: [],
           claims: {},
           claimShares: undefined,
+          paidItemIds: [],
+          itemPaidUnits: {},
+          payments: [],
           posOrdenId: undefined,
           posDocumentoId: undefined,
         },

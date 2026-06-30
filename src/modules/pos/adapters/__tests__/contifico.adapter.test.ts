@@ -262,7 +262,7 @@ describe("ContificoAdapter.confirmPayment", () => {
     await adapter.confirmPayment({
       posDocumentId: "DOC-001",
       amount: 10,
-      paymentReference: "KUSHKI-REF-001",
+      paymentReference: "STUB-REF-001",
       posToken: "a004388c-1550-463e-a96e-a1dc4dfe7c8a",
     });
     const calls = fetchMock.mock.calls.filter((c: any[]) => /\/documento\/DOC-001\/cobro\//.test(c[0]));
@@ -271,7 +271,7 @@ describe("ContificoAdapter.confirmPayment", () => {
     expect(body.forma_cobro).toBe("EF");
     expect(body.monto).toBe(10);
     expect(body.fecha).toMatch(/\d{2}\/\d{2}\/\d{4}/); // DD/MM/YYYY
-    expect(body.descripcion).toBe("KUSHKI-REF-001");
+    expect(body.descripcion).toBe("STUB-REF-001");
     expect(body.pos).toBe("a004388c-1550-463e-a96e-a1dc4dfe7c8a");
     expect(body.lote).toBeUndefined();        // EF has no lote
     expect(body.documento_id).toBeUndefined(); // id is in URL, not body
@@ -284,14 +284,14 @@ describe("ContificoAdapter.confirmPayment", () => {
     await adapter.confirmPayment({
       posDocumentId: "DOC-001",
       amount: 10,
-      paymentReference: "KUSHKI-TX-ABC",
+      paymentReference: "STUB-TX-ABC",
       posToken: "a004388c-1550-463e-a96e-a1dc4dfe7c8a",
     });
     const calls = fetchMock.mock.calls.filter((c: any[]) => /\/cobro\//.test(c[0]));
     const body = JSON.parse(calls[0][1].body);
     expect(body.forma_cobro).toBe("TC");
     expect(body.tipo_ping).toBe("D");
-    expect(body.lote).toBe("KUSHKI-TX-ABC");
+    expect(body.lote).toBe("STUB-TX-ABC");
     expect(body.descripcion).toBeUndefined(); // TC has no descripcion
     expect(body.pos).toBe("a004388c-1550-463e-a96e-a1dc4dfe7c8a");
   });

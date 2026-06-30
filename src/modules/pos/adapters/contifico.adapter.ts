@@ -151,7 +151,7 @@ export class ContificoAdapter implements PosPort {
    * Records a partial cobro and (when applicable) updates the document's cliente before the cobro
    * so Contífico issues the SRI factura to the right guest. Never throws on POS error (D-10).
    *
-   * Option B semantics: called ONCE per Kushki transaction with the PARTIAL split amount.
+   * Option B semantics: called ONCE per card transaction with the PARTIAL split amount.
    * Contífico converts PRE → FAC automatically when the sum of cobros equals the document total.
    */
   async confirmPayment(params: POSConfirmPaymentParams): Promise<POSConfirmPaymentResult> {
@@ -192,8 +192,8 @@ export class ContificoAdapter implements PosPort {
       pos: params.posToken,
     };
     if (isCard) {
-      cobroBody.tipo_ping = this.config.tipoPing ?? "D"; // "D" = Datafast; Kushki TBD
-      cobroBody.lote = params.paymentReference;          // Kushki transaction ID
+      cobroBody.tipo_ping = this.config.tipoPing ?? "D"; // "D" = Datafast; Diners TBD
+      cobroBody.lote = params.paymentReference;          // provider transaction ID
     } else {
       cobroBody.descripcion = params.paymentReference;
     }

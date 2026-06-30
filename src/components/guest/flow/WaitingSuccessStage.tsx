@@ -732,7 +732,7 @@ export function WaitingSuccessStage({
         >
           <Ic.users s={16} /> {backToBillCta}
         </button>
-        {config.demoMode && onResetDemo ? (
+        {config.showResetButton && onResetDemo ? (
           <button
             type="button"
             className="completed-btn demo-reset-success-btn"

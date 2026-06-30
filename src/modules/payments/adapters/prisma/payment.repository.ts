@@ -20,7 +20,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
       restaurantId,
       amount,
       voluntaryTip,
-      kushkiTransactionId,
+      providerTransactionId,
       idempotencyKey,
       splitMode,
       selectedItemIds,
@@ -43,7 +43,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
           restaurantId,
           amount: new Decimal(amount),
           voluntaryTip: voluntaryTip > 0 ? new Decimal(voluntaryTip) : null,
-          kushkiTransactionId,
+          providerTransactionId,
           idempotencyKey,
           splitMode: splitMode as PrismaSplitMode,
           guestSessionId,
@@ -72,7 +72,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
         // predicate makes the claim conditional: if another guest paid one of
         // these items between our snapshot and now, count < ids.length and we
         // throw, which rolls back the tx and triggers process-payment's
-        // compensation path (Kushki void).
+        // compensation path (provider void).
         const claimed = await tx.billItem.updateMany({
           where: { id: { in: ids }, billId, restaurantId, isPaid: false },
           data: { isPaid: true, paidAt: new Date() },
@@ -104,7 +104,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
         // would be overpaid. The `equalSharesPaid < totalPeople` + status
         // predicates make the increment conditional: the loser matches 0 rows,
         // we throw, the tx rolls back, and process-payment's compensation path
-        // voids the loser's Kushki charge.
+        // voids the loser's provider charge.
         const totalPeople = currentBill.equalSplitPeople ?? requestedSplitPeople ?? 1;
         const billUpdate: Prisma.BillUpdateManyMutationInput = {
           equalSharesPaid: { increment: 1 },
@@ -189,6 +189,18 @@ export class PrismaPaymentRepository implements PaymentRepository {
       billStatus: updatedBill.status as RecordPaymentResult["billStatus"],
       thisPaymentIsRecipient,
     };
+  }
+
+  async updatePosRegistration(
+    paymentId: string,
+    data: { registered: boolean; note?: string | null }
+  ): Promise<void> {
+    await prisma.payment.update({
+      where: { id: paymentId },
+      data: data.registered
+        ? { posRegisteredAt: new Date(), posRegistrationNote: null }
+        : { posRegistrationNote: data.note?.slice(0, 500) ?? null },
+    });
   }
 }
 

@@ -593,6 +593,14 @@ export const SCENARIOS: Scenario[] = [
       await c.pay({ mode: "item", itemIds: ["encebollado"], itemUnits: { encebollado: 1 } });
       await a.pay({ mode: "item", itemIds: ["ceviche"], itemUnits: { ceviche: 0.5 } });
       await b.pay({ mode: "item", itemIds: ["ceviche"], itemUnits: { ceviche: 0.5 } });
+      await a.claim("jugo-1");
+      await b.claim("jugo-2");
+      await c.claim("club-1");
+      await a.claim("club-2");
+      await a.pay({ mode: "item", itemIds: ["jugo-1"], itemUnits: { "jugo-1": 1 } });
+      await b.pay({ mode: "item", itemIds: ["jugo-2"], itemUnits: { "jugo-2": 1 } });
+      await c.pay({ mode: "item", itemIds: ["club-1"], itemUnits: { "club-1": 1 } });
+      await a.pay({ mode: "item", itemIds: ["club-2"], itemUnits: { "club-2": 1 } });
       // `tableClosed` is derived (see demo-table-progress.ts) — the canonical
       // store-level proxy is "every item id is in paidItemIds OR every unit
       // appears in itemPaidUnits ≥ qty".

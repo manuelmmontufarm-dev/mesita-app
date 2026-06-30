@@ -1125,6 +1125,55 @@ Work needed:
 Do not remove or modify any demo path code. Demo must stay working.
 ```
 
+| **Status** | `COMPLETE` (pending live PRE mapping) |
+| **Completed** | `2026-06-30` |
+| **Code shipped** | payment STUB refactor + `test-contifico.mjs` v2 + `test-ingest.ts` |
+
+**Verification evidence:**
+- `node scripts/test-contifico.mjs` → 7 open PREs on sandbox v2
+- `npm test -- src/modules/pos/application` → pass
+- Live ingest on mesitademo requires human: PRE with `adicional1` = `posExternalId`
+
+**Carry-forward:** Run ingest after creating mapped PRE in APIPRUEBA account.
+
+---
+
+#### Phase 3 — Completion Record (updated)
+
+| **Status** | `COMPLETE` (pending 2-device manual test) |
+| **Completed** | `2026-06-30` |
+
+**What was done:** Production guest path uses `/api/guest/*`; `PaymentStage` sends `stub:` token; bill reads `posTotal`.
+
+---
+
+#### Phase 4 — Completion Record (updated)
+
+| **Status** | `COMPLETE` (STUB; Contifico cobro best-effort) |
+| **Completed** | `2026-06-30` |
+
+**What was done:** Kushki removed; `process-payment` uses STUB adapter; `scripts/test-payment-flow.ts` added.
+
+---
+
+#### Phase 5 — Completion Record (updated)
+
+| **Status** | `COMPLETE` |
+| **Completed** | `2026-06-30` |
+
+**What was done:** `PanelDashboard` + `StatisticsDashboard` → `/api/dashboard` with `posTotal`, polling 5s.
+
+---
+
+#### Phase 6–9 — Summary (2026-06-30)
+
+- **Companion:** POST retry cobro on `/api/pos-companion/payments`
+- **Refunds:** STUB path updates DB only; Diners placeholder
+- **Branding:** PagaYa → MesitaQR in contact, middleware, admin UI
+- **Env:** `PAYMENT_PROVIDER=STUB`; remove `KUSHKI_*`
+
+See [HANDOFF_PRESENTATION.md](./HANDOFF_PRESENTATION.md) for tomorrow's checklist.
+
 ---
 
 ## 7. Open Questions to Resolve Before Starting

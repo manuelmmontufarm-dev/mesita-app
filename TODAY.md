@@ -11,12 +11,12 @@ Este es el **diario de a bordo** del proyecto. Sirve para que cualquier persona
 La idea es simple: en vez de adivinar mirando el código, abres este archivo y te
 pones al día. Está escrito a propósito en lenguaje sencillo.
 
-> **Sobre el proyecto:** *PagaYa / MesitaQR* es una app web para que los clientes
+> **Sobre el proyecto:** *MesitaQR* es una app web para que los clientes
 > de un restaurante **paguen desde su celular escaneando un QR en la mesa**.
-> Está hecha con Next.js 15, React 19, Prisma y pagos con Kushki. Se conecta al
-> POS del restaurante (Contífico) para leer las cuentas y registrar los pagos;
-> **el POS sigue siendo el dueño de la factura electrónica**, PagaYa solo agrega
-> la capa de "pagar en la mesa con QR".
+> Está hecha con Next.js 15, React 19, Prisma y pagos con **STUB** (demo) o
+> **Diners Club** (producción). Se conecta al POS del restaurante (Contífico)
+> para leer las cuentas y registrar los pagos; **el POS sigue siendo el dueño
+> de la factura electrónica**, MesitaQR solo agrega la capa de "pagar en la mesa con QR".
 
 ---
 
@@ -52,7 +52,21 @@ Reglas de oro:
 
 ## 🟢 En qué estamos ahora
 
+Fix POS sync mesas 1–4: cobros importados ya no inflan “% pagado”; mesa se reinicia sola al pagar/cerrar en POS; Reiniciar solo en Mesa 12.
+
 ## 🗂️ Registro de cambios
+
+### 2026-06-30 — Fix glitch “todo pagado” + auto-reset mesa POS
+
+- **Qué:** `pull-pos-payments.ts`, `sync.ts`, `demo-table-store.ts` (`closeDemoTableAfterFullPayment`), `demo/table/[token]/route.ts`, `BillStage.tsx`, `GuestBillFlow.tsx`, `WaitingSuccessStage.tsx`, `GuestPayPage.tsx`, `useDemoTableSession.ts`, `resolve.ts`, tests `pull-pos-payments.test.ts`.
+- **Por qué:** Al añadir ítems desde el POS, la app mostraba 25637% pagado y saltaba a “cuenta pagada” porque cada cobro del POS heredaba el `subtotal_15` del documento completo; mesas 1–4 tenían botón Reiniciar que no debía existir; no se reiniciaba sola tras pago total.
+- **Qué hace:** Subtotal por cobro es proporcional al `monto`; se limpian flags `paidItemIds` stale al crecer la cuenta; poll POS más rápido (400ms); pago total → cierra mesa en POS + `closeDemoTableAfterFullPayment`; Reiniciar manual solo Mesa 12.
+
+### 2026-06-30 — Auditoría: Kushki cleanup, env, tests, demo catalog seed
+
+- **Qué:** `.env.example`, `prisma/supabase_deploy.sql`, `definitions.ts` (mesa-2 seed), `demo-table-store.ts`, `receipt-peek-layout.test.ts`, `demo-scenarios.ts` (escenario 23), pay route + hooks + comments (STUB/Diners), `CLAUDE.md`/`LAUNCH-PLAN.md`/`architecture.md` (parcial), `TODAY.md` intro.
+- **Por qué:** Auditoría post-migración `payment_provider_stub`: env obsoleto (Kushki/Dátil), SQL drift, 6 tests rojos, referencias Kushki en código activo.
+- **Qué hace:** Env documenta `PAYMENT_PROVIDER` + `ENCRYPTION_KEY`; SQL alinea `providerTransactionId`/`paymentProvider`; mesa-2 arranca con pagos parciales; demo store siempre carga ítems del catálogo; tests CSS alineados con `customer.css`; API acepta solo `paymentToken`.
 
 ### 2026-06-30 — Phase 1 + Phase 2 (partial): mesas producción, gates, POS wiring
 

@@ -14,6 +14,7 @@ type Alert = {
   pendingTotal: number;
   unregisteredTotal: number;
   needsPosRegistration: boolean;
+  unregisteredPaymentIds?: string[];
   paymentCount: number;
   lastPaymentAt: string | null;
   lastPaymentReference: string | null;
@@ -110,6 +111,27 @@ export default function CompanionPage() {
       setSelectedBillId(pendingAlerts[0]?.billId ?? alerts[0].billId);
     }
   }, [alerts, pendingAlerts, selectedBillId]);
+
+  async function retryCobro(paymentId: string) {
+    setSavingBillId(paymentId);
+    setError(null);
+    try {
+      const res = await fetch("/api/pos-companion/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentId }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error ?? "No se pudo reintentar cobro");
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error");
+    } finally {
+      setSavingBillId(null);
+    }
+  }
 
   async function markRegistered(billId: string) {
     setSavingBillId(billId);
@@ -282,16 +304,30 @@ export default function CompanionPage() {
                 )}
 
                 {selectedAlert.needsPosRegistration && (
-                  <Button
-                    className="mt-3 h-11 w-full rounded-2xl bg-emerald-500 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-600"
-                    disabled={savingBillId === selectedAlert.billId}
-                    onClick={() => markRegistered(selectedAlert.billId)}
-                  >
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    {savingBillId === selectedAlert.billId
-                      ? "Marcando..."
-                      : "Registrado en POS"}
-                  </Button>
+                  <div className="mt-3 space-y-2">
+                    {(selectedAlert.unregisteredPaymentIds ?? []).slice(0, 1).map((paymentId) => (
+                      <Button
+                        key={paymentId}
+                        variant="outline"
+                        className="h-11 w-full rounded-2xl text-sm font-semibold"
+                        disabled={savingBillId === paymentId}
+                        onClick={() => retryCobro(paymentId)}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        {savingBillId === paymentId ? "Reintentando..." : "Reintentar cobro en Contífico"}
+                      </Button>
+                    ))}
+                    <Button
+                      className="h-11 w-full rounded-2xl bg-emerald-500 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-600"
+                      disabled={savingBillId === selectedAlert.billId}
+                      onClick={() => markRegistered(selectedAlert.billId)}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      {savingBillId === selectedAlert.billId
+                        ? "Marcando..."
+                        : "Marcado manual en POS"}
+                    </Button>
+                  </div>
                 )}
               </div>
             </section>

@@ -159,6 +159,21 @@ export async function GET(request: Request): Promise<Response> {
           time: entry.time,
           paymentIds: entry.paymentIds,
         })),
+        payments: payments.map((p) => ({
+          paymentId: p.id,
+          billId: p.billId,
+          tableId: p.bill.tableId,
+          tableName: p.bill.table?.name ?? "Mesa",
+          amount: Number(p.amount),
+          voluntaryTip: Number(p.voluntaryTip ?? 0),
+          splitMode: p.splitMode,
+          guestNombre: p.guestNombre,
+          providerTransactionId: p.providerTransactionId,
+          posRegisteredAt: p.posRegisteredAt?.toISOString() ?? null,
+          posRegistrationNote: p.posRegistrationNote,
+          createdAt: p.createdAt.toISOString(),
+          status: p.status,
+        })),
       },
       200
     );

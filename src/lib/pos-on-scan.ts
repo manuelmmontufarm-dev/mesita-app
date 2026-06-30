@@ -11,6 +11,7 @@ export async function ingestRestaurantOnScan(restaurantId: string): Promise<void
     where: { id: restaurantId },
     select: {
       id: true,
+      name: true,
       status: true,
       invoiceMode: true,
       posProvider: true,

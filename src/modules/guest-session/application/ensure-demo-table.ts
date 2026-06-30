@@ -110,7 +110,7 @@ export async function ensureDemoTableReady(token: string): Promise<void> {
         restaurantId: restaurant.id,
         amount: 5.63,
         status: PaymentStatus.COMPLETED,
-        kushkiTransactionId: "DEMO-LOCRO",
+        providerTransactionId: "DEMO-LOCRO",
         idempotencyKey: randomUUID(),
         splitMode: SplitMode.BY_ITEM,
         createdAt: paidAt,

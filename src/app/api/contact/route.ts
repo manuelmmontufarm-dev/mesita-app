@@ -41,12 +41,12 @@ export async function POST(request: Request): Promise<Response> {
       const safePhone      = phone ? escapeHtml(phone) : "—";
       const safeMessage    = message ? escapeHtml(message).replace(/\n/g, "<br>") : "—";
       await resend.emails.send({
-        from: "PagaYa <noreply@pagaya.ec>",
-        to: process.env.CONTACT_EMAIL ?? "hola@pagaya.ec",
+        from: "MesitaQR <noreply@mesita.ec>",
+        to: process.env.CONTACT_EMAIL ?? "hola@mesita.ec",
         replyTo: email,
         subject: `Nuevo contacto: ${safeName} — ${safeRestaurant}`,
         html: `
-          <h2>Nuevo mensaje de contacto — PagaYa</h2>
+          <h2>Nuevo mensaje de contacto — MesitaQR</h2>
           <table style="border-collapse:collapse;width:100%;max-width:520px">
             <tr><td style="padding:8px;color:#6b7280;width:140px">Nombre</td><td style="padding:8px;font-weight:600">${safeName}</td></tr>
             <tr style="background:#f9fafb"><td style="padding:8px;color:#6b7280">Restaurante</td><td style="padding:8px;font-weight:600">${safeRestaurant}</td></tr>
@@ -59,7 +59,7 @@ export async function POST(request: Request): Promise<Response> {
       });
     } else {
       // Fallback: log to console in development
-      console.log("[PagaYa Contact]", {
+      console.log("[Mesita Contact]", {
         name, restaurant, email, phone: phone ?? "—",
         message: message ?? "—", receivedAt: new Date().toISOString(),
       });
@@ -67,7 +67,7 @@ export async function POST(request: Request): Promise<Response> {
 
     return Response.json({ success: true }, { status: 200 });
   } catch (error) {
-    console.error("[PagaYa Contact] Error:", error);
+    console.error("[Mesita Contact] Error:", error);
     // Still return success so the form doesn't scare the user —
     // email delivery failure shouldn't block the lead capture
     return Response.json({ success: true }, { status: 200 });

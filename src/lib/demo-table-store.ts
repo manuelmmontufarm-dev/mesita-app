@@ -135,11 +135,6 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function isPosMirroredTable(def: ReturnType<typeof resolveDemoTableToken>): boolean {
-  if (!def) return false;
-  return def.token !== "demo" && def.table.name !== "12";
-}
-
 function createState(token: string): DemoTableState {
   const ts = nowIso();
   const def =
@@ -153,13 +148,8 @@ function createState(token: string): DemoTableState {
     serviceEnabled: true,
   };
   const tableName = def?.table.name ?? "12";
-  const mirrorPos = isPosMirroredTable(def);
-  const items = mirrorPos
-    ? []
-    : def?.items
-      ? def.items.map((it) => ({ ...it }))
-      : [];
-  const seed = mirrorPos ? undefined : def?.seed;
+  const items = def?.items ? def.items.map((it) => ({ ...it })) : [];
+  const seed = def?.seed;
   return {
     token,
     restaurant: { ...restaurant },
@@ -381,6 +371,43 @@ export async function resetDemoTableState(token: string): Promise<DemoTableState
   // createState now seeds from the catalog (preserves mesa-2 partial payments,
   // empty for the rest). Reset bumps resetSeq + version so SSE clients re-sync.
   const state = createState(token);
+  state.resetSeq = (prev?.resetSeq ?? 0) + 1;
+  state.version = (prev?.version ?? 0) + 1;
+  state.guests = [];
+  state.payments = [];
+  state.nextGuestNumber = 1;
+  applyPosLinkedEmptyBill(token, state);
+  getMemoryStore().set(token, state);
+  const redis = getRedis();
+  if (redis) {
+    await redis.set(REDIS_KEY(token), state, { ex: REDIS_TTL_SECONDS });
+  }
+  return state;
+}
+
+/** POS-linked mesas (1–4): start empty — items come from POS pull, not catalog seed. */
+function applyPosLinkedEmptyBill(token: string, state: DemoTableState): void {
+  const def = resolveDemoTableToken(token);
+  if (!def || def.token === "demo" || def.table.name === "12") return;
+  state.items = [];
+  state.claims = {};
+  state.claimShares = {};
+  state.paidItemIds = [];
+  state.itemPaidUnits = {};
+  state.posOrdenId = undefined;
+  state.posDocumentoId = undefined;
+}
+
+/**
+ * After full payment or POS close — clear session so the next comensal starts fresh.
+ * Bumps resetSeq so all devices re-sync (no manual Reiniciar on mesas 1–4).
+ */
+export async function closeDemoTableAfterFullPayment(
+  token: string,
+): Promise<DemoTableState> {
+  const prev = await loadState(token);
+  const state = createState(token);
+  applyPosLinkedEmptyBill(token, state);
   state.resetSeq = (prev?.resetSeq ?? 0) + 1;
   state.version = (prev?.version ?? 0) + 1;
   state.guests = [];

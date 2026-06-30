@@ -6,7 +6,7 @@
 .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 16px); }
 
 /* ============================================================
-   MesaQR / PagaYa — Design System
+   MesaQR — Design System
    Tokens match the landing page (landing/src/index.css)
    ============================================================
 

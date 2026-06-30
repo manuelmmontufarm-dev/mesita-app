@@ -20,7 +20,7 @@ El swarm ejecutó 3 auditorías senior (~70 hallazgos), un inspector verificó c
 
 Lo que se arregló (resumen):
 
-- **Seguridad:** dev-login bloqueado (doble flag), secreto admin solo por header con comparación timing-safe, rate limit al endpoint de guest (120/min por IP+token), webhook Kushki devuelve 500 ante fallo de DB (para que Kushki reintente), headers de seguridad (HSTS, nosniff, X-Frame-Options), validación zod endurecida (precios, logo http(s), nombres).
+- **Seguridad:** dev-login bloqueado (doble flag), secreto admin solo por header con comparación timing-safe, rate limit al endpoint de guest (120/min por IP+token), headers de seguridad (HSTS, nosniff, X-Frame-Options), validación zod endurecida (precios, logo http(s), nombres).
 - **Pagos (el fix más importante):** los totales del POS (`subtotal/iva/propina/total` de Contífico) ahora se persisten y son la fuente de verdad. Antes se recalculaban con un multiplicador fijo — cualquier descuento o ítem con IVA 0% hacía que los cobros nunca sumaran exacto al documento y la prefactura **jamás se convertía en factura**. El último pago de un split ahora paga el remanente exacto. Además: claves de idempotencia atadas al bill, guard contra doble pago concurrente del mismo ítem y del último share, refund con claim atómico (imposible doble reembolso).
 - **UX del guest:** propina 10% etiquetada "(incluida por el restaurante)" vs propina adicional opcional, recuperación clara ante tarjeta rechazada / pérdida de red (retry seguro con la misma clave de idempotencia), referencia de pago + fecha + mesa en la confirmación (comprobante), sección "Pagos hasta ahora" en cuentas parcialmente pagadas, dashboard sin datos falsos y con botón de reintentar, diálogos de confirmación reales, errores en español.
 
@@ -34,22 +34,22 @@ Lo que se arregló (resumen):
 | **sunday (global)** | Exactamente tu producto, en US/EU | No está en Ecuador; no integra Contífico/Siigo ni SRI |
 | **POS locales (Contífico, Siigo)** | Dueños de la orden y la factura | No tienen pay-at-table; son tu socio, no tu rival |
 
-Lectura estratégica: tienes una ventana de 12–24 meses antes de que un jugador grande (Deuna, Kushki mismo, o sunday expandiéndose) ataque el nicho. La defensa es profundidad de integración POS + base instalada de restaurantes. Cada integración nueva (Siigo, Practicis) ensancha la moat porque el `POSAdapter` ya está diseñado para eso.
+Lectura estratégica: tienes una ventana de 12–24 meses antes de que un jugador grande (Deuna, sunday expandiéndose) ataque el nicho. La defensa es profundidad de integración POS + base instalada de restaurantes. Cada integración nueva (Siigo, Practicis) ensancha la moat porque el `POSAdapter` ya está diseñado para eso.
 
 ## 4. Modelo de negocio recomendado
 
-- **Cobro por transacción, no SaaS puro al inicio.** Para un restaurante de Quito, $X fijos/mes es fricción; 1.5–2.5% sobre lo procesado vía MesitaQR (encima del MDR de Kushki) se siente "gratis hasta que vendo". sunday usa este modelo.
+- **Cobro por transacción, no SaaS puro al inicio.** Para un restaurante de Quito, $X fijos/mes es fricción; 1.5–2.5% sobre lo procesado vía MesitaQR (encima del MDR del adquirente) se siente "gratis hasta que vendo". sunday usa este modelo.
 - **Ancla el pitch en datos duros del propio restaurante:** rotación de mesa (+1 turno en almuerzo = el simulador del landing ya lo muestra), propinas (+15–25% típico en pay-at-table por los presets), y cero descuadre contable (cobros = documento POS exacto — esto ahora es literalmente cierto en el código).
 - **Pricing piloto:** gratis 60–90 días para los primeros 3–5 restaurantes a cambio de data, testimonios y tolerancia a bugs. Luego grandfathering a tarifa preferencial.
-- **No toques el flujo de dinero todavía** (no seas adquirente ni hagas split de fondos): Kushki liquida directo al restaurante, tú cobras tu fee por separado. Menos riesgo regulatorio, cierre de ventas más fácil.
+- **No toques el flujo de dinero todavía** (no seas adquirente ni hagas split de fondos): el adquirente (Diners / banco del restaurante) liquida directo al restaurante, tú cobras tu fee por separado. Menos riesgo regulatorio, cierre de ventas más fácil.
 
 ## 5. Qué falta antes del primer restaurante real
 
 **Bloqueantes (1–2 semanas):**
 
 1. **Prueba end-to-end contra Contífico real** (sandbox y luego producción): prefactura → ingest → pago split → cobro → conversión PRE→FAC. Es la única parte del sistema que ningún test cubre — los tests mockean el adapter. Hazlo con tu propia cuenta Contífico antes de tocar la de un cliente.
-2. **Webhook Kushki en producción:** registrar la URL, verificar firma con el secreto real, y probar un pago real de $1 con tarjeta propia.
-3. **Variables de entorno de producción auditadas:** `CRON_SECRET`, `KUSHKI_WEBHOOK_SECRET`, `ADMIN_SECRET` largos y únicos; `ENABLE_DEV_LOGIN` ausente; verificar que el cron de ingest esté agendado en Vercel.
+2. **Pagos STUB → Diners en producción:** `PAYMENT_PROVIDER=DINERS` cuando el adapter esté listo; hoy demo/prod usa STUB (`paymentToken: stub:XXXX`). Probar un pago real de $1 con tarjeta propia.
+3. **Variables de entorno de producción auditadas:** `CRON_SECRET`, `ENCRYPTION_KEY`, `ADMIN_SECRET` largos y únicos; `PAYMENT_PROVIDER=STUB`; `ENABLE_DEV_LOGIN` ausente; verificar que el cron de ingest esté agendado en Vercel.
 4. **Backup y runbook mínimo:** qué hacer cuando un pago quedó COMPLETED en MesitaQR pero el cobro falló en Contífico (el código ya loguea `POS_COBRO_FAILED` — define quién lo revisa y cómo se reconcilia a mano).
 
 **Importantes (antes de escalar más allá del pilot) — diferidos por el inspector con razón:**

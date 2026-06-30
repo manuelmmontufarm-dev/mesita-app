@@ -1,6 +1,8 @@
 import { errorResponse, hasRole, requireAuth, successResponse } from "@/lib/api-utils";
 import { TAX_MULTIPLIER } from "@/lib/constants/ecuador-tax";
 import { prisma } from "@/lib/db";
+import { buildPosConfig } from "@/modules/pos/adapters/pos-config";
+import { ContificoAdapter } from "@/modules/pos/adapters/contifico.adapter";
 
 const LOOKBACK_HOURS = 12;
 
@@ -43,7 +45,10 @@ export async function GET(): Promise<Response> {
     });
 
     const alerts = bills.map((bill) => {
-      const billTotal = billTotalWithTax(bill.items);
+      const billTotal =
+        bill.posTotal != null
+          ? money(Number(bill.posTotal))
+          : billTotalWithTax(bill.items);
       const paidTotal = bill.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
       const unregistered = bill.payments.filter((payment) => !payment.posRegisteredAt);
       const lastPayment = bill.payments[0] ?? null;
@@ -63,7 +68,7 @@ export async function GET(): Promise<Response> {
         needsPosRegistration: unregistered.length > 0,
         paymentCount: bill.payments.length,
         lastPaymentAt: lastPayment?.createdAt.toISOString() ?? null,
-        lastPaymentReference: lastPayment?.kushkiTransactionId ?? null,
+        lastPaymentReference: lastPayment?.providerTransactionId ?? null,
       };
     });
 
@@ -102,6 +107,75 @@ export async function PATCH(request: Request): Promise<Response> {
     return successResponse({ updated: result.count }, 200);
   } catch (error) {
     console.error("Error marking POS companion payment:", error);
+    return errorResponse("Internal server error", 500);
+  }
+}
+
+export async function POST(request: Request): Promise<Response> {
+  try {
+    const auth = await requireAuth();
+    if (auth instanceof Response) return auth;
+    if (!hasRole(auth.role, "SERVER")) return errorResponse("Insufficient permissions", 403);
+
+    const body = await request.json().catch(() => ({}));
+    const paymentId = typeof body.paymentId === "string" ? body.paymentId : null;
+    if (!paymentId) return errorResponse("Missing paymentId", 400);
+
+    const payment = await prisma.payment.findFirst({
+      where: { id: paymentId, restaurantId: auth.restaurantId, status: "COMPLETED" },
+      include: { bill: true, restaurant: true },
+    });
+    if (!payment) return errorResponse("Payment not found", 404);
+    if (payment.posRegisteredAt) {
+      return successResponse({ success: true, alreadyRegistered: true }, 200);
+    }
+    if (!payment.bill.posDocumentId) {
+      return errorResponse("Bill has no POS document", 422);
+    }
+
+    const restaurant = payment.restaurant;
+    if (restaurant.invoiceMode !== "POS" || !restaurant.posApiKeyEnc) {
+      return errorResponse("POS integration not configured", 422);
+    }
+
+    const adapter = new ContificoAdapter(
+      buildPosConfig({
+        invoiceMode: restaurant.invoiceMode,
+        posProvider: restaurant.posProvider,
+        posApiKeyEnc: restaurant.posApiKeyEnc,
+        posEnvironment: restaurant.posEnvironment,
+        posTableField: restaurant.posTableField,
+        posPaymentMethod: restaurant.posPaymentMethod,
+      })
+    );
+
+    const cobro = await adapter.confirmPayment({
+      posDocumentId: payment.bill.posDocumentId,
+      posToken: payment.bill.posToken,
+      amount: Number(payment.amount) - Number(payment.voluntaryTip ?? 0),
+      paymentReference: payment.id,
+    });
+
+    if (!cobro.success) {
+      await prisma.payment.update({
+        where: { id: paymentId },
+        data: { posRegistrationNote: cobro.errorMessage?.slice(0, 500) ?? "Cobro failed" },
+      });
+      return errorResponse(cobro.errorMessage ?? "Cobro failed", 502);
+    }
+
+    await prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        posRegisteredAt: new Date(),
+        posRegisteredByUserId: auth.userId,
+        posRegistrationNote: null,
+      },
+    });
+
+    return successResponse({ success: true }, 200);
+  } catch (error) {
+    console.error("Error retrying POS cobro:", error);
     return errorResponse("Internal server error", 500);
   }
 }

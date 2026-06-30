@@ -219,7 +219,7 @@ export default function PersonalPage() {
         open={!!deleteTarget}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title={`¿Eliminar a ${deleteTarget?.name ?? "este miembro"}?`}
-        description={`${deleteTarget ? roleLabels[deleteTarget.role] : "Esta persona"} perderá el acceso a PagaYa de inmediato. Esta acción no se puede deshacer.`}
+        description={`${deleteTarget ? roleLabels[deleteTarget.role] : "Esta persona"} perderá el acceso a MesitaQR de inmediato. Esta acción no se puede deshacer.`}
         confirmLabel="Eliminar personal"
         variant="destructive"
         onConfirm={confirmDeleteStaff}

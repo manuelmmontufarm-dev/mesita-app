@@ -14,7 +14,7 @@ interface Confirmation {
 interface TableRow {
   id: string;
   name: string;
-  status: "open" | "paying" | "closed";
+  status: "open" | "paying" | "paid" | "closed";
   guestCount: number;
   total: number;
   billTotal?: number;
@@ -41,13 +41,14 @@ interface DashboardData {
 const STATUS = {
   paying: { label: "Pagando con Mesita", bg: "rgba(47,179,126,.14)", color: "#1f6b4c" },
   open:   { label: "Abierta", bg: "rgba(232,106,51,.13)", color: "#c45a1a" },
-  closed: { label: "Cerrada", bg: "rgba(27,25,22,.08)",   color: "#6B7280" },
+  paid:   { label: "Pagada", bg: "rgba(47,179,126,.18)", color: "#166534" },
+  closed: { label: "Sin cuenta", bg: "rgba(27,25,22,.08)", color: "#6B7280" },
 } as const;
 
-// Occupancy square colors per table status (matches landing page mockup)
 const OCCUPANCY_COLOR: Record<TableRow["status"], string> = {
   open:   "#FF4D4D",
   paying: "#FF4D4D",
+  paid:   "rgba(47,179,126,.35)",
   closed: "rgba(27,25,22,.10)",
 };
 
@@ -210,7 +211,7 @@ export function PanelDashboard() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/demo-dashboard");
+      const res = await fetch("/api/dashboard");
       if (!res.ok) throw new Error("failed");
       const json = await res.json();
       if (mountedRef.current) {
@@ -263,7 +264,7 @@ export function PanelDashboard() {
   useEffect(() => {
     mountedRef.current = true;
     load();
-    const id = setInterval(load, 1_000);
+    const id = setInterval(load, 5_000);
     return () => { mountedRef.current = false; clearInterval(id); };
   }, [load]);
 
@@ -284,8 +285,6 @@ export function PanelDashboard() {
   if (isError) {
     return (
       <>
-        {/* Demo banner */}
-        <DemoBanner />
         <div style={{
           padding: "36px 24px",
           borderRadius: 18,
@@ -328,7 +327,6 @@ export function PanelDashboard() {
   if (isLoading) {
     return (
       <div style={{ display: "grid", gap: 12 }}>
-        <DemoBanner />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
           <div style={{ padding: "15px 16px", borderRadius: 18, background: "var(--ink-900)" }}>
             <div style={{ width: 72, height: 11, borderRadius: 6, background: "rgba(255,255,255,.12)", marginBottom: 12 }} />
@@ -431,9 +429,6 @@ export function PanelDashboard() {
             En vivo
           </div>
         </div>
-
-        {/* Demo banner */}
-        <DemoBanner />
 
         {/* Stale-data badge */}
         {staleAsOf && (
@@ -637,36 +632,5 @@ export function PanelDashboard() {
         </div>
       </div>
     </>
-  );
-}
-
-function DemoBanner() {
-  return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "8px 14px",
-      borderRadius: 10,
-      background: "rgba(47,179,126,.12)",
-      border: "1px solid rgba(47,179,126,.22)",
-      fontSize: 12.5,
-      fontWeight: 500,
-      color: "#1f6b4c",
-    }}>
-      <span>🟢</span>
-      <span>
-        <strong>Modo demo</strong> · Realiza un pago en{" "}
-        <a
-          href="https://mesitademo-two.vercel.app/pay/demo"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: "#1f6b4c", fontWeight: 700, textDecoration: "underline", textUnderlineOffset: 2 }}
-        >
-          mesitademo-two.vercel.app/pay/demo
-        </a>{" "}
-        para ver los datos en vivo
-      </span>
-    </div>
   );
 }

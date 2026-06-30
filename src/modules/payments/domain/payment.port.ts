@@ -1,23 +1,27 @@
+export type PaymentProviderType = "STUB" | "DINERS";
+export type PaymentEnvironment = "SANDBOX" | "PRODUCTION";
+
 export interface ProviderConfig {
-  kushkiPrivateKey: string;
-  kushkiPublicKey: string;
-  kushkiEnvironment: "SANDBOX" | "PRODUCTION";
+  provider: PaymentProviderType;
+  environment: PaymentEnvironment;
+  privateKeyEnc?: string | null;
+  publicKey?: string | null;
 }
 
 export interface ChargeParams {
-  kushkiToken: string;
+  chargeToken: string;
   amount: number;
   voluntaryTip: number;
 }
 
 export interface ChargeResult {
   approved: boolean;
-  ticketNumber?: string;
+  transactionId?: string;
   errorText?: string;
 }
 
 export interface RefundParams {
-  ticketNumber: string;
+  transactionId: string;
   amount: number;
 }
 

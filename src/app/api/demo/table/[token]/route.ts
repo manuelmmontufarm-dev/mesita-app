@@ -1,5 +1,6 @@
 import {
   claimDemoItem,
+  closeDemoTableAfterFullPayment,
   DemoGuestNotFoundError,
   getDemoTableState,
   joinDemoTable,
@@ -289,6 +290,7 @@ export async function POST(
             posDocumentoId: undefined,
           });
           await refreshDemoStateFromPos(token, { force: true });
+          await closeDemoTableAfterFullPayment(token);
         }
       }
 

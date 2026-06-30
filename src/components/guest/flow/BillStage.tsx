@@ -25,6 +25,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { useGuestPaymentFlow } from "@/hooks/useGuestPaymentFlow";
+import { paymentRecordSubtotal } from "@/lib/guest-billing/demo-table-progress";
 import {
   avatarColor,
   billSubtotal,
@@ -600,7 +601,11 @@ export function BillStage({
   const fullSub = useMemo(() => billSubtotal(items), [items]);
   const paidSub = useMemo(() => paidSubtotal(items, paidItemIds), [items, paidItemIds]);
   const paymentsTotal = useMemo(
-    () => paidSummaries.reduce((s, p) => s + (p.amount > 0 ? p.amount : 0), 0),
+    () =>
+      paidSummaries.reduce(
+        (s, p) => s + paymentRecordSubtotal(p),
+        0,
+      ),
     [paidSummaries],
   );
   const someonePaid =
@@ -608,11 +613,15 @@ export function BillStage({
 
   const paidTotalWithTax = useMemo(() => {
     const fromItems = computeTotals(paidSubtotal(items, paidItemIds), config, tip).total;
-    if (paymentsTotal > 0.009) {
-      return Math.max(fromItems, paymentsTotal);
+    const fromPayments =
+      paymentsTotal > 0.009
+        ? computeTotals(Math.min(paymentsTotal, fullSub), config, tip).total
+        : 0;
+    if (fromPayments > 0.009) {
+      return Math.max(fromItems, fromPayments);
     }
     return fromItems;
-  }, [items, paidItemIds, config, tip, paymentsTotal]);
+  }, [items, paidItemIds, config, tip, paymentsTotal, fullSub]);
 
   const myItemCount = useMemo(
     () =>

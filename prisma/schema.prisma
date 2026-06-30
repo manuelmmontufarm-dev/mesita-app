@@ -45,12 +45,13 @@ model Restaurant {
   obligadoContabilidad  Boolean? @default(false)
   contribuyenteEspecial String?
 
-  // Payment integration (Kushki)
-  paymentsEnabled     Boolean     @default(false)
-  invoiceMode         InvoiceMode @default(DISABLED)
-  kushkiEnvironment   String      @default("SANDBOX")
-  kushkiPrivateKeyEnc String?
-  kushkiPublicKey     String?
+  // Payment integration (STUB sandbox / Diners production)
+  paymentsEnabled       Boolean     @default(false)
+  invoiceMode           InvoiceMode @default(DISABLED)
+  paymentProvider       String      @default("STUB") // STUB | DINERS
+  paymentEnvironment    String      @default("SANDBOX")
+  paymentPrivateKeyEnc  String?
+  paymentPublicKey      String?
 
   // POS integration (Contífico / Siigo)
   posProvider      String? // e.g. "CONTIFICO"; null when POS disabled
@@ -305,7 +306,7 @@ model BillItemClaim {
   @@map("bill_item_claims")
 }
 
-// Payment: Records of payments via Kushki with idempotency key
+// Payment: Card charge records with idempotency key
 model Payment {
   id                    String            @id @default(uuid())
   billId                String
@@ -314,7 +315,7 @@ model Payment {
   restaurant            Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   amount                Decimal           @db.Decimal(10, 2)
   voluntaryTip          Decimal?          @db.Decimal(10, 2)
-  kushkiTransactionId   String
+  providerTransactionId String
   idempotencyKey        String            @unique
   status                PaymentStatus
   splitMode             SplitMode?
@@ -337,8 +338,7 @@ model Payment {
   @@index([restaurantId, posRegisteredAt])
   @@index([billId])
   @@index([guestSessionId])
-  // Kushki webhook looks payments up by ticket number — must not table-scan.
-  @@index([kushkiTransactionId])
+  @@index([providerTransactionId])
   @@map("payments")
 }
 

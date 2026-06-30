@@ -78,12 +78,13 @@ CREATE TABLE IF NOT EXISTS "restaurants" (
   "regimen"                TEXT,
   "obligadoContabilidad"   BOOLEAN DEFAULT false,
   "contribuyenteEspecial"  TEXT,
-  -- Kushki
+  -- Payment integration (STUB sandbox / Diners production)
   "paymentsEnabled"        BOOLEAN NOT NULL DEFAULT false,
   "invoiceMode"            "InvoiceMode" NOT NULL DEFAULT 'DISABLED',
-  "kushkiEnvironment"      TEXT NOT NULL DEFAULT 'SANDBOX',
-  "kushkiPrivateKeyEnc"    TEXT,
-  "kushkiPublicKey"        TEXT,
+  "paymentProvider"        TEXT NOT NULL DEFAULT 'STUB',
+  "paymentEnvironment"     TEXT NOT NULL DEFAULT 'SANDBOX',
+  "paymentPrivateKeyEnc"   TEXT,
+  "paymentPublicKey"       TEXT,
   -- POS (Contífico / Siigo)
   "posProvider"            TEXT,
   "posApiKeyEnc"           TEXT,
@@ -329,7 +330,7 @@ CREATE TABLE IF NOT EXISTS "payments" (
   "restaurantId"          TEXT NOT NULL,
   "amount"                DECIMAL(10,2) NOT NULL,
   "voluntaryTip"          DECIMAL(10,2),
-  "kushkiTransactionId"   TEXT NOT NULL DEFAULT '',
+  "providerTransactionId" TEXT NOT NULL DEFAULT '',
   "idempotencyKey"        TEXT NOT NULL,
   "status"                "PaymentStatus" NOT NULL,
   "splitMode"             "SplitMode",
@@ -352,7 +353,7 @@ CREATE INDEX        IF NOT EXISTS "payments_restaurantId_createdAt_idx"      ON 
 CREATE INDEX        IF NOT EXISTS "payments_restaurantId_posRegisteredAt_idx" ON "payments"("restaurantId", "posRegisteredAt");
 CREATE INDEX        IF NOT EXISTS "payments_billId_idx"                      ON "payments"("billId");
 CREATE INDEX        IF NOT EXISTS "payments_guestSessionId_idx"              ON "payments"("guestSessionId");
-CREATE INDEX        IF NOT EXISTS "payments_kushkiTransactionId_idx"         ON "payments"("kushkiTransactionId");
+CREATE INDEX        IF NOT EXISTS "payments_providerTransactionId_idx" ON "payments"("providerTransactionId");
 
 DO $$ BEGIN
   ALTER TABLE "payments" ADD CONSTRAINT "payments_billId_fkey"
@@ -480,5 +481,6 @@ VALUES
   (gen_random_uuid()::text,'baseline',NOW(),'20260609001000_align_pos_payment_method_default',NULL,NULL,NOW(),1),
   (gen_random_uuid()::text,'baseline',NOW(),'20260609120000_add_pos_totals',      NULL,NULL,NOW(),1),
   (gen_random_uuid()::text,'baseline',NOW(),'20260612110000_guest_table_sessions',NULL,NULL,NOW(),1),
-  (gen_random_uuid()::text,'baseline',NOW(),'20260629000000_scale_and_merge',     NULL,NULL,NOW(),1)
+  (gen_random_uuid()::text,'baseline',NOW(),'20260629000000_scale_and_merge',     NULL,NULL,NOW(),1),
+  (gen_random_uuid()::text,'baseline',NOW(),'20260630100000_payment_provider_stub',NULL,NULL,NOW(),1)
 ON CONFLICT DO NOTHING;

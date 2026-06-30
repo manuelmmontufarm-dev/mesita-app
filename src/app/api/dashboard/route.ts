@@ -20,12 +20,17 @@ export async function GET(): Promise<Response> {
           id: true,
           name: true,
           bills: {
-            where: { status: { in: ["UNPAID", "PARTIALLY_PAID"] } },
+            where: { status: { in: ["UNPAID", "PARTIALLY_PAID", "FULLY_PAID"] } },
             select: {
+              id: true,
               status: true,
+              posTotal: true,
               equalSplitPeople: true,
-              items: {
-                select: { price: true, quantity: true },
+              items: { select: { price: true, quantity: true, isPaid: true } },
+              payments: { where: { status: "COMPLETED" }, select: { amount: true, voluntaryTip: true } },
+              guestSessions: {
+                where: { status: { not: "LEFT" } },
+                select: { id: true },
               },
             },
             orderBy: { createdAt: "desc" },
@@ -45,35 +50,31 @@ export async function GET(): Promise<Response> {
           amount: true,
           voluntaryTip: true,
           createdAt: true,
-          bill: {
-            select: {
-              table: { select: { name: true } },
-            },
-          },
+          bill: { select: { table: { select: { name: true } } } },
         },
         orderBy: { createdAt: "desc" },
       }),
     ]);
 
-    // KPIs
     const revenueToday = todayPayments.reduce((s, p) => s + Number(p.amount), 0);
-    const activeTables = tables.filter((t) => t.bills.length > 0).length;
+    const activeTables = tables.filter((t) => {
+      const bill = t.bills[0];
+      return bill && bill.status !== "FULLY_PAID";
+    }).length;
     const avgTicket = todayPayments.length > 0 ? revenueToday / todayPayments.length : 0;
     const propinaTotal = todayPayments.reduce((s, p) => {
       const a = Number(p.amount);
-      const tip = Number((p as Record<string, unknown>).voluntaryTip ?? 0);
+      const tip = Number(p.voluntaryTip ?? 0);
       const base = a - tip;
       return s + (base / (1 + PROPINA_RATE)) * PROPINA_RATE;
     }, 0);
     const propinaRate = revenueToday > 0 ? (propinaTotal / revenueToday) * 100 : 0;
 
-    // Hourly activity — bucket payments into the last 12 hours (0=oldest, 11=now)
     const nowHour = new Date().getHours();
     const hourBuckets: number[] = Array(12).fill(0);
     todayPayments.forEach((p) => {
       const h = new Date(p.createdAt).getHours();
-      const offset = ((h - nowHour + 24) % 24);
-      // only include within the last 11 hours
+      const offset = (h - nowHour + 24) % 24;
       if (offset <= 11) {
         const idx = 11 - offset;
         hourBuckets[idx] += Number(p.amount);
@@ -82,26 +83,52 @@ export async function GET(): Promise<Response> {
     const maxVal = Math.max(...hourBuckets, 1);
     const hourlyActivity = hourBuckets.map((v) => Math.round((v / maxVal) * 100));
 
-    // Recent confirmations (last 5 paid tables)
     const recentConfirmations = todayPayments.slice(0, 5).map((p) => ({
       tableName: p.bill.table?.name ?? "Mesa",
       amount: Number(p.amount),
+      createdAt: p.createdAt.toISOString(),
     }));
 
-    // Table status with bill totals
     const tableStatus = tables.map((t) => {
       const bill = t.bills[0];
-      let status: "open" | "paying" | "closed" = "closed";
-      if (bill) status = bill.status === "PARTIALLY_PAID" ? "paying" : "open";
-      const total = bill
-        ? bill.items.reduce((s, i) => s + Number(i.price) * i.quantity, 0)
-        : 0;
+      if (!bill) {
+        return {
+          id: t.id,
+          name: t.name,
+          status: "closed" as const,
+          guestCount: 0,
+          total: 0,
+          billTotal: 0,
+          paidAmount: 0,
+          remainingBalance: 0,
+          billStatus: null,
+        };
+      }
+
+      const posTotal = bill.posTotal != null ? Number(bill.posTotal) : null;
+      const itemTotal = bill.items.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
+      const billTotal = posTotal ?? itemTotal;
+      const paidAmount = bill.payments.reduce((s, p) => {
+        const tip = Number(p.voluntaryTip ?? 0);
+        return s + Number(p.amount) - tip;
+      }, 0);
+      const remainingBalance = Math.max(billTotal - paidAmount, 0);
+
+      let status: "open" | "paying" | "paid" | "closed" = "closed";
+      if (bill.status === "FULLY_PAID") status = "paid";
+      else if (bill.status === "PARTIALLY_PAID") status = "paying";
+      else if (bill.status === "UNPAID") status = "open";
+
       return {
         id: t.id,
         name: t.name,
         status,
-        guestCount: bill?.equalSplitPeople ?? 0,
-        total: Number(total.toFixed(2)),
+        guestCount: bill.guestSessions.length,
+        total: Number(billTotal.toFixed(2)),
+        billTotal: Number(billTotal.toFixed(2)),
+        paidAmount: Number(paidAmount.toFixed(2)),
+        remainingBalance: Number(remainingBalance.toFixed(2)),
+        billStatus: bill.status,
       };
     });
 

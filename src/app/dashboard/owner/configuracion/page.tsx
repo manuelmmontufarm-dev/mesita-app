@@ -19,7 +19,14 @@ interface FiscalData {
   establecimientoCodigo: string; puntoEmisionCodigo: string; regimen: string;
   obligadoContabilidad: boolean; contribuyenteEspecial: string; contactEmail: string; phone: string;
 }
-interface PaymentProviderStatus { privateKeyConfigured: boolean; publicKey: string | null; environment: string; enabled: boolean; }
+interface PaymentProviderStatus {
+  provider: string;
+  stubMode?: boolean;
+  privateKeyConfigured: boolean;
+  publicKey: string | null;
+  environment: string;
+  enabled: boolean;
+}
 interface PosStatus { enabled: boolean; provider: string | null; apiKeyConfigured: boolean; environment: string; tableField: string | null; paymentMethod: string; }
 
 const EMPTY_FISCAL: FiscalData = {
@@ -77,9 +84,9 @@ export default function ConfiguracionPage() {
       }
       if (iData?.data) {
         const d = iData.data;
-        setPaymentStatus(d.kushki ?? null);
-        if (d.kushki?.publicKey)   setPaymentForm(p => ({ ...p, publicKey: d.kushki.publicKey ?? "" }));
-        if (d.kushki?.environment) setPaymentForm(p => ({ ...p, environment: d.kushki.environment }));
+        setPaymentStatus(d.payments ?? null);
+        if (d.payments?.publicKey)   setPaymentForm(p => ({ ...p, publicKey: d.payments.publicKey ?? "" }));
+        if (d.payments?.environment) setPaymentForm(p => ({ ...p, environment: d.payments.environment }));
         if (d.pos) {
           setPosStatus(d.pos);
           setPosForm(p => ({
@@ -144,11 +151,11 @@ export default function ConfiguracionPage() {
       if (paymentForm.publicKey)  payload.publicKey  = paymentForm.publicKey;
       const res = await fetch(`/api/restaurant/${restaurantId}/integrations`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kushki: payload }),
+        body: JSON.stringify({ payments: payload }),
       });
       if (res.ok) {
         const d = await res.json();
-        setPaymentStatus(d.data?.kushki ?? null);
+        setPaymentStatus(d.data?.payments ?? null);
         setPaymentForm(p => ({ ...p, privateKey: "" }));
         toast({ title: "Botón de pago configurado" });
       } else { const e = await res.json(); toast({ title: "Error", description: e?.error, variant: "destructive" }); }
@@ -157,12 +164,13 @@ export default function ConfiguracionPage() {
 
   async function togglePayments(enabled: boolean) {
     if (!restaurantId) return;
-    if (enabled && !paymentStatus?.privateKeyConfigured) {
+    const isStub = paymentStatus?.stubMode ?? paymentStatus?.provider === "STUB";
+    if (enabled && !isStub && !paymentStatus?.privateKeyConfigured) {
       toast({ title: "Configura las credenciales del botón de pago primero", variant: "destructive" }); return;
     }
     const res = await fetch(`/api/restaurant/${restaurantId}/integrations`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kushki: { enabled } }),
+      body: JSON.stringify({ payments: { enabled } }),
     });
     if (res.ok) {
       setPaymentStatus(p => p ? { ...p, enabled } : null);
@@ -324,13 +332,26 @@ export default function ConfiguracionPage() {
                 <div>
                   <CardTitle>Botón de pago Mesita</CardTitle>
                   <CardDescription className="mt-1">
-                    Credenciales para que los comensales paguen desde el QR en la mesa
+                    {paymentStatus?.stubMode
+                      ? "Modo simulado activo — los comensales pagan con tarjeta fake hasta conectar Diners."
+                      : "Credenciales para que los comensales paguen desde el QR en la mesa"}
                   </CardDescription>
                 </div>
-                {paymentStatus && <StatusBadge configured={paymentStatus.privateKeyConfigured} enabled={paymentStatus.enabled} />}
+                {paymentStatus && (
+                  <StatusBadge
+                    configured={paymentStatus.stubMode || paymentStatus.privateKeyConfigured}
+                    enabled={paymentStatus.enabled}
+                  />
+                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
+                <p className="font-medium text-zinc-900">Proveedor actual: {paymentStatus?.provider ?? "STUB"}</p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  STUB = pruebas sin cargo real. Diners Club estará disponible cuando tengas credenciales del banco.
+                </p>
+              </div>
               <form onSubmit={savePayments} className="space-y-4">
                 <div>
                   <Label>Ambiente</Label>
@@ -341,38 +362,42 @@ export default function ConfiguracionPage() {
                       <SelectItem value="PRODUCTION">Producción</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-zinc-500 mt-2">Sandbox = pagos de prueba sin cargo real. Producción = cobros reales.</p>
                 </div>
                 <div>
-                  <Label htmlFor="paymentPublicKey">Clave pública (Merchant ID)</Label>
-                  <Input id="paymentPublicKey" value={paymentForm.publicKey}
+                  <Label htmlFor="paymentPublicKey">Clave pública Diners (próximamente)</Label>
+                  <Input id="paymentPublicKey" value={paymentForm.publicKey} disabled={paymentStatus?.stubMode}
                     onChange={e => setPaymentForm({ ...paymentForm, publicKey: e.target.value })}
-                    placeholder="Tu clave pública del proveedor de pago" className="mt-1 h-11" />
-                  <p className="text-xs text-zinc-500 mt-1">Se usa en el frontend para tokenizar la tarjeta. No es sensible.</p>
+                    placeholder="Disponible cuando actives Diners Club" className="mt-1 h-11" />
                 </div>
                 <div>
                   <Label htmlFor="paymentPrivateKey">
-                    Clave privada{paymentStatus?.privateKeyConfigured && <span className="ml-2 text-xs text-green-600 font-normal">✓ configurada</span>}
+                    Clave privada Diners (próximamente)
+                    {paymentStatus?.privateKeyConfigured && <span className="ml-2 text-xs text-green-600 font-normal">✓ configurada</span>}
                   </Label>
-                  <Input id="paymentPrivateKey" type="password" value={paymentForm.privateKey}
+                  <Input id="paymentPrivateKey" type="password" value={paymentForm.privateKey} disabled={paymentStatus?.stubMode}
                     onChange={e => setPaymentForm({ ...paymentForm, privateKey: e.target.value })}
-                    placeholder={paymentStatus?.privateKeyConfigured ? "Deja vacío para no cambiar" : "Tu clave privada del proveedor de pago"}
+                    placeholder="Disponible cuando actives Diners Club"
                     className="mt-1 h-11" />
-                  <p className="text-xs text-zinc-500 mt-1">Se cifra con AES-256-GCM. Nunca se expone en texto plano.</p>
                 </div>
-                <Button type="submit" disabled={savingPayments || !restaurantId}
-                  className="w-full h-11 bg-zinc-900 hover:bg-zinc-700 text-white">
-                  {savingPayments ? "Guardando..." : "Guardar botón de pago"}
-                </Button>
+                {!paymentStatus?.stubMode && (
+                  <Button type="submit" disabled={savingPayments || !restaurantId}
+                    className="w-full h-11 bg-zinc-900 hover:bg-zinc-700 text-white">
+                    {savingPayments ? "Guardando..." : "Guardar botón de pago"}
+                  </Button>
+                )}
               </form>
               {paymentStatus && (
                 <div className="border-t pt-4 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-zinc-900">Activar pagos en vivo</p>
-                    <p className="text-xs text-zinc-500">Solo activa en producción tras probar en sandbox</p>
+                    <p className="text-xs text-zinc-500">
+                      {paymentStatus.stubMode
+                        ? "En modo STUB los pagos simulados funcionan sin credenciales"
+                        : "Solo activa en producción tras probar en sandbox"}
+                    </p>
                   </div>
                   <Switch checked={paymentStatus.enabled} onCheckedChange={togglePayments}
-                    disabled={!paymentStatus.privateKeyConfigured} />
+                    disabled={!paymentStatus.stubMode && !paymentStatus.privateKeyConfigured} />
                 </div>
               )}
             </CardContent>

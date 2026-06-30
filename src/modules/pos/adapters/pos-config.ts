@@ -16,10 +16,10 @@ export interface PosConfig {
   /** Contífico `forma_cobro` short code for POST /documento/{id}/cobro/.
    *  Must match a forma configured in the restaurant's Contífico account.
    *  Confirmed codes: "EF" (efectivo/cash), "TC" (tarjeta/card).
-   *  Default "EF"; set to "TC" for Kushki card payments once tipo_ping is confirmed. */
+   *  Default "EF"; set to "TC" for card payments once tipo_ping is confirmed. */
   paymentMethod: string;
   /** Required when paymentMethod = "TC". Contífico card-terminal network code.
-   *  "D" = Datafast (confirmed working). Kushki code TBD — pending Contífico support answer. */
+   *  "D" = Datafast (confirmed working). Diners code TBD — pending Contífico support answer. */
   tipoPing?: string;
 }
 

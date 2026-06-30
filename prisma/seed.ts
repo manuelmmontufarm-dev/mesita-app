@@ -103,7 +103,7 @@ async function seedMinimal() {
       restaurantId: restaurant.id,
       amount: 5.63,
       status: PaymentStatus.COMPLETED,
-      kushkiTransactionId: "DEMO-LOCRO",
+      providerTransactionId: "DEMO-LOCRO",
       idempotencyKey: id(),
       splitMode: SplitMode.BY_ITEM,
       createdAt: minsAgo(3),
@@ -129,7 +129,7 @@ async function seedMinimal() {
 }
 
 async function seedFull() {
-  console.log("🌱 Seeding PagaYa demo data…");
+  console.log("🌱 Seeding MesitaQR demo data…");
 
   // ── Restaurant ──────────────────────────────────────────────────────────────
   const restaurant = await prisma.restaurant.upsert({
@@ -305,7 +305,7 @@ async function seedFull() {
     data: {
       id: pay1Id, billId: bill1Id, restaurantId: restaurant.id,
       amount: 62.50, status: PaymentStatus.COMPLETED,
-      kushkiTransactionId: "PP-32805001",
+      providerTransactionId: "PP-32805001",
       idempotencyKey: id(), splitMode: SplitMode.FULL,
       createdAt: minsAgo(50),
     },
@@ -339,7 +339,7 @@ async function seedFull() {
     data: {
       id: pay2Id, billId: bill2Id, restaurantId: restaurant.id,
       amount: 28.96, status: PaymentStatus.COMPLETED,
-      kushkiTransactionId: "PP-32805002",
+      providerTransactionId: "PP-32805002",
       idempotencyKey: id(), splitMode: SplitMode.EQUAL,
       createdAt: minsAgo(25),
     },
@@ -406,7 +406,7 @@ async function seedFull() {
     data: {
       id: pay5Id, billId: bill5Id, restaurantId: restaurant.id,
       amount: 56.25, status: PaymentStatus.COMPLETED,
-      kushkiTransactionId: "PP-32804998",
+      providerTransactionId: "PP-32804998",
       idempotencyKey: id(), splitMode: SplitMode.FULL,
       createdAt: minsAgo(145),
     },
@@ -543,7 +543,7 @@ async function seedFull() {
       restaurantId: mesitaDemo.id,
       amount: 5.63,
       status: PaymentStatus.COMPLETED,
-      kushkiTransactionId: "DEMO-LOCRO",
+      providerTransactionId: "DEMO-LOCRO",
       idempotencyKey: id(),
       splitMode: SplitMode.BY_ITEM,
       createdAt: minsAgo(3),

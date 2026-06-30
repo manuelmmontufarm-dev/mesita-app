@@ -10,7 +10,7 @@ interface PaymentConfirmationProps {
   checkoutMode: 'CONSUMIDOR_FINAL' | 'FACTURA_CON_DATOS';
   guestEmail?: string;
   language: 'es' | 'en';
-  /** Kushki/PagaYa payment id — shown truncated as proof of payment. */
+  /** Provider-agnostic payment reference for receipts. */
   paymentId?: string;
   tableName?: string;
   /** When the payment was confirmed. Defaults to now. */

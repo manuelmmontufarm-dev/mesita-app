@@ -10,6 +10,7 @@ import { useLiveTableSession } from "@/hooks/useLiveTableSession";
 import type { FlowInit, PaidPayload } from "@/hooks/useGuestPaymentFlow";
 import { mapSplitModeToDemo } from "@/lib/demo-live-adapter";
 import { isDemoTableToken } from "@/lib/demo-restaurant";
+import { isDemoUxTableToken } from "@/lib/demo-table-catalog/resolve";
 import { deriveDemoTableProgress, paymentRecordSubtotal } from "@/lib/guest-billing/demo-table-progress";
 import { guestLabel, personNumberFromLabel } from "@/lib/guest-billing/split-math";
 
@@ -138,7 +139,6 @@ function GuestPayShell({
         voluntaryTipAmount: payload.voluntaryTipAmount ?? 0,
         guestSessionId: live.guestSessionId ?? undefined,
         paymentToken,
-        kushkiToken: paymentToken,
         checkoutMode:
           payload.eInvoice == null ? "CONSUMIDOR_FINAL" : "FACTURA_CON_DATOS",
         guestData: payload.eInvoice
@@ -209,7 +209,11 @@ function GuestPayShell({
             }
           : undefined
       }
-      onResetDemo={isDemo && "resetDemo" in live ? live.resetDemo : undefined}
+      onResetDemo={
+        isDemo && "resetDemo" in live && isDemoUxTableToken(token)
+          ? live.resetDemo
+          : undefined
+      }
       sessionClaims={live.claims}
       pendingClaims={"pendingClaims" in live ? live.pendingClaims : undefined}
       paidSummaries={"paidSummaries" in live ? live.paidSummaries : undefined}

@@ -4,7 +4,7 @@
  * Ports the App() shell in `design_handoff_customer/customer/app.jsx` to a
  * typed React hook backed by useReducer so the transitions can be unit-tested
  * without React rendering. The hook owns flow state only — it does not fetch
- * the bill, talk to Kushki, or touch Prisma. Those are injected as callbacks
+ * the bill, talk to the payment provider, or touch Prisma. Those are injected as callbacks
  * so we can preserve the existing real backend wiring at the call sites
  * (`src/app/pay/[token]/page.tsx`, demo route).
  *
@@ -44,7 +44,7 @@ import type {
 
 /* ---------------- payment / receipt payloads ---------------- */
 
-export type PaymentMethod = "datafast" | "diners" | "kushki" | "card";
+export type PaymentMethod = "datafast" | "diners" | "card";
 
 export interface EInvoicePayload {
   /** "Cédula" (10) or "RUC" (13). */
@@ -320,7 +320,6 @@ const GUEST_NAME = guestLabel(1);
 const METHOD_LABELS: Record<PaymentMethod, string> = {
   datafast: "Datafast",
   diners: "Diners Club",
-  kushki: "Tarjeta",
   card: "Tarjeta",
 };
 

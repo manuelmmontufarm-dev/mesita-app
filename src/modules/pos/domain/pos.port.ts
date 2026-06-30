@@ -37,18 +37,18 @@ export interface POSGuestData {
 export interface POSConfirmPaymentParams {
   posDocumentId: string;
   /**
-   * Option B: this is the PARTIAL amount of THIS split (one POST /cobro/ per Kushki transaction),
+   * Option B: this is the PARTIAL amount of THIS split (one POST /cobro/ per card transaction),
    * not the bill total. Contífico sums cobros internally and marks the PRE as Cobrado (C) when the
    * sum reaches the document total.
    */
   amount: number;
-  /** Kushki transaction ID / authorization reference — sent as `lote` (TC) or `descripcion` (EF). */
+  /** Provider transaction ID / authorization reference — sent as `lote` (TC) or `descripcion` (EF). */
   paymentReference: string;
   /** The `pos` UUID from the original Contífico document. Required for cobro to succeed.
    *  Null for manually-created docs — cobro will fail, caller must log + handle. */
   posToken: string | null;
   /** Optional. When present, adapter resolves Contífico cliente_id and PUTs it onto the documento
-   *  before the cobro. Best-effort: a PUT failure logs and continues — never voids Kushki. */
+   *  before the cobro. Best-effort: a PUT failure logs and continues — never voids the card charge. */
   guestData?: POSGuestData;
 }
 
@@ -82,7 +82,7 @@ export interface PosPort {
   confirmPayment(params: POSConfirmPaymentParams): Promise<POSConfirmPaymentResult>;
 
   /**
-   * Optional — freshness check before charging Kushki (Gap #3).
+   * Optional — freshness check before charging the card (Gap #3).
    * Adapters that cannot expose this (e.g. Practisis stub) MAY omit it.
    * Throws (sanitized) on transport errors so the caller can fail-open.
    */

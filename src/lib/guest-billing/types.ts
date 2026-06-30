@@ -71,6 +71,8 @@ export interface RestaurantConfig {
   defaultTip: number;
   /** When true, card charges use the in-app demo adapter (no external provider). */
   demoMode?: boolean;
+  /** Manual Reiniciar demo — only Mesa 12 UX sandbox. */
+  showResetButton?: boolean;
 }
 
 export interface BillTotals {

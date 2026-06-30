@@ -1,8 +1,8 @@
 import { createHash } from "crypto";
 
 const SENSITIVE_FIELDS = new Set([
-  "email", "password", "token", "ticketNumber", "kushkiToken",
-  "kushkiTransactionId", "posDocumentId", "apiKey", "secret",
+  "email", "password", "token", "ticketNumber", "paymentToken",
+  "providerTransactionId", "posDocumentId", "apiKey", "secret",
   "sessionToken", "identificacion", "cardNumber",
 ]);
 

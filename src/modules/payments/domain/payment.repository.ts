@@ -7,7 +7,7 @@ export interface RecordPaymentInput {
   restaurantId: string;
   amount: number;
   voluntaryTip: number;
-  kushkiTransactionId: string;
+  providerTransactionId: string;
   idempotencyKey: string;
   splitMode: SplitMode;
   selectedItemIds?: string[];
@@ -29,4 +29,8 @@ export interface PaymentRepository {
   /** Returns billId too so callers can detect a key reused across DIFFERENT bills (conflict). */
   findByIdempotencyKey(key: string): Promise<{ id: string; billId: string } | null>;
   recordPaymentAtomically(input: RecordPaymentInput): Promise<RecordPaymentResult>;
+  updatePosRegistration(
+    paymentId: string,
+    data: { registered: boolean; note?: string | null }
+  ): Promise<void>;
 }

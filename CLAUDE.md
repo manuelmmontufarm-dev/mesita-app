@@ -1,4 +1,4 @@
-# PagaYa Frontend Skill Set
+# MesitaQR Frontend Skill Set
 
 > ## 📓 REGLA OBLIGATORIA — Bitácora `TODAY.md`
 >
@@ -113,7 +113,7 @@ PagaYa is **POS-integrated**, not standalone. The restaurant's POS (Contífico/S
 
 ### Flow
 1. **Order ingestion** — PagaYa **polls** the POS for open bills (Contífico *prefacturas*, type `PRE`) and creates a `Bill` + `BillItems` from the document's `detalles` (line items, quantities, unit prices, taxes). Contífico has **no webhooks**, so ingestion is polling-based and must be idempotent (keyed on the POS document id).
-2. **Guest payment** — Guest scans the table QR, opens `/pay/[token]`, sees the bill, and pays via Kushki (full / equal split / by-item). This layer already exists and is unchanged.
+2. **Guest payment** — Guest scans the table QR, opens `/pay/[token]`, sees the bill, and pays via STUB (demo) or Diners Club (production): full / equal split / by-item.
 3. **Payment confirmation** — On `FULLY_PAID`, PagaYa writes the result back to the POS (records a `cobro` / converts the prefactura to factura).
 4. **Facturación electrónica** — **The POS issues the SRI factura, not PagaYa.**
 
@@ -218,7 +218,7 @@ The guest `/pay/[token]` screen uses the **iOS Liquid Glass** design, implemente
 - Split modes: `BY_ITEM` → item checkboxes, `EQUAL` → stepper (min 2), `FULL` → amount input
 - Tip presets: 10%, 15%, 20%
 - Dock scroll detection: scrolls to bottom → full dock; scrolling up → mini pill
-- All backend logic (polling, Kushki, idempotency) lives in `src/app/pay/[token]/page.tsx`
+- All backend logic (polling, payment provider, idempotency) lives in `src/app/pay/[token]/page.tsx`
 
 For the guest screen, optimize for a customer using a phone after scanning a QR code.
 

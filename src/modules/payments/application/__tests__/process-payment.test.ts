@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../../adapters/kushki/client", () => ({
-  chargeCard: vi.fn(),
-  refundPayment: vi.fn(),
+vi.mock("../../adapters/resolve", () => ({
+  getPaymentAdapter: vi.fn(() => ({
+    charge: vi.fn(),
+    refund: vi.fn(),
+  })),
 }));
 
 vi.mock("@/lib/encryption", () => ({
@@ -22,17 +24,17 @@ vi.mock("@/modules/pos/adapters/contifico.adapter", () => ({
 vi.mock("uuid", () => ({ v4: () => "00000000-0000-0000-0000-000000000099" }));
 
 import { processPayment } from "../process-payment";
-import { chargeCard, refundPayment } from "../../adapters/kushki/client";
+import { getPaymentAdapter } from "../../adapters/resolve";
 
 const BILL_ID = "bill-00000000-0000-0000-0000-000000000001";
 const RESTAURANT_ID = "rest-00000000-0000-0000-0000-000000000001";
 const IDEMPOTENCY_KEY = "00000000-0000-0000-0000-000000000001";
-const PAYMENT_ID = "00000000-0000-0000-0000-000000000099"; // matches vi.mock("uuid")
+const PAYMENT_ID = "00000000-0000-0000-0000-000000000099";
 const POS_DOC_ID = "DOC-XYZ";
+
 const mockProviderConfig = {
-  kushkiPrivateKey: "priv",
-  kushkiPublicKey: "pub",
-  kushkiEnvironment: "SANDBOX" as const,
+  provider: "STUB" as const,
+  environment: "SANDBOX" as const,
 };
 
 const mockItem = (id: string, isPaid = false, price = 10) => ({
@@ -47,7 +49,7 @@ const baseParams = {
   restaurantId: RESTAURANT_ID,
   amount: 12.2,
   voluntaryTipAmount: 0,
-  kushkiToken: "kush-tok",
+  chargeToken: "stub:4242",
   splitMode: "FULL" as const,
   providerConfig: mockProviderConfig,
   checkoutMode: "CONSUMIDOR_FINAL" as const,
@@ -74,28 +76,35 @@ function setupRecordPayment(billStatus: string, thisPaymentIsRecipient = false) 
 // Returns the current repo mocks — read at call time so beforeEach reassignment is picked up.
 const repos = () => ({ bill: billRepo, payment: paymentRepo } as any);
 
+let mockChargeFn: ReturnType<typeof vi.fn>;
+let mockRefundFn: ReturnType<typeof vi.fn>;
+
 beforeEach(() => {
   vi.clearAllMocks();
   billRepo = { findSnapshot: vi.fn(), findPosInfo: vi.fn() };
-  paymentRepo = { findByIdempotencyKey: vi.fn(), recordPaymentAtomically: vi.fn() };
+  paymentRepo = { findByIdempotencyKey: vi.fn(), recordPaymentAtomically: vi.fn(), updatePosRegistration: vi.fn() };
   billRepo.findSnapshot.mockResolvedValue(null);
   billRepo.findPosInfo.mockResolvedValue(null);
   paymentRepo.findByIdempotencyKey.mockResolvedValue(null);
   paymentRepo.recordPaymentAtomically.mockResolvedValue({ billStatus: "FULLY_PAID", thisPaymentIsRecipient: false });
-  vi.mocked(chargeCard).mockResolvedValue({ approved: true, ticketNumber: "TKT-001" });
-  vi.mocked(refundPayment).mockResolvedValue({ success: true } as any);
+  mockChargeFn = vi.fn().mockResolvedValue({ approved: true, transactionId: "TKT-001" });
+  mockRefundFn = vi.fn().mockResolvedValue({ success: true });
+  vi.mocked(getPaymentAdapter).mockReturnValue({
+    charge: mockChargeFn,
+    refund: mockRefundFn,
+  } as any);
   confirmPaymentSpy.mockResolvedValue({ success: true });
   getOrderStatusSpy.mockResolvedValue({ exists: true, isClosedInPos: false });
 });
 
 describe("processPayment", () => {
-  it("FULL split, Kushki approves → FULLY_PAID, returns paymentId", async () => {
+  it("FULL split, provider approves → FULLY_PAID, returns paymentId", async () => {
     setupRecordPayment("FULLY_PAID");
 
     const result = await processPayment(baseParams, repos());
 
-    expect(chargeCard).toHaveBeenCalledWith(
-      { kushkiToken: "kush-tok", amount: 12.2, voluntaryTip: 0 },
+    expect(mockChargeFn).toHaveBeenCalledWith(
+      { chargeToken: "stub:4242", amount: 12.2, voluntaryTip: 0 },
       mockProviderConfig
     );
     expect(result.alreadyProcessed).toBe(false);
@@ -103,19 +112,19 @@ describe("processPayment", () => {
     expect(result.paymentId).toBe(PAYMENT_ID);
   });
 
-  it("duplicate idempotencyKey → alreadyProcessed:true, chargeCard not called", async () => {
+  it("duplicate idempotencyKey → alreadyProcessed:true, mockChargeFn not called", async () => {
     paymentRepo.findByIdempotencyKey.mockResolvedValue({ id: "existing-pay-id", billId: BILL_ID });
 
     const result = await processPayment(baseParams, repos());
 
     expect(result.alreadyProcessed).toBe(true);
     expect(result.paymentId).toBe("existing-pay-id");
-    expect(chargeCard).not.toHaveBeenCalled();
+    expect(mockChargeFn).not.toHaveBeenCalled();
     expect(paymentRepo.recordPaymentAtomically).not.toHaveBeenCalled();
   });
 
-  it("Kushki declined → throws PaymentDeclinedError, no DB transaction", async () => {
-    vi.mocked(chargeCard).mockResolvedValue({
+  it("provider declined → throws PaymentDeclinedError, no DB transaction", async () => {
+    mockChargeFn.mockResolvedValue({
       approved: false,
       errorText: "Insufficient funds",
     });
@@ -126,22 +135,19 @@ describe("processPayment", () => {
     expect(paymentRepo.recordPaymentAtomically).not.toHaveBeenCalled();
   });
 
-  it("chargeCard throws → re-throws error, no DB transaction", async () => {
-    vi.mocked(chargeCard).mockRejectedValue(new Error("Network timeout"));
+  it("mockChargeFn throws → re-throws error, no DB transaction", async () => {
+    mockChargeFn.mockRejectedValue(new Error("Network timeout"));
 
     await expect(processPayment(baseParams, repos())).rejects.toThrow("Network timeout");
     expect(paymentRepo.recordPaymentAtomically).not.toHaveBeenCalled();
   });
 
-  it("DB transaction fails → compensation refund attempted, error re-thrown", async () => {
+  it("DB transaction fails → stub token skips compensation refund, error re-thrown", async () => {
     const dbError = new Error("Constraint violation");
     paymentRepo.recordPaymentAtomically.mockRejectedValue(dbError);
 
     await expect(processPayment(baseParams, repos())).rejects.toThrow("Constraint violation");
-    expect(refundPayment).toHaveBeenCalledWith(
-      { ticketNumber: "TKT-001", amount: 12.2 },
-      mockProviderConfig
-    );
+    expect(mockRefundFn).not.toHaveBeenCalled();
   });
 
   it("BY_ITEM split with one item remaining unpaid → PARTIALLY_PAID", async () => {
@@ -160,7 +166,7 @@ describe("processPayment", () => {
 // Gap #3: freshness pre-check
 // ────────────────────────────────────────────────────────────────────────────
 describe("processPayment — Gap #3 (freshness pre-check)", () => {
-  it("isClosedInPos:true and no prior MesaQR payment → throws BillAlreadyClosedError, no Kushki charge", async () => {
+  it("isClosedInPos:true and no prior MesaQR payment → throws BillAlreadyClosedError, no card charge", async () => {
     billRepo.findSnapshot.mockResolvedValue({
       id: BILL_ID,
       posDocumentId: POS_DOC_ID,
@@ -175,7 +181,7 @@ describe("processPayment — Gap #3 (freshness pre-check)", () => {
     await expect(
       processPayment({ ...baseParams, posRestaurant }, repos())
     ).rejects.toThrow(/mesero/);
-    expect(chargeCard).not.toHaveBeenCalled();
+    expect(mockChargeFn).not.toHaveBeenCalled();
   });
 
   it("isClosedInPos:true but a prior COMPLETED payment exists → proceeds (Contífico flipped PRE→FAC after our prior split)", async () => {
@@ -193,10 +199,10 @@ describe("processPayment — Gap #3 (freshness pre-check)", () => {
 
     const result = await processPayment({ ...baseParams, posRestaurant }, repos());
     expect(result.billStatus).toBe("FULLY_PAID");
-    expect(chargeCard).toHaveBeenCalled();
+    expect(mockChargeFn).toHaveBeenCalled();
   });
 
-  it("exists:false → throws BillUnavailableError, no Kushki charge", async () => {
+  it("exists:false → throws BillUnavailableError, no card charge", async () => {
     billRepo.findSnapshot.mockResolvedValue({
       id: BILL_ID,
       posDocumentId: POS_DOC_ID,
@@ -211,10 +217,10 @@ describe("processPayment — Gap #3 (freshness pre-check)", () => {
     await expect(
       processPayment({ ...baseParams, posRestaurant }, repos())
     ).rejects.toThrow(/POS/);
-    expect(chargeCard).not.toHaveBeenCalled();
+    expect(mockChargeFn).not.toHaveBeenCalled();
   });
 
-  it("getOrderStatus throws → fail-open, Kushki still charged", async () => {
+  it("getOrderStatus throws → fail-open, provider still charged", async () => {
     billRepo.findSnapshot.mockResolvedValue({
       id: BILL_ID,
       posDocumentId: POS_DOC_ID,
@@ -230,7 +236,7 @@ describe("processPayment — Gap #3 (freshness pre-check)", () => {
 
     const result = await processPayment({ ...baseParams, posRestaurant }, repos());
     expect(result.billStatus).toBe("FULLY_PAID");
-    expect(chargeCard).toHaveBeenCalled();
+    expect(mockChargeFn).toHaveBeenCalled();
     const logged = errorSpy.mock.calls.map((c) => String(c[0])).join("\n");
     expect(logged).toMatch(/POS_PRECHECK_FAILED_FAIL_OPEN/);
   });
@@ -240,7 +246,7 @@ describe("processPayment — Gap #3 (freshness pre-check)", () => {
 // SRI $50 rule
 // ────────────────────────────────────────────────────────────────────────────
 describe("processPayment — SRI $50 rule", () => {
-  it("bill.total > 50, last split, no recipient, CONSUMIDOR_FINAL → throws InvoiceDataRequiredError (422), no Kushki", async () => {
+  it("bill.total > 50, last split, no recipient, CONSUMIDOR_FINAL → throws InvoiceDataRequiredError (422), no card charge", async () => {
     // 50 * 1.25 = 62.50 (> 50). Single unpaid item, FULL split → closes the bill.
     billRepo.findSnapshot.mockResolvedValue({
       id: BILL_ID,
@@ -260,7 +266,7 @@ describe("processPayment — SRI $50 rule", () => {
         guestData: { email: "guest@example.com" }, // no identificacion → CONSUMIDOR_FINAL
       }, repos())
     ).rejects.toThrow(/ley ecuatoriana/);
-    expect(chargeCard).not.toHaveBeenCalled();
+    expect(mockChargeFn).not.toHaveBeenCalled();
   });
 
   it("bill.total > 50, last split with valid guestData → recordPaymentAtomically receives hasUsableGuestData:true", async () => {
@@ -433,7 +439,7 @@ describe("processPayment — Option B partial cobros", () => {
     expect(passed.guestData).toBeUndefined();
   });
 
-  it("adapter.confirmPayment failure → logs POS_COBRO_FAILED, does NOT void Kushki, still returns success", async () => {
+  it("adapter.confirmPayment failure → logs POS_COBRO_FAILED, does NOT void provider charge, still returns success", async () => {
     billRepo.findSnapshot.mockResolvedValue({
       id: BILL_ID,
       posDocumentId: POS_DOC_ID,
@@ -450,7 +456,7 @@ describe("processPayment — Option B partial cobros", () => {
 
     const result = await processPayment({ ...baseParams, posRestaurant }, repos());
     expect(result.billStatus).toBe("FULLY_PAID");
-    expect(refundPayment).not.toHaveBeenCalled();
+    expect(mockRefundFn).not.toHaveBeenCalled();
     const logged = errorSpy.mock.calls.map((c) => String(c[0])).join("\n");
     expect(logged).toMatch(/POS_COBRO_FAILED/);
   });

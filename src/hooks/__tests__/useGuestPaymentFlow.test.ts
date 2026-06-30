@@ -508,7 +508,7 @@ describe("buildReceipt", () => {
       items,
       totals,
       ivaRate: 0.15,
-      method: "kushki",
+      method: "card",
       eInvoice: null,
       youId: "you",
       now,

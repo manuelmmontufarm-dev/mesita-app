@@ -32,3 +32,9 @@ export function isCatalogDemoToken(token: string): boolean {
 export function listDemoTables(): DemoTableDefinition[] {
   return DEMO_TABLE_DEFINITIONS.slice();
 }
+
+/** Mesa 12 / `/pay/demo` — only table with manual Reiniciar in the guest UI. */
+export function isDemoUxTableToken(token: string): boolean {
+  const def = resolveDemoTableToken(token);
+  return def?.token === "demo" || def?.table.name === "12";
+}

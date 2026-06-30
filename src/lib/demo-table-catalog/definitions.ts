@@ -125,6 +125,10 @@ export const DEMO_TABLE_DEFINITIONS: DemoTableDefinition[] = [
       "Fritada ya pagada, una empanada de las dos ya pagada.",
       "Demostración de pagos a medias: UI debe mostrar progreso parcial.",
     ],
+    seed: {
+      paidItemIds: ["fritada"],
+      itemPaidUnits: { empanada: 1 },
+    },
   },
   {
     slug: "mesa-3",

@@ -204,7 +204,7 @@ export function PaymentStage({
       eInvoice: wantBilling ? { ...bill } : null,
       paymentToken: demoMode
         ? `demo:${card.num.replace(/\s/g, "").slice(-4)}`
-        : undefined,
+        : `stub:${card.num.replace(/\s/g, "").slice(-4)}`,
     };
     setTimeout(() => {
       void flow.submitPayment(payload);
@@ -262,8 +262,13 @@ export function PaymentStage({
             </div>
           </div>
 
+          {!demoMode && (
+            <p className="text-xs text-center px-4 py-2 rounded-lg" style={{ background: "rgba(47,179,126,.1)", color: "#1f6b4c" }}>
+              Pago simulado — no se cobra tarjeta real hasta activar Diners.
+            </p>
+          )}
+
           <button
-            className="test-card"
             onClick={fillTest}
             data-testid="payment-test-card"
           >

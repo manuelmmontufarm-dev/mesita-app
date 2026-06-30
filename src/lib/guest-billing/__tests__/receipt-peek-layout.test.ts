@@ -70,13 +70,12 @@ describe("customer.css receipt-peek contract", () => {
     for (const selector of RECEIPT_PEEK_FLOW_FOOT_SELECTORS) {
       expect(customerCss).toContain(selector);
     }
-    const confirmBlock = customerCss.match(
-      /html\.has-receipt-peek \.cust-app\[data-stage="confirm"\] \.flow-foot[\s\S]*?\}/,
-    )?.[0];
-    expect(confirmBlock).toBeTruthy();
-    expect(confirmBlock).toContain("display: flex");
-    expect(confirmBlock).toContain("position: fixed");
-    expect(confirmBlock).toContain("z-index: 60");
+    expect(customerCss).toMatch(
+      /html\.has-receipt-peek \.cust-app\[data-stage="confirm"\] \.flow-foot[\s\S]*display:\s*flex[\s\S]*position:\s*fixed/,
+    );
+    expect(customerCss).toMatch(
+      /html\.has-receipt-peek \.cust-app\[data-stage="confirm"\] \.flow-foot[\s\S]*z-index:\s*91/,
+    );
   });
 
   it("does not blanket-hide all flow-foot when receipt peek is active", () => {
@@ -101,7 +100,7 @@ describe("customer.css receipt-peek contract", () => {
 
   it("pads flow-scroll for foot + receipt peek stack", () => {
     expect(customerCss).toMatch(
-      /html\.has-receipt-peek \.flow-scroll[\s\S]*--flow-foot-above-peek/,
+      /html\.has-receipt-peek \.flow-scroll[\s\S]*--pay-stack-height[\s\S]*--receipt-peek/,
     );
   });
 });

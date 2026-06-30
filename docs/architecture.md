@@ -15,7 +15,8 @@ src/
     payments/
       domain/payment.port.ts   ← PaymentPort interface + shared types
       application/             ← processPayment use case (Prisma direct, see MVP note)
-      adapters/kushki/         ← Kushki PaymentPort implementation
+      adapters/stub/         ← STUB PaymentPort (demo/sandbox)
+      adapters/diners/       ← Diners Club PaymentPort (production)
       index.ts                 ← public barrel
     pos/
       domain/pos.port.ts       ← PosPort + PosCapabilities interface
@@ -35,7 +36,7 @@ src/
 
 - `domain/` — interfaces (ports) + entities. No framework dependencies.
 - `application/` — use cases orchestrating domain + ports.
-- `adapters/` — driven adapters: Kushki client, future POS/invoicing clients.
+- `adapters/` — driven adapters: STUB/Diners clients, Contífico POS client.
 - `route.ts` files — driving adapters. Import only from `@/modules/<m>` barrels.
 
 **Cross-module imports go only through barrels.** Never import into `domain/`, `application/`,
@@ -56,7 +57,7 @@ abstraction prematurely — only when it aids testability or swapping persistenc
 
 | Port | Location | Current adapter | Why separate from POS |
 |------|----------|-----------------|-----------------------|
-| `PaymentPort` | `modules/payments/domain/payment.port.ts` | Kushki (`adapters/kushki/`) | — |
+| `PaymentPort` | `modules/payments/domain/payment.port.ts` | STUB (`adapters/stub/`) or Diners (`adapters/diners/`) | — |
 | `PosPort` | `modules/pos/domain/pos.port.ts` | ContificoAdapter (Phase 6) | — |
 | `InvoicingPort` | `modules/invoicing/domain/invoicing.port.ts` | Dátil legacy → Contífico (Phase 6) | Invoicing provider ≠ POS vendor (swap independently) |
 

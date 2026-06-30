@@ -4,12 +4,13 @@ import { isDemoRestaurant, isDemoTableToken } from "@/lib/demo-restaurant";
 import {
   buildProviderConfig,
   processPayment,
+  resolvePaymentProvider,
+  isStubPaymentToken,
   BillAlreadyClosedError,
   BillUnavailableError,
   IdempotencyConflictError,
   InvoiceDataRequiredError,
 } from "@/modules/payments";
-import { isDemoPaymentToken } from "@/modules/payments/adapters/demo/client";
 import type { ProviderConfig } from "@/modules/payments";
 import type { SplitMode } from "@/modules/payments";
 import { BillStatus } from "@prisma/client";
@@ -22,8 +23,7 @@ import { PrismaPaymentRepository } from "@/modules/payments/adapters/prisma/paym
 
 const paymentSchema = z.object({
   amount: z.number().min(0.01),
-  kushkiToken: z.string().min(1).optional(),
-  paymentToken: z.string().min(1).optional(),
+  paymentToken: z.string().min(1),
   tableToken: z.string().min(1),
   idempotencyKey: z.string().uuid().optional(),
   splitMode: z.enum(["FULL", "EQUAL", "BY_ITEM"]).optional(),
@@ -89,7 +89,7 @@ export async function POST(
     }
 
     const raw = validatedData.data;
-    const chargeToken = raw.kushkiToken ?? raw.paymentToken;
+    const chargeToken = raw.paymentToken;
     if (!chargeToken) {
       return errorResponse("Missing payment token", 400);
     }
@@ -105,10 +105,7 @@ export async function POST(
       equalSplitPeople: requestedSplitPeople,
       guestSessionId,
     } = raw;
-    const kushkiToken = chargeToken;
-    const effectiveSplitMode: SplitMode = splitMode;
 
-    // BLK-01: Validate via table token — no staff session required
     const table = await prisma.table.findUnique({
       where: { token: tableToken },
     });
@@ -132,20 +129,22 @@ export async function POST(
       return errorResponse("Bill not found", 404);
     }
 
+    const effectiveSplitMode: SplitMode = splitMode;
+
     const isDemo =
       isDemoTableToken(tableToken) || isDemoRestaurant(bill.restaurantId);
-    const isDemoPayment = isDemo || isDemoPaymentToken(kushkiToken);
+    const isStubPayment = isDemo || isStubPaymentToken(chargeToken);
+    const platformStub = resolvePaymentProvider(bill.restaurant.paymentProvider) === "STUB";
 
-    if (!isDemoPayment && !bill.restaurant.paymentsEnabled) {
+    if (!isStubPayment && !platformStub && !bill.restaurant.paymentsEnabled) {
       return errorResponse("Payments not enabled for this restaurant", 503);
     }
 
     let providerConfig: ProviderConfig;
-    if (isDemoPayment) {
+    if (isStubPayment || platformStub) {
       providerConfig = {
-        kushkiPrivateKey: "demo",
-        kushkiPublicKey: "demo",
-        kushkiEnvironment: "SANDBOX",
+        provider: "STUB",
+        environment: "SANDBOX",
       };
     } else {
       providerConfig = buildProviderConfig(bill.restaurant);
@@ -248,7 +247,7 @@ export async function POST(
           restaurantId,
           amount: expectedAmount,
           voluntaryTipAmount,
-          kushkiToken,
+          chargeToken,
           splitMode: effectiveSplitMode,
           selectedItemIds: validatedData.data.selectedItemIds,
           equalSplitPeople: requestedSplitPeople,

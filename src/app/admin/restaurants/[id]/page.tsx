@@ -26,8 +26,9 @@ interface RestaurantDetail {
   posPaymentMethod: string | null;
   paymentsEnabled: boolean;
   invoiceMode: string;
-  kushkiEnvironment: string;
-  kushkiConfigured: boolean;
+  paymentEnvironment: string;
+  paymentProvider: string;
+  paymentConfigured: boolean;
   tables: { id: string; name: string; posExternalId: string | null; openBillCount: number }[];
   openBills: { id: string; status: string; createdAt: string; tableName: string }[];
   recentPayments: { id: string; amount: number; status: string; createdAt: string; tableName: string }[];
@@ -234,9 +235,10 @@ export default function RestaurantDetailPage({ params }: { params: Promise<{ id:
               <InfoRow label="POS API key" value={data.posConfigured ? "Configurada" : "No configurada"} />
               <InfoRow label="Campo de mesa POS" value={data.posTableField} />
               <InfoRow label="Método pago POS" value={data.posPaymentMethod} />
-              <InfoRow label="Pagos Kushki" value={data.paymentsEnabled ? "Habilitados" : "Deshabilitados"} />
-              <InfoRow label="Kushki entorno" value={data.kushkiEnvironment} />
-              <InfoRow label="Kushki API key" value={data.kushkiConfigured ? "Configurada" : "No configurada"} />
+              <InfoRow label="Pagos Mesita" value={data.paymentsEnabled ? "Habilitados" : "Deshabilitados"} />
+              <InfoRow label="Proveedor pago" value={data.paymentProvider ?? "STUB"} />
+              <InfoRow label="Pago entorno" value={data.paymentEnvironment} />
+              <InfoRow label="Pago credenciales" value={data.paymentConfigured ? "Configuradas" : "No configuradas (STUB ok)"} />
               <InfoRow label="Modo factura" value={data.invoiceMode} />
             </CardContent>
           </Card>

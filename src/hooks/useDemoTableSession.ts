@@ -16,6 +16,10 @@ import {
   type PendingDemoOps,
 } from "@/lib/demo-optimistic-merge";
 import { getDemoLobbyFallback } from "@/lib/demo-restaurant";
+import {
+  isDemoUxTableToken,
+  resolveDemoTableToken,
+} from "@/lib/demo-table-catalog/resolve";
 import { emojiForPosDish } from "@/lib/pos-mesita/menu-emoji";
 import type { DemoTableState } from "@/lib/demo-table-store";
 import { shouldApplyDemoVersion } from "@/lib/demo-table-store";
@@ -52,7 +56,8 @@ const RESET_SEQ_KEY = (token: string) => `mesita:demo-reset-seq:${token}`;
 const DEVICE_ID_KEY = "mesita:device-id";
 
 /** Poll interval: 800ms — POS ↔ app sync. */
-const SYNC_INTERVAL_MS = 800;
+const SYNC_INTERVAL_MS = 500;
+const SYNC_INTERVAL_POS_MS = 400;
 
 export interface UseDemoTableSessionResult {
   state: TableSessionState | null;
@@ -614,7 +619,9 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
 
     // Bootstrap once — guarantees a fresh snapshot before SSE handshakes.
     void poll();
-    const heartbeatMs = SYNC_INTERVAL_MS;
+    const posLinked =
+      !isDemoUxTableToken(token) && Boolean(raw?.posMesaId ?? resolveDemoTableToken(token)?.posMesaId);
+    const heartbeatMs = posLinked ? SYNC_INTERVAL_POS_MS : SYNC_INTERVAL_MS;
     const interval = setInterval(() => void poll(), heartbeatMs);
     return () => {
       cancelled = true;
@@ -901,8 +908,9 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
       tipPresets: [10, 15, 20],
       defaultTip: 15,
       demoMode: true,
+      showResetButton: isDemoUxTableToken(token),
     }),
-    [raw, lobbyFallback],
+    [raw, lobbyFallback, token],
   );
 
   const lobby = useMemo(

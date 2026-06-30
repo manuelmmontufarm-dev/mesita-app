@@ -1,5 +1,5 @@
-import { chargeCard, refundPayment } from "../adapters/kushki/client";
-import { chargeDemoCard, isDemoPaymentToken } from "../adapters/demo/client";
+import { getPaymentAdapter } from "../adapters/resolve";
+import { isStubPaymentToken } from "../adapters/stub/client";
 import type { ProviderConfig } from "../domain/payment.port";
 import { buildPosConfig } from "@/modules/pos/adapters/pos-config";
 import { ContificoAdapter } from "@/modules/pos/adapters/contifico.adapter";
@@ -38,12 +38,12 @@ export interface ProcessPaymentParams {
   restaurantId: string;
   amount: number;
   voluntaryTipAmount: number;
-  kushkiToken: string;
+  chargeToken: string;
   splitMode: SplitMode;
   selectedItemIds?: string[];
   equalSplitPeople?: number;
   providerConfig: ProviderConfig;
-  posRestaurant?: PosRestaurantConfig;  // present when invoiceMode === "POS"
+  posRestaurant?: PosRestaurantConfig;
   checkoutMode: "CONSUMIDOR_FINAL" | "FACTURA_CON_DATOS";
   guestData?: {
     email: string;
@@ -60,7 +60,6 @@ export interface ProcessPaymentResult {
   alreadyProcessed: boolean;
 }
 
-/** Detect Contífico `tipo_identificacion` from the raw identification string. */
 function detectTipo(
   identificacion: string | undefined
 ): "CEDULA" | "RUC" | "PASAPORTE" | "CONSUMIDOR_FINAL" {
@@ -79,7 +78,7 @@ export async function processPayment(
     restaurantId,
     amount,
     voluntaryTipAmount,
-    kushkiToken,
+    chargeToken,
     splitMode,
     selectedItemIds,
     equalSplitPeople: requestedSplitPeople,
@@ -104,8 +103,6 @@ export async function processPayment(
   const existingPayment = await repos.payment.findByIdempotencyKey(idempotencyKey);
 
   if (existingPayment) {
-    // Idempotency keys are scoped to a bill: replaying a key against a DIFFERENT
-    // bill must never silently return the other bill's payment (B3).
     if (existingPayment.billId !== billId) {
       throw new IdempotencyConflictError();
     }
@@ -116,13 +113,9 @@ export async function processPayment(
     };
   }
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Gap #3: freshness pre-check + SRI $50 guard, BEFORE the Kushki charge.
-  // ────────────────────────────────────────────────────────────────────────────
   const billSnapshot = await repos.bill.findSnapshot(billId);
 
   if (billSnapshot && posRestaurant?.invoiceMode === "POS" && billSnapshot.posDocumentId) {
-    // Fail-open on any transport error from getOrderStatus — we'd rather charge than block legitimate guests.
     let adapterForCheck: ContificoAdapter | null = null;
     try {
       const posConfig = buildPosConfig(posRestaurant);
@@ -146,7 +139,6 @@ export async function processPayment(
         if (!status.exists) {
           throw new BillUnavailableError();
         }
-        // Closed in POS is only an error if WE haven't already accepted a payment for this bill.
         const hasOurPreviousPayment = billSnapshot.payments.length > 0;
         if (status.isClosedInPos && !hasOurPreviousPayment) {
           throw new BillAlreadyClosedError();
@@ -173,9 +165,7 @@ export async function processPayment(
     }
   }
 
-  // SRI $50 guard — only when this split would close the bill and no recipient exists yet.
   if (billSnapshot) {
-    // POS total is authoritative when present (D-07); item-derived math is fallback only.
     const billTotal = billSnapshot.posTotal ?? computeFallbackTotal(billSnapshot.items);
     const wouldBeFullyPaidAfterThisSplit = wouldThisSplitCloseTheBill(
       billSnapshot,
@@ -195,29 +185,23 @@ export async function processPayment(
     }
   }
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Card charge (demo token or live provider)
-  // ────────────────────────────────────────────────────────────────────────────
-  let kushkiResponse;
+  const paymentAdapter = getPaymentAdapter(providerConfig.provider);
+  let chargeResponse;
   try {
-    if (isDemoPaymentToken(kushkiToken)) {
-      kushkiResponse = await chargeDemoCard({
-        kushkiToken,
+    chargeResponse = await paymentAdapter.charge(
+      {
+        chargeToken,
         amount: Math.round(amount * 100) / 100,
         voluntaryTip: voluntaryTipAmount,
-      });
-    } else {
-      kushkiResponse = await chargeCard(
-        { kushkiToken, amount: Math.round(amount * 100) / 100, voluntaryTip: voluntaryTipAmount },
-        providerConfig
-      );
-    }
+      },
+      providerConfig
+    );
   } catch (error) {
     throw error instanceof Error ? error : new Error("Payment processing failed");
   }
 
-  if (!kushkiResponse.approved) {
-    throw new Error(`Payment declined: ${kushkiResponse.errorText ?? "Unknown error"}`);
+  if (!chargeResponse.approved) {
+    throw new Error(`Payment declined: ${chargeResponse.errorText ?? "Unknown error"}`);
   }
 
   const paymentId = uuidv4();
@@ -231,7 +215,7 @@ export async function processPayment(
       restaurantId,
       amount,
       voluntaryTip: voluntaryTipAmount,
-      kushkiTransactionId: kushkiResponse.ticketNumber ?? "",
+      providerTransactionId: chargeResponse.transactionId ?? "",
       idempotencyKey,
       splitMode,
       selectedItemIds,
@@ -245,10 +229,6 @@ export async function processPayment(
     });
     thisPaymentIsRecipient = result.thisPaymentIsRecipient;
 
-    // ────────────────────────────────────────────────────────────────────────────
-    // POS confirmation: Option B — record a PARTIAL cobro per split (D-08, D-10).
-    // Never throws / never voids Kushki — failures log POS_COBRO_FAILED and continue.
-    // ────────────────────────────────────────────────────────────────────────────
     if (posRestaurant?.invoiceMode === "POS") {
       try {
         const posIds = await repos.bill.findPosInfo(billId);
@@ -257,19 +237,23 @@ export async function processPayment(
           const posConfig = buildPosConfig(posRestaurant);
           const adapter = new ContificoAdapter(posConfig);
 
-          // Only send guestData when THIS Payment is the recipient — avoid re-PUTing cliente
-          // on a document that already has its recipient set on a prior cobro.
           const guestDataForCobro: POSGuestData | undefined =
             thisPaymentIsRecipient && hasUsableGuestData ? normalizedGuest : undefined;
+
+          const cobroNetAmount = Math.round((amount - voluntaryTipAmount) * 100) / 100;
 
           const cobro = await adapter.confirmPayment({
             posDocumentId,
             posToken,
-            amount, // PARTIAL amount of THIS split, NOT bill.total (Option B)
+            amount: cobroNetAmount,
             paymentReference: paymentId,
             guestData: guestDataForCobro,
           });
           if (!cobro.success) {
+            await repos.payment.updatePosRegistration(paymentId, {
+              registered: false,
+              note: cobro.errorMessage ?? "Cobro failed",
+            });
             console.error(
               JSON.stringify(
                 redact({
@@ -285,10 +269,15 @@ export async function processPayment(
                 })
               )
             );
+          } else {
+            await repos.payment.updatePosRegistration(paymentId, { registered: true });
           }
         }
       } catch (err) {
-        // Never void the successful Kushki charge on POS failure (D-10)
+        await repos.payment.updatePosRegistration(paymentId, {
+          registered: false,
+          note: err instanceof Error ? err.message : String(err),
+        }).catch(() => undefined);
         console.error(
           JSON.stringify(
             redact({
@@ -313,10 +302,10 @@ export async function processPayment(
     };
   } catch (error) {
     console.error("Transaction error — attempting void:", error);
-    if (!isDemoPaymentToken(kushkiToken)) {
+    if (!isStubPaymentToken(chargeToken)) {
       try {
-        await refundPayment(
-          { ticketNumber: kushkiResponse.ticketNumber ?? "", amount },
+        await paymentAdapter.refund(
+          { transactionId: chargeResponse.transactionId ?? "", amount },
           providerConfig
         );
       } catch (voidError) {
@@ -327,7 +316,7 @@ export async function processPayment(
               severity: "CRITICAL",
               billId: hashForLog(billId),
               restaurantId: hashForLog(restaurantId),
-              ticketNumber: hashForLog(kushkiResponse.ticketNumber ?? ""),
+              transactionId: hashForLog(chargeResponse.transactionId ?? ""),
               amount,
               dbError: error instanceof Error ? error.message : String(error),
               refundError: voidError instanceof Error ? voidError.message : String(voidError),
@@ -341,10 +330,6 @@ export async function processPayment(
   }
 }
 
-/**
- * Replicates the in-transaction FULLY_PAID logic but read-only,
- * so the SRI $50 guard can predict whether THIS split will close the bill.
- */
 function wouldThisSplitCloseTheBill(
   bill: {
     items: { id: string; isPaid: boolean }[];
@@ -365,6 +350,5 @@ function wouldThisSplitCloseTheBill(
     return bill.items.every((i) => i.isPaid || ids.has(i.id));
   }
 
-  // FULL pays every unpaid item.
   return true;
 }

@@ -615,7 +615,7 @@ function BillShellStage({
             En vivo
           </span>
           <span className="bill-shell-mesa">Mesa {config.table}</span>
-          {config.demoMode && onResetDemo ? (
+          {config.showResetButton && onResetDemo ? (
             <button
               type="button"
               className={

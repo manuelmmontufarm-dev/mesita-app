@@ -101,44 +101,6 @@ function CheckIcon() {
   );
 }
 
-function DemoBanner() {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "8px 14px",
-        borderRadius: 10,
-        background: "rgba(47,179,126,.12)",
-        border: "1px solid rgba(47,179,126,.22)",
-        fontSize: 12.5,
-        fontWeight: 500,
-        color: "#1f6b4c",
-      }}
-    >
-      <span>🟢</span>
-      <span>
-        <strong>Modo demo</strong> · Realiza un pago en{" "}
-        <a
-          href="https://mesitademo-two.vercel.app/pay/demo"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            color: "#1f6b4c",
-            fontWeight: 700,
-            textDecoration: "underline",
-            textUnderlineOffset: 2,
-          }}
-        >
-          mesitademo-two.vercel.app/pay/demo
-        </a>{" "}
-        para ver los datos en vivo
-      </span>
-    </div>
-  );
-}
-
 function LiveBadge() {
   return (
     <div
@@ -181,7 +143,7 @@ export function StatisticsDashboard() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/demo-dashboard");
+      const res = await fetch("/api/dashboard");
       if (!res.ok) throw new Error("failed");
       const json = await res.json();
       if (mountedRef.current) {
@@ -221,7 +183,6 @@ export function StatisticsDashboard() {
   if (isError) {
     return (
       <div style={{ display: "grid", gap: 14 }}>
-        <DemoBanner />
         <div
           style={{
             padding: "36px 24px",
@@ -265,7 +226,6 @@ export function StatisticsDashboard() {
   if (isLoading) {
     return (
       <div style={{ display: "grid", gap: 12 }}>
-        <DemoBanner />
         <div className="stats-kpi-grid">
           <div style={{ padding: "15px 16px", borderRadius: 18, background: "var(--ink-900)" }}>
             <div
@@ -395,8 +355,6 @@ export function StatisticsDashboard() {
           </div>
           <LiveBadge />
         </div>
-
-        <DemoBanner />
 
         {staleAsOf && (
           <div

@@ -4,7 +4,6 @@ import type { BillItem, MemberId, RestaurantConfig, TablePaymentSummary } from "
 
 const METHOD_LABELS: Record<string, string> = {
   card: "Tarjeta",
-  kushki: "Tarjeta",
   datafast: "Datafast",
   diners: "Diners Club",
 };

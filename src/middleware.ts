@@ -37,7 +37,7 @@ const ratelimit = redis
       redis,
       limiter: Ratelimit.slidingWindow(10, "60s"),
       analytics: true,
-      prefix: "pagaya:rl:",
+      prefix: "mesita:rl:",
     })
   : null;
 
@@ -46,7 +46,7 @@ const guestRatelimit = redis
       redis,
       limiter: Ratelimit.slidingWindow(120, "60s"),
       analytics: true,
-      prefix: "pagaya:rl:guest:",
+      prefix: "mesita:rl:guest:",
     })
   : null;
 

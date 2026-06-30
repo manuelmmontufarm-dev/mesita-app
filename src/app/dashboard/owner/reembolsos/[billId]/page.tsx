@@ -24,7 +24,7 @@ interface Payment {
   amount: number;
   status: string;
   splitMode: string | null;
-  kushkiTransactionId: string;
+  providerTransactionId: string;
   guestEmail: string | null;
   guestNombre: string | null;
   createdAt: string;
@@ -277,7 +277,7 @@ export default function BillDetailPage() {
                     {payment.guestEmail && (
                       <p className="text-xs text-zinc-400">{payment.guestEmail}</p>
                     )}
-                    <p className="text-xs text-zinc-300 font-mono mt-0.5">{payment.kushkiTransactionId}</p>
+                    <p className="text-xs text-zinc-300 font-mono mt-0.5">{payment.providerTransactionId}</p>
                   </div>
                   {canRefund && (
                     <Dialog

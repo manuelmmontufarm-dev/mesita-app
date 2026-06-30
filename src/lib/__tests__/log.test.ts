@@ -37,7 +37,7 @@ describe("redact", () => {
         password: "secret123",
       },
       data: {
-        kushkiToken: "kt123",
+        paymentToken: "pt123",
         value: "safe",
       },
     };
@@ -45,7 +45,7 @@ describe("redact", () => {
     expect(((result as AnyObj).user as AnyObj).email).toBe("[redacted]");
     expect(((result as AnyObj).user as AnyObj).password).toBe("[redacted]");
     expect(((result as AnyObj).user as AnyObj).name).toBe("John");
-    expect(((result as AnyObj).data as AnyObj).kushkiToken).toBe("[redacted]");
+    expect(((result as AnyObj).data as AnyObj).paymentToken).toBe("[redacted]");
     expect(((result as AnyObj).data as AnyObj).value).toBe("safe");
   });
 
@@ -91,8 +91,8 @@ describe("redact", () => {
       password: "pass",
       token: "tok",
       ticketNumber: "123",
-      kushkiToken: "kt",
-      kushkiTransactionId: "kti",
+      paymentToken: "pt",
+      providerTransactionId: "pti",
       posDocumentId: "pdi",
       apiKey: "ak",
       secret: "sec",

@@ -84,14 +84,14 @@ export async function GET(
       _sum: { amount: true },
     });
 
-    const { posApiKeyEnc, kushkiPrivateKeyEnc, ...safeRestaurant } = restaurant;
+    const { posApiKeyEnc, paymentPrivateKeyEnc, ...safeRestaurant } = restaurant;
 
     return successResponse({
       ...safeRestaurant,
       ownerEmail: restaurant.users[0]?.email ?? null,
       ownerName: restaurant.users[0]?.name ?? null,
       posConfigured: !!posApiKeyEnc,
-      kushkiConfigured: !!kushkiPrivateKeyEnc,
+      paymentConfigured: !!paymentPrivateKeyEnc,
       tables: restaurant.tables.map((t) => ({
         id: t.id,
         name: t.name,
