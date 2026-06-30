@@ -108,13 +108,14 @@ function dateTime(value: string) {
   }).format(new Date(value));
 }
 
+const STATUS_BADGE_CLASS: Record<RestaurantStatus, string> = {
+  ACTIVE:    "bg-emerald-500/10 text-emerald-700",
+  PENDING:   "bg-amber-500/10 text-amber-700",
+  SUSPENDED: "bg-red-500/10 text-red-700",
+};
+
 function StatusBadge({ status }: { status: RestaurantStatus }) {
-  const styles: Record<RestaurantStatus, string> = {
-    ACTIVE: "bg-emerald-500/10 text-emerald-700",
-    PENDING: "bg-amber-500/10 text-amber-700",
-    SUSPENDED: "bg-red-500/10 text-red-700",
-  };
-  return <span className={`pill ${styles[status]}`}>{STATUS_LABEL[status]}</span>;
+  return <span className={`pill ${STATUS_BADGE_CLASS[status]}`}>{STATUS_LABEL[status]}</span>;
 }
 
 function IntegrationDot({ status, label }: { status: IntegrationStatus; label: string }) {
@@ -183,7 +184,15 @@ export default function AdminPage() {
         credentials: "include",
         cache: "no-store",
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        const hint =
+          response.status === 401
+            ? "Sesión de administrador inválida o expirada."
+            : response.status >= 500
+              ? "Error del servidor — revisa DATABASE_URL en Vercel."
+              : `Error HTTP ${response.status}`;
+        throw new Error(hint);
+      }
       const json = await response.json();
       setData(json.data);
       setLastUpdated(new Date());
@@ -201,8 +210,6 @@ export default function AdminPage() {
 
   useEffect(() => {
     load(true);
-    const interval = window.setInterval(() => load(true), 30_000);
-    return () => window.clearInterval(interval);
   }, [load]);
 
   async function updateStatus(restaurant: RestaurantRow, status: "ACTIVE" | "SUSPENDED") {
@@ -239,7 +246,8 @@ export default function AdminPage() {
     });
   }, [data, query, filter]);
 
-  const maxTrend = Math.max(...(data?.trend.map((day) => day.volume) ?? [1]), 1);
+  const trendSlice = (data?.trend ?? []).slice(-7);
+  const maxTrend = Math.max(...(trendSlice.map((day) => day.volume) ?? [1]), 1);
   const alertTotal = data
     ? data.alerts.failedPayments30d +
       data.alerts.pendingPosRegistrations +
@@ -265,6 +273,9 @@ export default function AdminPage() {
         <CardContent className="py-14 text-center">
           <AlertTriangle className="mx-auto h-7 w-7 text-[var(--warning)]" />
           <h1 className="mt-4 text-xl font-semibold">No pudimos cargar el control de plataforma</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Requiere <code className="text-xs">ADMIN_SECRET</code> válido y base de datos Postgres configurada en Vercel.
+          </p>
           <Button className="mt-5" onClick={() => load()}>Reintentar</Button>
         </CardContent>
       </Card>
@@ -341,32 +352,34 @@ export default function AdminPage() {
         <Card className="border-black/[0.08] bg-[var(--surface)] shadow-none">
           <CardHeader className="flex-row items-start justify-between space-y-0 pb-2">
             <div>
-              <CardTitle className="text-base">Volumen procesado · 14 días</CardTitle>
+              <CardTitle className="text-base">Volumen procesado · 7 días</CardTitle>
               <p className="mt-1 text-xs text-[var(--on-light-mut)]">Misma fuente de pagos que usan los dashboards owner.</p>
             </div>
             <span className="pill pill-muted">USD</span>
           </CardHeader>
           <CardContent>
-            <div className="flex h-52 items-end gap-2 pt-6">
-              {data.trend.map((day, index) => {
-                const height = day.volume > 0 ? Math.max(10, Math.round((day.volume / maxTrend) * 100)) : 3;
-                const showLabel = index === 0 || index === data.trend.length - 1 || index === 6;
-                return (
-                  <div key={day.date} className="group flex h-full min-w-0 flex-1 flex-col justify-end">
-                    <div className="mb-2 hidden rounded-lg bg-[var(--ink-900)] px-2 py-1 text-center text-[10px] text-white group-hover:block">
-                      {money(day.volume)} · {day.transactions}
+            <div className="overflow-x-auto">
+              <div className="flex h-52 min-w-[280px] items-end gap-2 pt-6">
+                {trendSlice.map((day, index) => {
+                  const height = day.volume > 0 ? Math.max(10, Math.round((day.volume / maxTrend) * 100)) : 3;
+                  const showLabel = index === 0 || index === trendSlice.length - 1;
+                  return (
+                    <div key={day.date} className="group flex h-full min-w-0 flex-1 flex-col justify-end">
+                      <div className="mb-2 hidden rounded-lg bg-[var(--ink-900)] px-2 py-1 text-center text-[10px] text-white group-hover:block">
+                        {money(day.volume)} · {day.transactions}
+                      </div>
+                      <div
+                        className="w-full rounded-t-md bg-[var(--emerald)]/80 transition-all group-hover:bg-[var(--emerald)]"
+                        style={{ height: `${height}%` }}
+                        title={`${day.date}: ${money(day.volume)} · ${day.transactions} transacciones`}
+                      />
+                      <span className="mt-2 h-4 text-center text-[10px] text-[var(--on-light-mut)]">
+                        {showLabel ? new Date(`${day.date}T12:00:00`).toLocaleDateString("es-EC", { day: "numeric", month: "short" }) : ""}
+                      </span>
                     </div>
-                    <div
-                      className="w-full rounded-t-md bg-[var(--emerald)]/80 transition-all group-hover:bg-[var(--emerald)]"
-                      style={{ height: `${height}%` }}
-                      title={`${day.date}: ${money(day.volume)} · ${day.transactions} transacciones`}
-                    />
-                    <span className="mt-2 h-4 text-center text-[10px] text-[var(--on-light-mut)]">
-                      {showLabel ? new Date(`${day.date}T12:00:00`).toLocaleDateString("es-EC", { day: "numeric", month: "short" }) : ""}
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </CardContent>
         </Card>

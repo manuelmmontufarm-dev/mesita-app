@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatCurrency } from "@/lib/format";
+import { ownerDashboardEndpoint } from "@/lib/owner-data-source";
 import { SkeletonCard } from "@/components/shared/LoadingState";
 
 interface Confirmation {
@@ -37,15 +38,6 @@ interface DashboardData {
   tables: TableRow[];
   demoMode?: boolean;
 }
-
-/**
- * Fuente de datos del panel:
- * - `/api/demo-dashboard` refleja el POS demo en vivo (mesas 1-4) — usar en modo demo.
- * - `/api/dashboard` lee Prisma (restaurante real) — modo producción.
- * Controlado por NEXT_PUBLIC_DEMO_PANEL=1.
- */
-const DASHBOARD_ENDPOINT =
-  process.env.NEXT_PUBLIC_DEMO_PANEL === "1" ? "/api/demo-dashboard" : "/api/dashboard";
 
 const STATUS = {
   paying: { label: "Pagando con Mesita", bg: "rgba(47,179,126,.14)", color: "#1f6b4c" },
@@ -220,7 +212,8 @@ export function PanelDashboard() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(DASHBOARD_ENDPOINT);
+      const endpoint = await ownerDashboardEndpoint();
+      const res = await fetch(endpoint, { credentials: "include", cache: "no-store" });
       if (!res.ok) throw new Error("failed");
       const json = await res.json();
       if (mountedRef.current) {

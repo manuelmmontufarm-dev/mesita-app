@@ -121,6 +121,7 @@ export async function middleware(request: NextRequest) {
     "/register",
     "/api/auth/register",
     "/api/demo-auth/enter",
+    "/api/demo-auth/status",
     "/admin/login",
     "/api/admin/session",
   ];

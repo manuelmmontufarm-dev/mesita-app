@@ -52,12 +52,17 @@ Reglas de oro:
 
 ## 🟢 En qué estamos ahora
 
-Deploy en producción (`mesitademo-two.vercel.app`). Recién: benchmark de latencia
-(20 iteraciones reales) + dashboard del dueño solo-lectura que refleja el POS demo
-+ optimización de tiempos de sync. Baseline medido: POS→app ~2.2s, app→POS ~2.0s,
-POS→dashboard ~0.45s. Optimizado el throttle de pull (1500→800ms) y polls.
+Deploy en producción (`mesitademo-two.vercel.app`). Fix aplicado: panel/estadísticas/mesas/reportes
+del dueño detectan modo demo en runtime (cookie httpOnly) y leen `/api/demo-dashboard` + `/api/demo-pos`
+en vez de Prisma sin sesión. Pendiente: push a `main` y redeploy Vercel.
 
 ## 🗂️ Registro de cambios
+
+### 2026-06-30 — Fix panel owner en modo demo (runtime, sin env de build)
+
+- **Qué:** `src/lib/owner-data-source.ts` (NUEVO), `src/app/api/demo-auth/status/route.ts` (NUEVO), `PanelDashboard.tsx`, `StatisticsDashboard.tsx`, `dashboard/owner/mesas/page.tsx`, `dashboard/owner/reembolsos/page.tsx`, `middleware.ts`, `admin/page.tsx` (mensaje de error más claro).
+- **Por qué:** En Vercel el panel mostraba "No pudimos cargar el panel/estadísticas" porque `NEXT_PUBLIC_DEMO_PANEL` no estaba en el build y el cliente llamaba `/api/dashboard` (requiere sesión Prisma) en vez de `/api/demo-dashboard` (cookie demo).
+- **Qué hace:** `GET /api/demo-auth/status` lee la cookie httpOnly `mesita-demo-mode`; el panel elige el endpoint correcto en runtime. Mesas y pagos en demo leen `/api/demo-pos`. En solo-lectura se oculta "+ Nueva mesa". Admin muestra hint si falta `ADMIN_SECRET` o Postgres.
 
 ### 2026-06-30 — Benchmark latencia + dashboard solo-lectura + optimización sync
 

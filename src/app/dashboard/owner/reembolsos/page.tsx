@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { formatCurrency } from "@/lib/format";
+import { isOwnerDemoMode } from "@/lib/owner-data-source";
 
 interface PaymentRow {
   paymentId: string;
@@ -63,6 +64,7 @@ export default function ReembolsosPage() {
   const [kpis, setKpis] = useState<KpiCards | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -71,8 +73,61 @@ export default function ReembolsosPage() {
   const load = useCallback(async () => {
     try {
       setError(null);
+      const isDemo = await isOwnerDemoMode();
+      setDemoMode(isDemo);
+
+      if (isDemo) {
+        const res = await fetch(`/api/demo-pos?view=reports&date=${encodeURIComponent(date)}`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error("No se pudieron cargar los pagos");
+        const json = await res.json();
+        const reports: Array<{
+          id: string;
+          tableName: string;
+          tableToken: string;
+          payments: Array<{
+            id: string;
+            amount: number;
+            guestName?: string;
+            ref?: string;
+            createdAt: string;
+            viaMesita?: boolean;
+          }>;
+        }> = json.data?.reports ?? [];
+
+        const rows: PaymentRow[] = reports.flatMap((r) =>
+          r.payments.map((p) => ({
+            paymentId: p.id,
+            billId: r.id,
+            tableId: r.tableToken,
+            tableName: r.tableName,
+            amount: p.amount,
+            voluntaryTip: 0,
+            splitMode: null,
+            guestNombre: p.guestName ?? null,
+            providerTransactionId: p.ref ?? p.id,
+            posRegisteredAt: p.viaMesita ? p.createdAt : null,
+            posRegistrationNote: null,
+            createdAt: p.createdAt,
+            status: "COMPLETED",
+          })),
+        ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        const totalCollected = rows.reduce((s, p) => s + p.amount, 0);
+        setPayments(rows);
+        setKpis({
+          totalCollected,
+          propinaTotal: 0,
+          paymentCount: rows.length,
+          avgPayment: rows.length > 0 ? totalCollected / rows.length : 0,
+        });
+        return;
+      }
+
       const params = new URLSearchParams({ from: date, to: date });
-      const res = await fetch(`/api/reports/payments?${params}`);
+      const res = await fetch(`/api/reports/payments?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("No se pudieron cargar los pagos");
       const json = await res.json();
       const data = json.data ?? {};
@@ -123,7 +178,9 @@ export default function ReembolsosPage() {
           Pagos y reembolsos
         </h1>
         <p style={{ fontSize: 13, color: "var(--on-light-mut)", marginTop: 4 }}>
-          Historial de pagos MesitaQR · base de datos del restaurante · {date}
+          {demoMode
+            ? `Historial de pagos MesitaQR · POS demo en vivo · ${date}`
+            : `Historial de pagos MesitaQR · base de datos del restaurante · ${date}`}
         </p>
       </div>
 
@@ -250,7 +307,10 @@ export default function ReembolsosPage() {
       )}
 
       <p style={{ fontSize: 11, color: "var(--on-light-mut)", textAlign: "right" }}>
-        Fuente: <strong>Postgres</strong> · GET /api/reports/payments · actualiza cada 12s
+        Fuente: <strong>{demoMode ? "POS demo" : "Postgres"}</strong>
+        {" · "}
+        {demoMode ? "GET /api/demo-pos?view=reports" : "GET /api/reports/payments"}
+        {" · actualiza cada 12s"}
       </p>
     </div>
   );
