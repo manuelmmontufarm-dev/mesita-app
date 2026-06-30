@@ -26,7 +26,7 @@ export default function AdminPage() {
 
   async function loadRestaurants() {
     try {
-      const response = await fetch("/api/admin/restaurants");
+      const response = await fetch("/api/admin/restaurants", { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
         setRestaurants(data.data || []);
@@ -47,6 +47,7 @@ export default function AdminPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
+        credentials: "include",
       });
 
       if (response.ok) {

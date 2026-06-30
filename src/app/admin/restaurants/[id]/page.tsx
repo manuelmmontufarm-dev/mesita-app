@@ -113,7 +113,7 @@ export default function RestaurantDetailPage({ params }: { params: Promise<{ id:
   async function load() {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/admin/restaurants/${id}`);
+      const res = await fetch(`/api/admin/restaurants/${id}`, { credentials: "include" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setData(json.data);
@@ -132,6 +132,7 @@ export default function RestaurantDetailPage({ params }: { params: Promise<{ id:
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
+        credentials: "include",
       });
       if (!res.ok) throw new Error();
       toast({ title: newStatus === "ACTIVE" ? "Restaurante activado" : "Restaurante suspendido" });

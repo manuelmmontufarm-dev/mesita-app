@@ -245,6 +245,7 @@ model BillItem {
 
 // PaymentStatus: Payment completion status
 enum PaymentStatus {
+  PENDING
   COMPLETED
   FAILED
   REFUNDED

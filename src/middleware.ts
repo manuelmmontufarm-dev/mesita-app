@@ -116,7 +116,14 @@ export async function middleware(request: NextRequest) {
   }
 
   // Public routes (no auth required)
-  const publicRoutes = ["/login", "/register", "/api/auth/register", "/api/demo-auth/enter"];
+  const publicRoutes = [
+    "/login",
+    "/register",
+    "/api/auth/register",
+    "/api/demo-auth/enter",
+    "/admin/login",
+    "/api/admin/session",
+  ];
   if (pathname === "/" || publicRoutes.some((route) => pathname.startsWith(route))) {
     return NextResponse.next();
   }
@@ -135,12 +142,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for admin panel access (/admin and /api/admin/*)
-  if (pathname.startsWith("/admin")) {
+  // Admin panel + admin API routes (/admin/*, /api/admin/* except /api/admin/session)
+  if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
     const adminSecret = process.env.ADMIN_SECRET;
     if (!adminSecret) {
-      // ADMIN_SECRET not configured, deny access
-      return NextResponse.redirect(new URL("/login", request.url));
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      }
+      return NextResponse.redirect(new URL("/admin/login", request.url));
     }
 
     let hasValidSecret = false;
@@ -155,8 +164,6 @@ export async function middleware(request: NextRequest) {
       hasValidSecret = headerSecret !== null && timingSafeEqualStr(headerSecret, adminSecret);
     }
 
-    // admin_secret cookie (header-only auth — the ?secret= query param path was removed:
-    // secrets in URLs leak via logs, browser history, and Referer headers)
     if (!hasValidSecret) {
       const cookieSecret = request.cookies.get("admin_secret")?.value;
       hasValidSecret =
@@ -164,7 +171,10 @@ export async function middleware(request: NextRequest) {
     }
 
     if (!hasValidSecret) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      }
+      return NextResponse.redirect(new URL("/admin/login", request.url));
     }
 
     return NextResponse.next();

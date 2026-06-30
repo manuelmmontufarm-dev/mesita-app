@@ -7,7 +7,128 @@ const prisma = new PrismaClient();
 const HASH = (pw: string) => bcrypt.hashSync(pw, 10);
 const id = () => randomUUID();
 
-async function main() {
+/** Production-safe: Mesita Demo restaurant, owner, demo table + bill for /pay/demo */
+async function seedMinimal() {
+  console.log("🌱 Seeding minimal (production-safe) data…");
+
+  const restaurant = await prisma.restaurant.upsert({
+    where: { name: "Mesita Demo" },
+    update: { paymentsEnabled: true, invoiceMode: "DISABLED", status: "ACTIVE" },
+    create: {
+      id: "rest-mesita-demo",
+      name: "Mesita Demo",
+      slug: "mesita-demo",
+      address: "Quito, Ecuador",
+      status: "ACTIVE",
+      paymentsEnabled: true,
+      invoiceMode: "DISABLED",
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: "owner@mesita.demo" },
+    update: {},
+    create: {
+      id: "user-mesita-demo-owner",
+      name: "Demo Owner",
+      email: "owner@mesita.demo",
+      password: HASH("Demo1234!"),
+      role: UserRole.OWNER,
+      restaurantId: restaurant.id,
+    },
+  });
+
+  await prisma.table.upsert({
+    where: { token: "demo" },
+    update: { name: "12", restaurantId: restaurant.id, posExternalId: "12" },
+    create: {
+      id: "tbl-mesita-demo",
+      name: "12",
+      token: "demo",
+      posExternalId: "12",
+      restaurantId: restaurant.id,
+    },
+  });
+
+  await prisma.payment.deleteMany({ where: { restaurantId: restaurant.id } });
+  await prisma.billGuestSession.deleteMany({
+    where: { bill: { restaurantId: restaurant.id } },
+  });
+  await prisma.billItemClaim.deleteMany({
+    where: { bill: { restaurantId: restaurant.id } },
+  });
+  await prisma.billItem.deleteMany({ where: { restaurantId: restaurant.id } });
+  await prisma.bill.deleteMany({ where: { restaurantId: restaurant.id } });
+
+  const now = new Date();
+  const minsAgo = (n: number) => new Date(now.getTime() - n * 60_000);
+  const demoLocroId = "demo-item-locro";
+  const demoBillId = "bill-mesita-demo";
+
+  await prisma.bill.create({
+    data: {
+      id: demoBillId,
+      tableId: "tbl-mesita-demo",
+      restaurantId: restaurant.id,
+      status: BillStatus.PARTIALLY_PAID,
+      createdAt: minsAgo(5),
+      items: {
+        create: [
+          {
+            id: demoLocroId,
+            name: "Locro de papa",
+            price: 4.5,
+            quantity: 1,
+            isPaid: true,
+            paidAt: minsAgo(3),
+            restaurantId: restaurant.id,
+          },
+          {
+            id: "demo-item-seco",
+            name: "Seco de chivo",
+            price: 8.9,
+            quantity: 1,
+            isPaid: false,
+            restaurantId: restaurant.id,
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.payment.create({
+    data: {
+      id: id(),
+      billId: demoBillId,
+      restaurantId: restaurant.id,
+      amount: 5.63,
+      status: PaymentStatus.COMPLETED,
+      kushkiTransactionId: "DEMO-LOCRO",
+      idempotencyKey: id(),
+      splitMode: SplitMode.BY_ITEM,
+      createdAt: minsAgo(3),
+      paymentItems: {
+        create: [
+          {
+            id: id(),
+            billItemId: demoLocroId,
+            name: "Locro de papa",
+            units: 1,
+            unitPrice: 4.5,
+            amount: 4.5,
+          },
+        ],
+      },
+    },
+  });
+
+  console.log("\n✅ Minimal seed complete!\n");
+  console.log("  Guest demo : http://localhost:3000/pay/demo");
+  console.log("  Owner      : owner@mesita.demo / Demo1234!");
+  console.log("");
+}
+
+async function seedFull() {
   console.log("🌱 Seeding PagaYa demo data…");
 
   // ── Restaurant ──────────────────────────────────────────────────────────────
@@ -17,6 +138,7 @@ async function main() {
     create: {
       id: "rest-demo-0001",
       name: "La Floresta Bistró",
+      slug: "la-floresta-bistro",
       address: "Av. Coruña N25-60 y Luis Cordero, La Floresta, Quito",
       status: "ACTIVE",
       ruc: "1792456789001",
@@ -95,8 +217,8 @@ async function main() {
   for (const t of tableData) {
     await prisma.table.upsert({
       where: { token: t.token },
-      update: {},
-      create: { ...t, restaurantId: restaurant.id },
+      update: { posExternalId: t.name },
+      create: { ...t, posExternalId: t.name, restaurantId: restaurant.id },
     });
   }
 
@@ -319,6 +441,7 @@ async function main() {
     create: {
       id: "rest-mesita-demo",
       name: "Mesita Demo",
+      slug: "mesita-demo",
       address: "Quito, Ecuador",
       status: "ACTIVE",
       paymentsEnabled: true,
@@ -328,11 +451,12 @@ async function main() {
 
   await prisma.table.upsert({
     where: { token: "demo" },
-    update: { name: "12", restaurantId: mesitaDemo.id },
+    update: { name: "12", restaurantId: mesitaDemo.id, posExternalId: "12" },
     create: {
       id: "tbl-mesita-demo",
       name: "12",
       token: "demo",
+      posExternalId: "12",
       restaurantId: mesitaDemo.id,
     },
   });
@@ -449,6 +573,15 @@ async function main() {
   console.log("  SERVER     : carlos@lafloresta.ec");
   console.log("  PASSWORD   : Demo1234! (all users)");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+}
+
+async function main() {
+  const mode = (process.env.SEED_MODE ?? "full").toLowerCase();
+  if (mode === "minimal") {
+    await seedMinimal();
+  } else {
+    await seedFull();
+  }
 }
 
 main()

@@ -52,6 +52,14 @@ Reglas de oro:
 
 ## 🟢 En qué estamos ahora
 
+## 🗂️ Registro de cambios
+
+### 2026-06-29 — Phase 0 hardening: admin login, seed modes, slug on register
+
+- **Qué:** `src/app/admin/login/page.tsx`, `src/app/api/admin/session/route.ts`, `src/middleware.ts`, `src/app/admin/*.tsx`, `src/app/api/auth/register/route.ts`, `src/lib/slug.ts`, `prisma/schema.prisma` (PaymentStatus.PENDING), `prisma/seed.ts` (SEED_MODE minimal/full), `package.json`, `.env.example`, `.github/workflows/ci.yml`, `prisma/supabase_deploy.sql` (deprecated banner).
+- **Por qué:** Auditoría Phase 0 encontró admin panel inaccesible en browser, prod sin seed demo, register sin slug, enum drift, CI en branch equivocado, y dos caminos de deploy SQL.
+- **Qué hace:** Super-admin entra en `/admin/login` → cookie httpOnly → `/admin` y `/api/admin/*` funcionan. Register crea `slug`. `npm run db:seed:minimal` es seguro para producción (Mesita Demo + `/pay/demo`). CI corre en `main`. Prisma schema alinea `PaymentStatus` con la DB.
+
 ### 2026-06-29 — docs: INTEGRATION_PLAN.md — plan de integración completo por fases
 
 - **Qué:** `docs/INTEGRATION_PLAN.md` (archivo nuevo).

@@ -126,11 +126,18 @@ describe("middleware - public routes", () => {
 });
 
 describe("middleware - admin access", () => {
-  it("redirects to login if ADMIN_SECRET not configured", async () => {
+  it("allows access to /admin/login without auth", async () => {
+    const request = createMockRequest("/admin/login");
+    const response = await middleware(request);
+    expect(response?.status).not.toBe(307);
+  });
+
+  it("redirects to admin login if ADMIN_SECRET not configured", async () => {
     vi.stubEnv("ADMIN_SECRET", "");
     const request = createMockRequest("/admin");
     const response = await middleware(request);
     expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/admin/login");
   });
 
   it("allows access with valid Bearer token", async () => {
@@ -158,5 +165,6 @@ describe("middleware - admin access", () => {
     });
     const response = await middleware(request);
     expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/admin/login");
   });
 });

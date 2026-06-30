@@ -1,6 +1,18 @@
 import { prisma } from "@/lib/db";
 import { hashPassword, validateEmail } from "@/lib/auth-utils";
+import { slugifyName } from "@/lib/slug";
 import { AuthResponse } from "@/types/auth";
+
+async function uniqueRestaurantSlug(baseName: string): Promise<string> {
+  const base = slugifyName(baseName);
+  let slug = base;
+  let suffix = 0;
+  while (await prisma.restaurant.findFirst({ where: { slug } })) {
+    suffix += 1;
+    slug = `${base}-${suffix}`;
+  }
+  return slug;
+}
 
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -52,7 +64,8 @@ export async function POST(request: Request): Promise<Response> {
     // Create restaurant
     const restaurant = await prisma.restaurant.create({
       data: {
-        name: restaurantName,
+        name: restaurantName.trim(),
+        slug: await uniqueRestaurantSlug(restaurantName),
         status: "PENDING",
       },
     });
