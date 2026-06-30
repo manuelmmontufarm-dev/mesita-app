@@ -3,7 +3,10 @@
  */
 import type { DemoTableDefinition } from "@/lib/demo-table-catalog/definitions";
 import type { DemoFoodItem, DemoTableState } from "@/lib/demo-table-store";
-import { closeDemoTableAfterFullPayment } from "@/lib/demo-table-store";
+import {
+  markDemoTableClosed,
+  startFreshDemoSession,
+} from "@/lib/demo-table-store";
 import {
   findActivePosOrdenForMesa,
   getPosMesaSession,
@@ -374,6 +377,18 @@ export async function pullPosOrdenIntoDemoState(
   }
 
   const ordenId = session.orden?.id;
+
+  // Mesa cerrada (pagada): no re-sincronizar para preservar la pantalla de éxito/confeti.
+  // Si el POS reabrió con una orden NUEVA, arranca una sesión limpia (mesa vacía).
+  if (state.sessionPhase === "closed") {
+    const reopened = Boolean(ordenId && ordenId !== state.posOrdenId);
+    if (reopened) {
+      const fresh = await startFreshDemoSession(token);
+      return { state: fresh, changed: true, posOrdenId: undefined };
+    }
+    return { state, changed: false, posOrdenId: state.posOrdenId };
+  }
+
   const hadLinkedOrden = Boolean(state.posOrdenId);
   const ordenClosed = hadLinkedOrden && !ordenId;
   const mesaLibre = session.mesa?.estado === "L";
@@ -387,20 +402,13 @@ export async function pullPosOrdenIntoDemoState(
 
   if (!session.orden || !ordenId) {
     if (ordenClosed && fullyPaidSession) {
-      await closeDemoTableAfterFullPayment(token).catch(() => undefined);
+      // Pago total detectado: marca cerrada CONSERVANDO items/guests/payments
+      // para que los comensales presentes vean confeti. No vacía la mesa.
+      const closed = await markDemoTableClosed(token).catch(() => undefined);
       return {
-        state: {
-          ...state,
-          items: [],
-          claims: {},
-          claimShares: undefined,
-          paidItemIds: [],
-          itemPaidUnits: {},
-          payments: [],
-          posOrdenId: undefined,
-          posDocumentoId: undefined,
-        },
+        state: closed ?? { ...state },
         changed: true,
+        posOrdenId: state.posOrdenId,
       };
     }
 

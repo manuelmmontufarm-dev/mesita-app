@@ -1,6 +1,6 @@
 import {
   claimDemoItem,
-  closeDemoTableAfterFullPayment,
+  markDemoTableClosed,
   DemoGuestNotFoundError,
   getDemoTableState,
   joinDemoTable,
@@ -291,12 +291,11 @@ export async function POST(
           !isDemoUxTable(def) &&
           isDemoTableFullyPaid(state)
         ) {
-          await patchDemoTablePosLinks(token, {
-            posOrdenId: undefined,
-            posDocumentoId: undefined,
-          });
-          await refreshDemoStateFromPos(token, { force: true });
-          await closeDemoTableAfterFullPayment(token);
+          // POS ya cerró la mesa dentro de registerPaymentInPosMesita
+          // (releasePosMesaAfterFullPayment). Aquí solo marcamos la sesión
+          // como cerrada CONSERVANDO el snapshot para mostrar confeti — no
+          // vaciamos la mesa ni expulsamos a los comensales presentes.
+          await markDemoTableClosed(token);
         }
       }
 

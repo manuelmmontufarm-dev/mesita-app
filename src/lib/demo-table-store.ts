@@ -98,6 +98,10 @@ export interface DemoTableState {
   resetSeq: number;
   version: number;
   updatedAt: string;
+  /** "open" = comensales pueden pagar; "closed" = mesa pagada, muestra éxito/confeti sin permitir más pagos. */
+  sessionPhase?: "open" | "closed";
+  /** ISO timestamp del cierre por pago total. */
+  closedAt?: string;
   /** Linked POS orden (tenant_demo). */
   posOrdenId?: string;
   posDocumentoId?: string;
@@ -166,6 +170,7 @@ function createState(token: string): DemoTableState {
     resetSeq: 0,
     version: 1,
     updatedAt: ts,
+    sessionPhase: "open",
   };
 }
 
@@ -399,10 +404,30 @@ function applyPosLinkedEmptyBill(token: string, state: DemoTableState): void {
 }
 
 /**
- * After full payment or POS close — clear session so the next comensal starts fresh.
- * Bumps resetSeq so all devices re-sync (no manual Reiniciar on mesas 1–4).
+ * Marca la mesa como cerrada tras pago total — CONSERVA guests, items, payments y claims.
+ * No bumpea resetSeq (no expulsa a nadie): los comensales presentes ven la pantalla de
+ * éxito/confeti. La mesa no acepta más pagos hasta que el mesero abra una nueva orden
+ * (→ startFreshDemoSession) o un nuevo dispositivo escanee.
  */
-export async function closeDemoTableAfterFullPayment(
+export async function markDemoTableClosed(
+  token: string,
+): Promise<DemoTableState> {
+  return mutateDemoState(token, (draft) => {
+    draft.sessionPhase = "closed";
+    draft.closedAt = nowIso();
+    draft.paidItemIds = draft.items.map((it) => it.id);
+    for (const guest of draft.guests) {
+      guest.status = "paid";
+    }
+  });
+}
+
+/**
+ * Inicia una sesión nueva y limpia — para nuevos escaneos después del cierre o cuando
+ * el mesero reabre la mesa en el POS. Bumpea resetSeq para que todos los dispositivos
+ * re-sincronicen a la mesa vacía.
+ */
+export async function startFreshDemoSession(
   token: string,
 ): Promise<DemoTableState> {
   const prev = await loadState(token);
@@ -413,12 +438,24 @@ export async function closeDemoTableAfterFullPayment(
   state.guests = [];
   state.payments = [];
   state.nextGuestNumber = 1;
+  state.sessionPhase = "open";
+  state.closedAt = undefined;
   getMemoryStore().set(token, state);
   const redis = getRedis();
   if (redis) {
     await redis.set(REDIS_KEY(token), state, { ex: REDIS_TTL_SECONDS });
   }
   return state;
+}
+
+/**
+ * @deprecated Use markDemoTableClosed (preserve confetti) + startFreshDemoSession (new scan).
+ * Mantenido como alias de markDemoTableClosed para compatibilidad de llamadas existentes.
+ */
+export async function closeDemoTableAfterFullPayment(
+  token: string,
+): Promise<DemoTableState> {
+  return markDemoTableClosed(token);
 }
 
 /** Derive next Persona N from existing labels — recycles gaps, immune to ghost increments. */
@@ -438,7 +475,18 @@ export async function joinDemoTable(
   const { guestId, deviceId } =
     typeof opts === "string" ? { guestId: opts, deviceId: undefined } : opts ?? {};
 
-  await getDemoTableState(token);
+  const current = await getDemoTableState(token);
+
+  // Mesa cerrada (pagada): un comensal que vuelve re-entra al snapshot de éxito;
+  // un dispositivo/guest NUEVO arranca una sesión limpia (mesa vacía).
+  if (current.sessionPhase === "closed") {
+    const returning =
+      (deviceId && current.guests.some((g) => g.deviceId === deviceId)) ||
+      (guestId && current.guests.some((g) => g.id === guestId));
+    if (!returning) {
+      await startFreshDemoSession(token);
+    }
+  }
 
   let resolvedGuest: DemoGuest | null = null;
   const state = await mutateDemoState(token, (draft) => {
@@ -534,6 +582,8 @@ export async function refreshDemoStateFromPos(
       draft.posOrdenId = undefined;
       draft.posDocumentoId = undefined;
     }
+    if (pulled.state.sessionPhase) draft.sessionPhase = pulled.state.sessionPhase;
+    if (pulled.state.closedAt !== undefined) draft.closedAt = pulled.state.closedAt;
     remapDemoItemReferences(draft, idMap);
     draft.version += 1;
   });

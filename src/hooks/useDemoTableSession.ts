@@ -93,6 +93,7 @@ export interface UseDemoTableSessionResult {
   }) => Promise<void>;
   retry: () => void;
   resetSeq: number;
+  sessionPhase: "open" | "closed";
   paidSummaries: TablePaymentSummary[];
   /** Cumulative partial item payments from demo store. */
   itemPaidUnits: Readonly<Record<string, number>>;
@@ -258,6 +259,10 @@ function isRemoteTableReset(
   lastResetSeq: number | undefined,
 ): boolean {
   if (guestId == null || lastResetSeq === undefined) return false;
+  // Mesa cerrada (pagada): no expulsar — el comensal debe ver el éxito/confeti.
+  if (demo.sessionPhase === "closed" && demo.guests.some((g) => g.id === guestId)) {
+    return false;
+  }
   if (demo.resetSeq <= lastResetSeq) return false;
   return !demo.guests.some((g) => g.id === guestId);
 }
@@ -485,11 +490,19 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   joinTableRef.current = joinTable;
 
   useLayoutEffect(() => {
+    const uxTable = isDemoUxTableToken(token);
     if (isFreshDocumentNavigation()) {
       clearStoredGuestId(token);
-      clearStoredEntered(token);
       clearStoredResetSeq(token);
-      demoDebug("lobby", "fresh visit — require entry screen");
+      // Solo Mesa 12 (`/pay/demo`) exige el lobby manual en cada visita fresca.
+      if (uxTable) {
+        clearStoredEntered(token);
+        demoDebug("lobby", "fresh visit — require entry screen");
+      }
+    }
+    // Mesas POS-linked (1–4): auto-entrada con pantalla de bienvenida, sin lobby.
+    if (!uxTable) {
+      writeStoredEntered(token);
     }
     const storedReset = readStoredResetSeq(token);
     if (storedReset !== undefined) {
@@ -944,6 +957,7 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
     payDemo,
     retry: () => setJoinAttempt((n) => n + 1),
     resetSeq: raw?.resetSeq ?? 0,
+    sessionPhase: raw?.sessionPhase ?? "open",
     paidSummaries,
     itemPaidUnits,
     paymentCount,

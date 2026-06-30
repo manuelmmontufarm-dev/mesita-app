@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { GuestBillFlow } from "@/components/guest/flow/GuestBillFlow";
 import { DemoDebugPanel } from "@/components/guest/DemoDebugPanel";
 import { DemoTableEntry } from "@/components/guest/DemoTableEntry";
+import { WelcomeLoading } from "@/components/guest/WelcomeLoading";
 import { useDemoTableSession } from "@/hooks/useDemoTableSession";
 import { useLiveTableSession } from "@/hooks/useLiveTableSession";
 import type { FlowInit, PaidPayload } from "@/hooks/useGuestPaymentFlow";
@@ -204,7 +205,9 @@ function GuestPayShell({
               paidItemIds: live.paidItemIds,
               paidIds,
               people: live.people,
-              tableClosed: demoProgress?.tableClosed ?? false,
+              tableClosed:
+                (demoProgress?.tableClosed ?? false) ||
+                ("sessionPhase" in live && live.sessionPhase === "closed"),
               syncRevision: "syncRevision" in live ? live.syncRevision : undefined,
             }
           : undefined
@@ -233,10 +236,13 @@ export function GuestPayPage({ token }: GuestPayPageProps) {
 
 function GuestDemoPayPage({ token }: { token: string }) {
   const live = useDemoTableSession(token);
+  // Mesa 12 / `/pay/demo` conserva el lobby manual ("Entrar a la mesa").
+  // Mesas POS-linked (1–4) entran automáticamente con pantalla de bienvenida.
+  const isUxTable = isDemoUxTableToken(token);
 
-  // Never render a blank shell — lobby is static and safe before sessionStorage is read.
+  // Never render a blank shell — show welcome (1–4) or lobby (mesa 12) before sessionStorage is read.
   if (!live.hydrated) {
-    return (
+    return isUxTable ? (
       <DemoTableEntry
         restaurantName={live.lobby.restaurantName}
         tagline={live.lobby.tagline}
@@ -246,12 +252,28 @@ function GuestDemoPayPage({ token }: { token: string }) {
         entering
         error={null}
       />
+    ) : (
+      <WelcomeLoading
+        restaurantName={live.lobby.restaurantName}
+        table={live.lobby.table}
+      />
     );
   }
 
   const inTable = Boolean(live.guestSessionId);
 
   if (!inTable) {
+    if (!isUxTable) {
+      // Auto-entrada (mesas 1–4): el hook llama enterTable() solo; mostramos bienvenida.
+      return (
+        <WelcomeLoading
+          restaurantName={live.lobby.restaurantName}
+          table={live.lobby.table}
+          error={live.error}
+          onRetry={() => void live.enterTable()}
+        />
+      );
+    }
     return (
       <>
         <DemoTableEntry

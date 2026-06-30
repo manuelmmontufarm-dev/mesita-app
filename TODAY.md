@@ -52,9 +52,78 @@ Reglas de oro:
 
 ## 🟢 En qué estamos ahora
 
-Deploy en producción (`mesitademo-two.vercel.app`) con fix POS sync; cron ingest diario (Hobby Vercel).
+Deploy en producción (`mesitademo-two.vercel.app`). Recién terminado el bloque UX:
+fase "mesa cerrada" con confeti (sin wipe inmediato), auto-entrada con pantalla
+de bienvenida para mesas 1–4 (lobby manual solo Mesa 12). Pendiente: deploy y QA
+con dos teléfonos + POS abierto.
 
 ## 🗂️ Registro de cambios
+
+### 2026-06-30 — UX guest: mesa cerrada con confeti + auto-entrada (mesas 1–4)
+
+- **Qué:** `lib/demo-table-store.ts` (nuevo `sessionPhase`/`closedAt`, `markDemoTableClosed`, `startFreshDemoSession`, join post-cierre), `lib/pos-mesita/sync.ts` (cierre conserva snapshot, reapertura → sesión fresca), `app/api/demo/table/[token]/route.ts` (pay total → `markDemoTableClosed`), `hooks/useDemoTableSession.ts` (`isRemoteTableReset` respeta fase cerrada, auto-`enterTable` para mesas 1–4, expone `sessionPhase`), `components/guest/GuestPayPage.tsx` + nuevo `WelcomeLoading.tsx` + `app/pay/customer.css`, tests `closed-phase.test.ts` y `reset-detect.test.ts`.
+- **Por qué:** Al pagar la cuenta completa la mesa se reiniciaba al instante: se perdía la pantalla de éxito/confeti y a veces expulsaba a los comensales al lobby. Además el lobby "Entrar a la mesa" era innecesario para las mesas POS-linked (1–4).
+- **Qué hace:** El pago total marca la mesa como `closed` CONSERVANDO guests/items/payments → todos los presentes ven confeti y pueden volver al resumen; no se aceptan más pagos. Un escaneo NUEVO después del cierre (o el mesero abriendo otra orden en POS) arranca una sesión limpia (mesa vacía). Las mesas 1–4 entran automáticamente con pantalla "Bienvenido a Mesita"; Mesa 12 conserva su lobby y botón Reiniciar manual.
+
+### 2026-06-30 — Admin control tower: QA y handoff final
+
+- **Qué:** cierre de QA y coordinación en `HANDOFF.md` para todo el bloque admin.
+- **Por qué:** El cambio requería evidencia de compilación, tests y límites honestos de validación.
+- **Qué hace:** Registra build verde, suite 419/419 y test de roles 2/2; documenta que el browser integrado no estuvo disponible, Supabase local no respondió y un cambio paralelo ajeno al admin introdujo luego un error de tipo en `useDemoTableSession.ts`.
+
+### 2026-06-30 — Admin navegación: estado activo por contexto
+
+- **Qué:** `AdminShell.tsx`.
+- **Por qué:** El detalle de restaurante no marcaba ninguna sección activa en el sidebar.
+- **Qué hace:** Resumen queda activo en `/admin` y Restaurantes en cualquier `/admin/restaurants/*`.
+
+### 2026-06-30 — Admin: retorno total en confirmación async
+
+- **Qué:** callback `onConfirm` de suspensión en `admin/page.tsx`.
+- **Por qué:** `noImplicitReturns` exige que todas las rutas del callback async devuelvan el mismo contrato.
+- **Qué hace:** Devuelve una promesa resuelta cuando no hay objetivo y la promesa real cuando se suspende.
+
+### 2026-06-30 — Admin permisos: cobertura del guard de propietario
+
+- **Qué:** test de `PATCH /api/admin/users/[userId]`.
+- **Por qué:** Cambiar roles desde super-admin es una operación sensible y no debe dejar un restaurante sin owner.
+- **Qué hace:** Verifica el bloqueo del último propietario y el cambio válido de SERVER a MANAGER.
+
+### 2026-06-30 — Admin: correcciones TypeScript de acciones
+
+- **Qué:** callbacks de suspensión en `admin/page.tsx` y limpieza de import en el detalle.
+- **Por qué:** `ConfirmDialog` exige `void | Promise<void>` y TypeScript detectó un retorno `null` posible.
+- **Qué hace:** La confirmación conserva el mismo comportamiento con un contrato de tipos seguro y sin imports muertos.
+
+### 2026-06-30 — Admin restaurante: resumen, QR, integraciones y permisos
+
+- **Qué:** `src/app/admin/restaurants/[id]/page.tsx`.
+- **Por qué:** El detalle mezclaba toda la información en una sola columna larga y no permitía actuar sobre QR ni roles.
+- **Qué hace:** Organiza el restaurante en tabs de Resumen, Mesas y QR, Integraciones y Accesos; muestra conciliación, alertas y métricas; permite abrir/copiar/descargar QR y cambiar roles con feedback y protección del último owner.
+
+### 2026-06-30 — Admin API: QR, conciliación y roles por restaurante
+
+- **Qué:** `api/admin/restaurants/[id]`, `api/admin/tables/[tableId]/qr`, `api/admin/users/[userId]`.
+- **Por qué:** El detalle admin no exponía QR descargables, estado de conciliación ni una forma de administrar accesos existentes.
+- **Qué hace:** Entrega staff, URLs de pago/QR, transacciones con estado POS y alertas; permite cambiar roles OWNER/MANAGER/SERVER con protección del último owner; genera PNG/PDF QR usando las utilidades existentes y la misma URL pública de la app.
+
+### 2026-06-30 — Admin overview: control tower multi-restaurante
+
+- **Qué:** `src/app/admin/page.tsx`.
+- **Por qué:** La vista anterior era una tabla mínima y no explicaba para qué servía el super-admin.
+- **Qué hace:** Muestra volumen procesado (sin confundirlo con ingreso neto), transacciones, ticket promedio, restaurantes activos, alertas, tendencia de 14 días, búsqueda/filtros, salud POS/pagos, actividad reciente y acciones seguras con confirmación. Refresca desde la misma DB cada 30 segundos.
+
+### 2026-06-30 — Admin API: métricas de plataforma y salud operativa
+
+- **Qué:** `src/app/api/admin/restaurants/route.ts`.
+- **Por qué:** `/admin` solo recibía nombre, estado y propietario; no podía explicar volumen, actividad ni problemas de integración.
+- **Qué hace:** Devuelve KPIs globales, volumen y transacciones, tendencia de 14 días, pagos recientes, alertas de conciliación/mapeo y un resumen operativo por restaurante sin exponer secretos.
+
+### 2026-06-30 — Admin: shell consistente con dashboard owner
+
+- **Qué:** `src/components/admin/AdminShell.tsx`, `src/app/admin/layout.tsx` y coordinación en `HANDOFF.md`.
+- **Por qué:** El super-admin era una página aislada sin navegación ni contexto de plataforma.
+- **Qué hace:** Reutiliza la paleta, densidad, navegación lateral y patrones del dashboard owner; mantiene el login limpio y prepara el admin para resumen, restaurantes, integraciones, QR y accesos.
 
 ### 2026-06-30 — Deploy prod: cron Hobby + fix tsc CI
 
