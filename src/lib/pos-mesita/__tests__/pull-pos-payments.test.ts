@@ -118,7 +118,7 @@ describe("mergePosCobrosIntoPayments", () => {
     expect(merged.payments[0]!.subtotal).toBeCloseTo(4, 1);
   });
 
-  it("marks items paid only when payments cover the current bill", () => {
+  it("marks items paid only when caja payments cover the current bill", () => {
     const state = baseState();
     const billSub = 2 * 2.75 + 1.75;
     const doc = {
@@ -134,10 +134,10 @@ describe("mergePosCobrosIntoPayments", () => {
       cobros: [
         {
           id: "cobro-full",
-          forma_cobro: "TC",
+          forma_cobro: "EF",
           monto: billSub * 1.25,
-          referencia: "MESITAQR:MQR-123",
-          procesador: "MesitaQR",
+          referencia: "POS-CAJA-123",
+          procesador: "Caja",
           detalle: "Manuel",
           created_at: new Date().toISOString(),
         },
@@ -148,6 +148,83 @@ describe("mergePosCobrosIntoPayments", () => {
     const merged = mergePosCobrosIntoPayments(state, [doc]);
     expect(merged.paidItemIds).toHaveLength(2);
     expect(merged.payments[0]!.subtotal).toBeCloseTo(billSub, 2);
+  });
+
+  it("skips MesitaQR cobros — already in Redis from pay action", () => {
+    const state = baseState();
+    const doc = {
+      id: "doc-mesita",
+      tipo_documento: "PRE",
+      estado: "P",
+      descripcion: null,
+      total: 52.15,
+      subtotal_15: 40,
+      iva: 6,
+      servicio: 4,
+      fecha_emision: "",
+      cobros: [
+        {
+          id: "c-mesita",
+          forma_cobro: "TC",
+          monto: 52.15,
+          referencia: "MESITAQR:MQR-20260630-1234",
+          procesador: "MesitaQR",
+          detalle: "Manuel",
+          created_at: new Date().toISOString(),
+        },
+      ],
+      created_at: "",
+    };
+    const merged = mergePosCobrosIntoPayments(state, [doc]);
+    expect(merged.payments).toHaveLength(0);
+    expect(merged.paidItemIds).toHaveLength(0);
+  });
+
+  it("dedupes MESITAQR: prefix against bare Redis ref", () => {
+    const state = baseState({
+      payments: [
+        {
+          id: "p1",
+          guestId: "g1",
+          guestName: "Manuel",
+          mode: "todo" as const,
+          amount: 10,
+          subtotal: 8,
+          iva: 1,
+          service: 0,
+          tip: 0,
+          itemIds: [],
+          method: "Tarjeta",
+          ref: "MQR-20260630-1234",
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    });
+    const doc = {
+      id: "doc-dup",
+      tipo_documento: "PRE",
+      estado: "P",
+      descripcion: null,
+      total: 10,
+      subtotal_15: 8,
+      iva: 1,
+      servicio: 0,
+      fecha_emision: "",
+      cobros: [
+        {
+          id: "c-dup",
+          forma_cobro: "TC",
+          monto: 10,
+          referencia: "MESITAQR:MQR-20260630-1234",
+          procesador: "MesitaQR",
+          detalle: "Manuel",
+          created_at: "",
+        },
+      ],
+      created_at: "",
+    };
+    const merged = mergePosCobrosIntoPayments(state, [doc]);
+    expect(merged.payments).toHaveLength(1);
   });
 
   it("skips cancelled documentos", () => {

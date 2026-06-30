@@ -11,6 +11,27 @@ function cobroRef(cobro: PosMesitaDocumento["cobros"][number]): string {
   return (cobro.referencia ?? "").trim();
 }
 
+/** Normalize MESITAQR:MQR-… → MQR-… for dedup against Redis payment.ref */
+export function normalizePaymentRef(ref: string): string {
+  const trimmed = ref.trim();
+  if (trimmed.startsWith("MESITAQR:")) return trimmed.slice("MESITAQR:".length);
+  return trimmed;
+}
+
+function refAlreadyKnown(ref: string, knownRefs: Set<string>): boolean {
+  if (!ref) return false;
+  const bare = normalizePaymentRef(ref);
+  if (knownRefs.has(ref) || knownRefs.has(bare)) return true;
+  if (bare !== ref && knownRefs.has(`MESITAQR:${bare}`)) return true;
+  return false;
+}
+
+function trackRef(ref: string, knownRefs: Set<string>): void {
+  if (!ref) return;
+  knownRefs.add(ref);
+  knownRefs.add(normalizePaymentRef(ref));
+}
+
 /**
  * Food subtotal credited by a single cobro — never the full document subtotal.
  * Using doc.subtotal_15 per cobro inflated paid totals (e.g. 25637% paid).
@@ -64,13 +85,17 @@ export function mergePosCobrosIntoPayments(
       const amount = num(cobro.monto);
       if (amount <= 0.009) continue;
 
+      // MesitaQR cobros are written from Redis on pay — re-importing duplicates rows.
+      if (cobroViaMesita(cobro)) continue;
+
       const cobroId = cobro.id || `pos-cobro-${ref || doc.id}`;
-      if (ref && knownRefs.has(ref)) continue;
+      if (ref && refAlreadyKnown(ref, knownRefs)) continue;
       if (cobro.id && knownCobroIds.has(cobroId)) continue;
 
       const viaMesita = cobroViaMesita(cobro);
       const guestName = cobro.detalle?.trim() || (viaMesita ? "MesitaQR" : "Caja");
       const subtotal = cobroFoodSubtotal(cobro, doc);
+      const storedRef = ref ? normalizePaymentRef(ref) : `POS-${doc.id}`;
 
       payments.unshift({
         id: cobroId,
@@ -84,10 +109,10 @@ export function mergePosCobrosIntoPayments(
         tip: 0,
         itemIds: [],
         method: cobro.forma_cobro === "EF" ? "Efectivo" : "Tarjeta",
-        ref: ref || `POS-${doc.id}`,
+        ref: storedRef,
         createdAt: cobro.created_at || doc.created_at || new Date().toISOString(),
       });
-      if (ref) knownRefs.add(ref);
+      if (ref) trackRef(ref, knownRefs);
       if (cobro.id) knownCobroIds.add(cobroId);
       changed = true;
     }

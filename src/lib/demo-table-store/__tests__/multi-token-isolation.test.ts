@@ -20,9 +20,13 @@ describe("multi-token isolation — catalog-backed demo tables", () => {
       const state = await getDemoTableState(def.token);
       expect(state.table.name).toBe(def.table.name);
       expect(state.restaurant.name).toBe(def.restaurant.name);
-      expect(state.items.map((i) => i.id)).toEqual(
-        def.items.map((i) => i.id),
-      );
+      if (def.token === "demo") {
+        expect(state.items.map((i) => i.id)).toEqual(
+          def.items.map((i) => i.id),
+        );
+      } else {
+        expect(state.items).toHaveLength(0);
+      }
     }
   });
 
@@ -40,19 +44,25 @@ describe("multi-token isolation — catalog-backed demo tables", () => {
     expect(m2.table.name).toBe("2");
   });
 
-  it("mesa-2 seeded payments survive after first join", async () => {
+  it("mesa-2 POS-linked tables start empty after reset (items from POS pull)", async () => {
     await resetDemoTableState("demo-mesa-2");
     const { state } = await joinDemoTable("demo-mesa-2", {
       deviceId: "mesa2-device",
     });
-    expect(state.paidItemIds).toContain("fritada");
-    expect(state.itemPaidUnits.empanada).toBe(1);
+    expect(state.items).toHaveLength(0);
+    expect(state.paidItemIds).toHaveLength(0);
   });
 
-  it("mesa-4 bill total is >= $50 (invoice trigger invariant)", async () => {
+  it("mesa-4 POS-linked reset clears catalog seed (invoice demo uses mesa 12)", async () => {
     await resetDemoTableState("demo-mesa-4");
     const state = await getDemoTableState("demo-mesa-4");
-    const total = state.items.reduce(
+    expect(state.items).toHaveLength(0);
+  });
+
+  it("mesa-4 catalog subtotal supports invoice trigger (>= $50 food)", () => {
+    const def = listDemoTables().find((t) => t.token === "demo-mesa-4");
+    expect(def).toBeTruthy();
+    const total = def!.items.reduce(
       (sum, it) => sum + it.qty * it.unitPrice,
       0,
     );

@@ -175,29 +175,18 @@ export async function releasePosMesaAfterFullPayment(
   mesaId: string,
   ordenId?: string,
 ): Promise<void> {
-  if (ordenId) {
-    await posFetch(`/orden/${ordenId}/`, {
+  await posFetch(`/mesa/${mesaId}/reset-demo/`, { method: "POST" }).catch(async () => {
+    if (ordenId) {
+      await posFetch(`/orden/${ordenId}/`, {
+        method: "PATCH",
+        json: { estado: "C" },
+      }).catch(() => {});
+    }
+    await posFetch(`/mesa/${mesaId}/`, {
       method: "PATCH",
-      json: { estado: "C" },
+      json: { estado: "L" },
     }).catch(() => {});
-  }
-
-  await posFetch(`/mesa/${mesaId}/`, {
-    method: "PATCH",
-    json: { estado: "L" },
-  }).catch(() => {});
-
-  // Some POS builds keep the editor open until the active orden is cleared.
-  const active = ordenId
-    ? null
-    : await findActivePosOrdenForMesa(mesaId).catch(() => null);
-  const closeId = ordenId ?? active?.id;
-  if (closeId) {
-    await posFetch(`/orden/${closeId}/`, {
-      method: "PATCH",
-      json: { estado: "C" },
-    }).catch(() => {});
-  }
+  });
 }
 
 export async function registerPaymentInPosMesita(input: {
@@ -257,59 +246,69 @@ export async function registerPaymentInPosMesita(input: {
 
     const cobro = {
       forma_cobro: input.method === "EF" ? "EF" : "TC",
-      monto: docTotal,
+      monto: input.amount,
       referencia: `MESITAQR:${input.ref}`,
       procesador: "MesitaQR",
       detalle: input.guestName,
     };
 
-    const doc = await posFetch<PosMesitaDocumento>("/documento/", {
-      method: "POST",
-      json: {
-        tipo_documento: input.tableFullyPaid ? "FAC" : input.isDemoUx ? "FAC" : "PRE",
-        orden_id: ordenId ?? undefined,
-        fecha_emision: todayEcPosDate(),
-        descripcion: `Pago MesitaQR — ${input.tableName} — ${input.guestName}`,
-        subtotal_15: subtotal15,
-        iva,
-        servicio,
-        total: docTotal,
-        estado: input.tableFullyPaid ? "C" : "P",
-        ...(detalles ? { detalles } : {}),
-        cobros: [cobro],
-      },
-    });
+    let documentoId = input.posDocumentoId;
 
-    if (input.posMesaId) {
+    if (!documentoId && ordenId) {
+      const listed = await posFetch<{ results: PosMesitaDocumento[] }>(
+        `/documento/?orden_id=${encodeURIComponent(ordenId)}&tipo_documento=PRE&estado=P&result_size=5`,
+      );
+      documentoId = listed.results?.[0]?.id;
+    }
+
+    if (documentoId) {
+      await posFetch<PosMesitaDocumento>(`/documento/${documentoId}/`, {
+        method: "PATCH",
+        json: {
+          cobro,
+          ...(input.tableFullyPaid ? { estado: "C" } : {}),
+        },
+      });
+    } else {
+      const doc = await posFetch<PosMesitaDocumento>("/documento/", {
+        method: "POST",
+        json: {
+          tipo_documento: input.tableFullyPaid ? "FAC" : input.isDemoUx ? "FAC" : "PRE",
+          orden_id: ordenId ?? undefined,
+          fecha_emision: todayEcPosDate(),
+          descripcion: `Pago MesitaQR — ${input.tableName} — ${input.guestName}`,
+          subtotal_15: subtotal15,
+          iva,
+          servicio,
+          total: docTotal,
+          estado: input.tableFullyPaid ? "C" : "P",
+          ...(detalles ? { detalles } : {}),
+          cobros: [cobro],
+        },
+      });
+      documentoId = doc.id;
+    }
+
+    if (input.tableFullyPaid && input.posMesaId) {
+      await releasePosMesaAfterFullPayment(input.posMesaId, ordenId);
+    } else if (input.posMesaId) {
       await posFetch(`/mesa/${input.posMesaId}/`, {
         method: "PATCH",
-        json: { estado: input.tableFullyPaid ? "L" : "P" },
+        json: { estado: "P" },
       }).catch(() => {});
     }
 
-    await finalizePosAfterMesitaPayment({
-      mesaId: input.posMesaId ?? "",
-      ordenId,
-      documentoId: doc.id,
-      tableFullyPaid: Boolean(input.tableFullyPaid),
-      guestName: input.guestName,
-      amount: input.amount,
-    });
-
-    return { ok: true, documentoId: doc.id, ordenId };
+    return { ok: true, documentoId, ordenId };
   } catch (e) {
     console.error("[pos-mesita] register payment failed:", e);
     return { ok: false, error: e instanceof Error ? e.message : "Error" };
   }
 }
 
-export async function resetDemoPosMesa(_def: DemoTableDefinition, state: DemoTableState): Promise<void> {
-  if (!isPosMesitaConfigured() || !state.posOrdenId) return;
+export async function resetDemoPosMesa(def: DemoTableDefinition, state: DemoTableState): Promise<void> {
+  if (!isPosMesitaConfigured() || !def.posMesaId) return;
   try {
-    await posFetch(`/orden/${state.posOrdenId}/`, {
-      method: "PATCH",
-      json: { estado: "C" },
-    });
+    await posFetch(`/mesa/${def.posMesaId}/reset-demo/`, { method: "POST" });
   } catch (_) { /* ignore */ }
 }
 
