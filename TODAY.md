@@ -58,6 +58,12 @@ en vez de Prisma sin sesión. Pendiente: push a `main` y redeploy Vercel.
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-30 — Accesos: enlace al admin de plataforma
+
+- **Qué:** `src/app/accesos/page.tsx`.
+- **Por qué:** El nuevo super-admin ya está en producción pero no aparecía en la central de accesos.
+- **Qué hace:** Añade una tarjeta “Admin plataforma” que abre `/admin` en una pestaña nueva y reutiliza la cuadrícula existente.
+
 ### 2026-06-30 — Fix panel owner en modo demo (runtime, sin env de build)
 
 - **Qué:** `src/lib/owner-data-source.ts` (NUEVO), `src/app/api/demo-auth/status/route.ts` (NUEVO), `PanelDashboard.tsx`, `StatisticsDashboard.tsx`, `dashboard/owner/mesas/page.tsx`, `dashboard/owner/reembolsos/page.tsx`, `middleware.ts`, `admin/page.tsx` (mensaje de error más claro).
