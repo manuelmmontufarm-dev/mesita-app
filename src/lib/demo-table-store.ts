@@ -615,24 +615,59 @@ export async function setDemoGuestStatus(
   });
 }
 
+/** Thrown inside mutateDemoState when a second guest races to claim an owned item. */
+export class DemoClaimConflictError extends Error {
+  readonly name = "DemoClaimConflictError";
+
+  constructor(
+    public readonly ownerId: string,
+    public readonly itemId: string,
+  ) {
+    super("ITEM_ALREADY_CLAIMED");
+  }
+}
+
+export interface ClaimDemoItemResult {
+  state: DemoTableState;
+  /** Present when another guest already owns the item (first server write wins). */
+  rejected?: { itemId: string; ownerId: string };
+}
+
+/**
+ * Claim or toggle-off an item. First guest to persist owns it; a second guest's
+ * claim is rejected atomically — never auto-converted to a share.
+ */
 export async function claimDemoItem(
   token: string,
   guestId: string,
   itemId: string,
-): Promise<DemoTableState> {
-  return mutateDemoState(token, (draft) => {
-    const guest = requireGuest(draft, guestId);
-    if (draft.paidItemIds.includes(itemId)) return;
-    const current = draft.claims[itemId];
-    if (current === guestId) {
-      delete draft.claims[itemId];
-    } else {
-      draft.claims[itemId] = guestId;
+): Promise<ClaimDemoItemResult> {
+  try {
+    const state = await mutateDemoState(token, (draft) => {
+      const guest = requireGuest(draft, guestId);
+      if (draft.paidItemIds.includes(itemId)) return;
+      const current = draft.claims[itemId];
+      if (current === guestId) {
+        delete draft.claims[itemId];
+      } else if (current) {
+        throw new DemoClaimConflictError(current, itemId);
+      } else {
+        draft.claims[itemId] = guestId;
+      }
+      if (draft.claimShares) delete draft.claimShares[itemId];
+      guest.status = "reviewing";
+      guest.updatedAt = nowIso();
+    });
+    return { state };
+  } catch (e) {
+    if (e instanceof DemoClaimConflictError) {
+      return {
+        state: await getDemoTableState(token),
+        rejected: { itemId: e.itemId, ownerId: e.ownerId },
+      };
     }
-    if (draft.claimShares) delete draft.claimShares[itemId];
-    guest.status = "reviewing";
-    guest.updatedAt = nowIso();
-  });
+    throw e;
+  }
 }
 
 export async function splitDemoItem(

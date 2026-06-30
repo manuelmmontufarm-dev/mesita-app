@@ -49,6 +49,10 @@ export function pruneResolvedPendingClaims(
     if (op === "claim" && owner === guestId) {
       pending.claims.delete(itemId);
       changed = true;
+    } else if (op === "claim" && owner && owner !== guestId) {
+      // Lost the race — another guest owns it on the server.
+      pending.claims.delete(itemId);
+      changed = true;
     } else if (op === "release" && owner !== guestId) {
       pending.claims.delete(itemId);
       changed = true;
@@ -73,6 +77,7 @@ export function deriveVisiblePendingClaims(
     const owner = raw.claims[itemId];
     const resolved =
       (op === "claim" && owner === guestId) ||
+      (op === "claim" && owner && owner !== guestId) ||
       (op === "release" && owner !== guestId);
     if (!resolved) out[itemId] = op;
   }
@@ -157,7 +162,13 @@ export function mergeClaimsPreserveLocal(
     const serverYours = serverMap[youId] ?? 0;
 
     if (localYours > 0.001 && serverYours <= 0.001) {
-      merged[itemId] = { ...serverMap, [youId]: localYours };
+      const serverOwner = Object.entries(serverMap).find(([, u]) => u > 0.001);
+      if (serverOwner && serverOwner[0] !== youId) {
+        // Server assigned another guest — do not merge into a phantom share.
+        merged[itemId] = { ...serverMap };
+      } else {
+        merged[itemId] = { ...serverMap, [youId]: localYours };
+      }
     } else {
       merged[itemId] = { ...serverMap };
     }

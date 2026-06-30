@@ -172,8 +172,8 @@ export async function POST(
     if (body.action === "claim") {
       // Claims live in Redis only — POS has no guest-selection state. Pulling
       // POS here remapped item ids and wiped in-flight multi-select claims.
-      const state = await claimDemoItem(token, body.guestId, body.itemId);
-      return successResponse(state, 200);
+      const result = await claimDemoItem(token, body.guestId, body.itemId);
+      return successResponse(result, 200);
     }
     if (body.action === "release") {
       return successResponse(await releaseDemoItem(token, body.guestId, body.itemId), 200);

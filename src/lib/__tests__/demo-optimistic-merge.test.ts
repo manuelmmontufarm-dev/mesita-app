@@ -137,6 +137,13 @@ describe("mergeClaimsPreserveLocal", () => {
     });
     expect(merged.locro).toBeUndefined();
   });
+
+  it("does not merge local claim when server already assigned another guest", () => {
+    const server = { locro: { g2: 1 } };
+    const local = { locro: { g1: 1 } };
+    const merged = mergeClaimsPreserveLocal(server, local, "g1");
+    expect(merged.locro).toEqual({ g2: 1 });
+  });
 });
 
 describe("mergeClaimsForDisplay", () => {

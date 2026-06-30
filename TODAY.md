@@ -52,10 +52,15 @@ Reglas de oro:
 
 ## 🟢 En qué estamos ahora
 
-Deploy demo en Vercel. Panel/estadísticas cargan en ~1–2s (cache Redis); el POS se
-refresca en background cada 4s. Pendiente: redeploy tras push a `main`.
+**Fase 1 (claims):** race de selección de ítems — first-wins en servidor + sin phantom shares en cliente. Pendiente verificación manual en dos teléfonos.
 
 ## 🗂️ Registro de cambios
+
+### 2026-06-30 — Fase 1: race claim → first-wins, nunca auto-shared
+
+- **Qué:** `demo-table-store.ts` (`claimDemoItem` + `DemoClaimConflictError`), `api/demo/table/[token]/route.ts`, `demo-optimistic-merge.ts`, `useDemoTableSession.ts`, `demo-scenarios.ts` (escenarios 05/07), tests `claim-race.test.ts` + merge test.
+- **Por qué:** Dos comensales tocando el mismo ítem a la vez mostraban el plato como "Shared" por merge optimista local aunque el servidor solo tenía un dueño (o last-writer sobrescribía).
+- **Qué hace:** El segundo `claim` se rechaza atómicamente; el cliente deja de fusionar `{yo:1, otro:1}` en pantalla. Compartir solo vía acción `split` explícita.
 
 ### 2026-06-30 — Panel/estadísticas: carga rápida sin bloquear en POS
 

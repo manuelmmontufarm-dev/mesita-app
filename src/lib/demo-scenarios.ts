@@ -78,13 +78,15 @@ export class SimulatedDevice {
   async claim(itemId: string): Promise<DemoTableState> {
     if (!this.guestId) await this.join();
     await jitter();
-    return claimDemoItem(this.token, this.guestId!, itemId);
+    const result = await claimDemoItem(this.token, this.guestId!, itemId);
+    return result.state;
   }
 
   /** Fire claim without jitter — exposes lost-update races. */
   async claimFast(itemId: string): Promise<DemoTableState> {
     if (!this.guestId) await this.join();
-    return claimDemoItem(this.token, this.guestId!, itemId);
+    const result = await claimDemoItem(this.token, this.guestId!, itemId);
+    return result.state;
   }
 
   async release(itemId: string): Promise<DemoTableState> {
@@ -223,7 +225,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: "05",
     category: "claim",
-    name: "2-device race on same item → last writer wins, no inconsistency",
+    name: "2-device race on same item → single owner, no share",
     run: async (token) => {
       const a = new SimulatedDevice(token);
       const b = new SimulatedDevice(token);
@@ -232,6 +234,7 @@ export const SCENARIOS: Scenario[] = [
       const state = await getDemoTableState(token);
       const owner = state.claims["locro"];
       expectTrue(owner === a.guestId || owner === b.guestId, "owner is one of the racers");
+      expectEq(state.claimShares?.locro, undefined, "never auto-shared");
       // No phantom claims
       const guestIds = new Set(state.guests.map((g) => g.id));
       for (const [item, gid] of Object.entries(state.claims)) {
@@ -256,16 +259,17 @@ export const SCENARIOS: Scenario[] = [
   {
     id: "07",
     category: "claim",
-    name: "Ping-pong A claim → B claim → A release → B keeps it",
+    name: "Ping-pong A claim → B rejected → A release → unclaimed",
     run: async (token) => {
       const a = new SimulatedDevice(token);
       const b = new SimulatedDevice(token);
       await Promise.all([a.join(), b.join()]);
       await a.claim("ceviche");
-      await b.claim("ceviche");
-      await a.release("ceviche"); // a's release is no-op since b owns it
+      const rejected = await claimDemoItem(token, b.guestId!, "ceviche");
+      expectEq(rejected.rejected?.ownerId, a.guestId, "B loses race to A");
+      await a.release("ceviche");
       const state = await getDemoTableState(token);
-      expectEq(state.claims["ceviche"], b.guestId, "B retains ownership after A's no-op release");
+      expectEq(state.claims["ceviche"], undefined, "unclaimed after owner releases");
     },
   },
   {

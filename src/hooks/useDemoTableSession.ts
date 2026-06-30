@@ -647,13 +647,20 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
   const postAction = useCallback(
     async (body: Record<string, unknown>) => {
       try {
-        const data = await postDemo<DemoTableState | { state: DemoTableState }>(token, body);
-        const next =
+        const data = await postDemo<
+          | DemoTableState
+          | { state: DemoTableState }
+          | { state: DemoTableState; rejected?: { itemId: string; ownerId: string } }
+        >(token, body);
+        const wrapped =
           data && typeof data === "object" && "state" in data
-            ? (data as { state: DemoTableState }).state
-            : (data as DemoTableState);
-        ingestDemoState(next, { force: true, source: "action" });
-        return next;
+            ? (data as { state: DemoTableState; rejected?: { itemId: string; ownerId: string } })
+            : { state: data as DemoTableState };
+        if (wrapped.rejected) {
+          pendingOps.current.claims.delete(wrapped.rejected.itemId);
+        }
+        ingestDemoState(wrapped.state, { force: true, source: "action" });
+        return wrapped.state;
       } catch (err) {
         if (err instanceof Error && err.message === "SESSION_EXPIRED") {
           demoDebug("join", "409 on action — try recover join");
@@ -753,6 +760,13 @@ export function useDemoTableSession(token: string): UseDemoTableSessionResult {
         })
         .catch((err) => {
           pendingOps.current.claims.delete(billItemId);
+          patchLocalDemo((prev) => {
+            const claims = { ...prev.claims };
+            if (claims[billItemId] === guestSessionId) {
+              delete claims[billItemId];
+            }
+            return { ...prev, claims };
+          });
           console.error(err);
         });
     },
