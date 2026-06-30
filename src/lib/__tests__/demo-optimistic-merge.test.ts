@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  clearPendingDemoOps,
   createPendingDemoOps,
   deriveVisiblePendingClaims,
-  isDemoTableReset,
   mergeClaimsForDisplay,
   mergeClaimsPreserveLocal,
   mapClaimsFromDemoRaw,
@@ -39,6 +37,7 @@ const base = (): DemoTableState => ({
   ],
   claims: {},
   paidItemIds: [],
+  itemPaidUnits: {},
   payments: [],
   nextGuestNumber: 2,
   resetSeq: 0,
@@ -180,7 +179,7 @@ describe("mapClaimsFromDemoRaw", () => {
     const raw = {
       claims: { ceviche: "g1" },
       claimShares: { ceviche: { g1: 0.5, g2: 0.5 } },
-    } as import("@/lib/demo-table-store").DemoTableState;
+    } as unknown as DemoTableState;
     expect(mapClaimsFromDemoRaw(raw).ceviche).toEqual({ g1: 0.5, g2: 0.5 });
   });
 });

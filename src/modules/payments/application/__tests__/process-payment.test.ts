@@ -67,7 +67,11 @@ const posRestaurant = {
 };
 
 let billRepo: { findSnapshot: ReturnType<typeof vi.fn>; findPosInfo: ReturnType<typeof vi.fn> };
-let paymentRepo: { findByIdempotencyKey: ReturnType<typeof vi.fn>; recordPaymentAtomically: ReturnType<typeof vi.fn> };
+let paymentRepo: {
+  findByIdempotencyKey: ReturnType<typeof vi.fn>;
+  recordPaymentAtomically: ReturnType<typeof vi.fn>;
+  updatePosRegistration: ReturnType<typeof vi.fn>;
+};
 
 function setupRecordPayment(billStatus: string, thisPaymentIsRecipient = false) {
   paymentRepo.recordPaymentAtomically.mockResolvedValue({ billStatus, thisPaymentIsRecipient });

@@ -52,9 +52,15 @@ Reglas de oro:
 
 ## 🟢 En qué estamos ahora
 
-Fix POS sync mesas 1–4: cobros importados ya no inflan “% pagado”; mesa se reinicia sola al pagar/cerrar en POS; Reiniciar solo en Mesa 12.
+Deploy en producción (`mesitademo-two.vercel.app`) con fix POS sync; cron ingest diario (Hobby Vercel).
 
 ## 🗂️ Registro de cambios
+
+### 2026-06-30 — Deploy prod: cron Hobby + fix tsc CI
+
+- **Qué:** `vercel.json` (cron `0 12 * * *`), tests tsc (`demo-optimistic-merge`, `remap-item-refs`, `process-payment`).
+- **Por qué:** Vercel Hobby rechazaba deploy con cron horario (`0 * * * *`); CI fallaba en `tsc --noEmit`.
+- **Qué hace:** Deploy manual OK → `mesitademo-two.vercel.app`; ingest Contífico 1×/día; pipeline verde.
 
 ### 2026-06-30 — Fix glitch “todo pagado” + auto-reset mesa POS
 

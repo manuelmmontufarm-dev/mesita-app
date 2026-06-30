@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { DemoFoodItem } from "@/lib/demo-table-store";
+import type { DemoFoodItem, DemoTableState } from "@/lib/demo-table-store";
 import {
   buildItemIdMigrationMap,
   remapDemoItemReferences,
@@ -38,12 +38,15 @@ describe("buildItemIdMigrationMap", () => {
 
 describe("remapDemoItemReferences", () => {
   it("moves claims to new item ids", () => {
-    const draft = {
+    const draft: Pick<
+      DemoTableState,
+      "claims" | "claimShares" | "paidItemIds" | "itemPaidUnits" | "payments"
+    > = {
       claims: { "pos-old": "guest-1" },
       claimShares: undefined,
-      paidItemIds: [] as string[],
-      itemPaidUnits: {} as Record<string, number>,
-      payments: [] as Array<{ itemIds?: string[] }>,
+      paidItemIds: [],
+      itemPaidUnits: {},
+      payments: [],
     };
     const idMap = new Map([["pos-old", "pos-new"]]);
     remapDemoItemReferences(draft, idMap);
