@@ -305,7 +305,7 @@ export async function registerPaymentInPosMesita(input: {
   }
 }
 
-export async function resetDemoPosMesa(def: DemoTableDefinition, state: DemoTableState): Promise<void> {
+export async function resetDemoPosMesa(def: DemoTableDefinition): Promise<void> {
   if (!isPosMesitaConfigured() || !def.posMesaId) return;
   try {
     await posFetch(`/mesa/${def.posMesaId}/reset-demo/`, { method: "POST" });
