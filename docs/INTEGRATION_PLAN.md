@@ -488,7 +488,7 @@ Do not change any existing migration files — only run deploy.
 |---|---|
 | **Status** | `COMPLETE` |
 | **Completed** | `2026-06-30` |
-| **Code shipped** | `TBD` *(set on push — see commit after this doc update)* |
+| **Code shipped** | `019bcf0` — `fix(phase0): admin login, minimal seed, slug on register, plan completion record` |
 
 **What was done:**
 - Vercel project **mesitademo**: all Phase 0 env vars set (`DATABASE_URL`, `DIRECT_URL`, `NEXTAUTH_*`, `ADMIN_SECRET`, `ENCRYPTION_KEY`, `CRON_SECRET`, `POS_MESITA_*`); production redeployed.
