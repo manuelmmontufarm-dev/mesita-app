@@ -1,3 +1,4 @@
+import { buildAdminDemoOverview } from "@/lib/admin-demo-overview";
 import { checkAdminSecret, errorResponse, successResponse } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
 
@@ -221,6 +222,10 @@ export async function GET(request: Request): Promise<Response> {
     );
   } catch (error) {
     console.error("Error fetching admin platform overview:", error);
+    // Demo deploy: si Postgres no responde, mostrar overview con La Doña Pepa.
+    if (checkAdminSecret(request)) {
+      return successResponse(buildAdminDemoOverview(), 200);
+    }
     return errorResponse("Internal server error", 500);
   }
 }

@@ -11,6 +11,7 @@ import {
   getReports,
   listActivities,
   listAllTables,
+  listAllTablesCached,
   listInvoices,
   listQrTables,
   updateDemoSettings,
@@ -27,7 +28,9 @@ export async function GET(request: Request): Promise<Response> {
   const view = url.searchParams.get("view") ?? "overview";
 
   if (view === "tables") {
-    return successResponse({ tables: await listAllTables(), qrTables: listQrTables() }, 200);
+    const cached = url.searchParams.get("cached") !== "0";
+    const tables = cached ? await listAllTablesCached() : await listAllTables();
+    return successResponse({ tables, qrTables: listQrTables() }, 200);
   }
   if (view === "menu") {
     return successResponse(await getMenu(), 200);

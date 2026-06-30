@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  env: {
+    // Deploy demo: el panel del dueño siempre refleja el POS en vivo.
+    NEXT_PUBLIC_DEMO_PANEL: process.env.NEXT_PUBLIC_DEMO_PANEL ?? "1",
+  },
   experimental: {
     // Tree-shake Radix packages — avoids importing entire namespaces when only
     // a few sub-components are used, reducing bundle size on the guest screen.

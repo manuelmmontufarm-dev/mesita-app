@@ -163,60 +163,69 @@ function tableStatus(
   return "closed";
 }
 
-export async function listAllTables(): Promise<DemoPosTableRow[]> {
+function buildQrTableRow(
+  def: (typeof DEMO_TABLE_DEFINITIONS)[number],
+  qr: DemoPosQrTable,
+  state: Awaited<ReturnType<typeof getDemoTableState>> | null,
+): DemoPosTableRow {
+  const restaurant = def.restaurant;
+  const amounts = computeDemoDisplayAmount(
+    state?.items ?? [],
+    state?.restaurant ?? restaurant,
+    state,
+  );
+
+  if (!state) {
+    return {
+      id: def.token,
+      name: qr.name,
+      token: def.token,
+      slug: def.slug,
+      payUrl: qr.payUrl,
+      posExternalId: qr.posExternalId,
+      live: true,
+      kind: "qr",
+      status: "closed",
+      guestCount: 0,
+      total: amounts.displayAmount,
+      billTotal: amounts.billTotal,
+      paidAmount: 0,
+    };
+  }
+  const allPaid =
+    state.paidItemIds.length >= state.items.length && state.items.length > 0;
+  const display = computeDemoDisplayAmount(state.items, state.restaurant, state);
+  return {
+    id: def.token,
+    name: qr.name,
+    token: def.token,
+    slug: def.slug,
+    payUrl: qr.payUrl,
+    posExternalId: qr.posExternalId,
+    live: true,
+    kind: "qr",
+    status: tableStatus(
+      state.guests.length > 0,
+      state.payments.length > 0,
+      allPaid,
+    ),
+    guestCount: state.guests.length,
+    total: display.displayAmount,
+    billTotal: display.billTotal,
+    paidAmount: display.paidAmount,
+  };
+}
+
+async function listAllTablesWithStates(
+  resolveState: (token: string) => Promise<Awaited<ReturnType<typeof getDemoTableState>> | null>,
+): Promise<DemoPosTableRow[]> {
   const config = await readConfig();
+  const qrTables = listQrTables();
   const qrRows: DemoPosTableRow[] = await Promise.all(
     DEMO_TABLE_DEFINITIONS.map(async (def, i) => {
-      const qr = listQrTables()[i];
-      const restaurant = def.restaurant;
-      const state = await refreshDemoStateFromPos(def.token).catch(() =>
-        getDemoTableState(def.token).catch(() => null),
-      );
-      const amounts = computeDemoDisplayAmount(
-        state?.items ?? [],
-        state?.restaurant ?? restaurant,
-        state,
-      );
-
-      if (!state) {
-        return {
-          id: def.token,
-          name: qr.name,
-          token: def.token,
-          slug: def.slug,
-          payUrl: qr.payUrl,
-          posExternalId: qr.posExternalId,
-          live: true,
-          kind: "qr",
-          status: "closed",
-          guestCount: 0,
-          total: amounts.displayAmount,
-          billTotal: amounts.billTotal,
-          paidAmount: 0,
-        };
-      }
-      const allPaid =
-        state.paidItemIds.length >= state.items.length && state.items.length > 0;
-      const display = computeDemoDisplayAmount(state.items, state.restaurant, state);
-      return {
-        id: def.token,
-        name: qr.name,
-        token: def.token,
-        slug: def.slug,
-        payUrl: qr.payUrl,
-        posExternalId: qr.posExternalId,
-        live: true,
-        kind: "qr",
-        status: tableStatus(
-          state.guests.length > 0,
-          state.payments.length > 0,
-          allPaid,
-        ),
-        guestCount: state.guests.length,
-        total: display.displayAmount,
-        billTotal: display.billTotal,
-        paidAmount: display.paidAmount,
-      };
+      const qr = qrTables[i];
+      const state = await resolveState(def.token);
+      return buildQrTableRow(def, qr, state);
     }),
   );
 
@@ -234,6 +243,22 @@ export async function listAllTables(): Promise<DemoPosTableRow[]> {
   }));
 
   return [...qrRows, ...demoRows];
+}
+
+/** Solo Redis — sin pull al POS (respuesta rápida para panel/estadísticas). */
+export async function listAllTablesCached(): Promise<DemoPosTableRow[]> {
+  return listAllTablesWithStates((token) =>
+    getDemoTableState(token).catch(() => null),
+  );
+}
+
+/** Pull en vivo desde POS antes de armar filas (guest reportes, operaciones). */
+export async function listAllTables(): Promise<DemoPosTableRow[]> {
+  return listAllTablesWithStates((token) =>
+    refreshDemoStateFromPos(token).catch(() =>
+      getDemoTableState(token).catch(() => null),
+    ),
+  );
 }
 
 export async function getMenu(): Promise<DemoPosConfig> {

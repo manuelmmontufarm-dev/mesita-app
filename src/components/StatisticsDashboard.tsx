@@ -141,8 +141,11 @@ export function StatisticsDashboard() {
 
   const lastGoodAtRef = useRef<Date | null>(null);
   const mountedRef = useRef(true);
+  const inFlightRef = useRef(false);
 
   const load = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
       const endpoint = await ownerDashboardEndpoint();
       const res = await fetch(endpoint, { credentials: "include", cache: "no-store" });
@@ -162,14 +165,15 @@ export function StatisticsDashboard() {
         setIsError(true);
       }
     } finally {
-      if (mountedRef.current) setIsLoading(false);
+      inFlightRef.current = false;
+      setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     mountedRef.current = true;
-    load();
-    const id = setInterval(load, 3_000);
+    void load();
+    const id = setInterval(() => { void load(); }, 5_000);
     return () => {
       mountedRef.current = false;
       clearInterval(id);

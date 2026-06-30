@@ -207,10 +207,13 @@ export function PanelDashboard() {
 
   const lastGoodAtRef = useRef<Date | null>(null);
   const mountedRef = useRef(true);
+  const inFlightRef = useRef(false);
   const lastPaymentKeyRef = useRef<string | null>(null);
   const lastGuestKeyRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
       const endpoint = await ownerDashboardEndpoint();
       const res = await fetch(endpoint, { credentials: "include", cache: "no-store" });
@@ -259,15 +262,15 @@ export function PanelDashboard() {
         setIsError(true);
       }
     } finally {
-      if (mountedRef.current) setIsLoading(false);
+      inFlightRef.current = false;
+      setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     mountedRef.current = true;
-    load();
-    // 5s→3s: el dato POS→dashboard ya llega en ~450ms; refrescamos la UI más seguido.
-    const id = setInterval(load, 3_000);
+    void load();
+    const id = setInterval(() => { void load(); }, 5_000);
     return () => { mountedRef.current = false; clearInterval(id); };
   }, [load]);
 

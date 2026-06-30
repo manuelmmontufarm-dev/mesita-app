@@ -1,20 +1,27 @@
 import { successResponse } from "@/lib/api-utils";
-import { getDemoTableState, refreshDemoStateFromPos } from "@/lib/demo-table-store";
+import { getDemoTableState } from "@/lib/demo-table-store";
 import { DEMO_TABLE_DEFINITIONS } from "@/lib/demo-table-catalog/definitions";
-import { listActivities, listAllTables, listInvoices } from "@/lib/demo-pos";
+import { listActivities, listAllTablesCached, listInvoices } from "@/lib/demo-pos";
+import { scheduleDashboardPosRefresh } from "@/lib/dashboard-pos-refresh";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
+  // Fast path: Redis cache only — no blocking POS pull (evita 30–60s en cold start).
   const states = await Promise.all(
     DEMO_TABLE_DEFINITIONS.map((d) =>
-      refreshDemoStateFromPos(d.token).catch(() =>
-        getDemoTableState(d.token).catch(() => null),
-      ),
+      getDemoTableState(d.token).catch(() => null),
     ),
   );
 
-  // today's payments across all tables
+  const [allTables, activities, invoices] = await Promise.all([
+    listAllTablesCached(),
+    listActivities(8),
+    listInvoices(20),
+  ]);
+
+  scheduleDashboardPosRefresh();
+
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
@@ -30,7 +37,7 @@ export async function GET(): Promise<Response> {
     })
     .sort(
       (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
 
   const revenueToday = allPayments.reduce((s, p) => s + p.amount, 0);
@@ -40,7 +47,6 @@ export async function GET(): Promise<Response> {
   const propinaRate =
     revenueToday > 0 ? (tipTotal / revenueToday) * 100 : 14.2;
 
-  const allTables = await listAllTables();
   const hasLiveData = allPayments.length > 0;
   const visibleTables = hasLiveData
     ? allTables.filter((t) => t.live)
@@ -49,14 +55,12 @@ export async function GET(): Promise<Response> {
     (t) => t.status === "open" || t.status === "paying",
   ).length;
   const totalTables = visibleTables.length;
-  const invoices = await listInvoices(20);
 
   const displayRevenue = hasLiveData ? revenueToday : 4820;
   const displayAvgTicket = hasLiveData ? avgTicket : 31.4;
   const displayActiveTables = hasLiveData ? activeTables : 4;
   const displayPropina = hasLiveData ? propinaRate : 14.2;
 
-  // 12-bucket hourly activity
   const nowHour = new Date().getHours();
   const buckets = Array(12).fill(0);
   allPayments.forEach((p) => {
@@ -84,7 +88,7 @@ export async function GET(): Promise<Response> {
     createdAt: p.createdAt,
   }));
 
-  const recentGuestJoins = (await listActivities(8))
+  const recentGuestJoins = activities
     .filter((a) => a.type === "guest_joined")
     .slice(0, 5)
     .map((a) => ({
@@ -120,6 +124,6 @@ export async function GET(): Promise<Response> {
       tables,
       demoMode: true,
     },
-    200
+    200,
   );
 }

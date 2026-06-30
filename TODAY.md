@@ -52,11 +52,16 @@ Reglas de oro:
 
 ## 🟢 En qué estamos ahora
 
-Deploy en producción (`mesitademo-two.vercel.app`). Fix aplicado: panel/estadísticas/mesas/reportes
-del dueño detectan modo demo en runtime (cookie httpOnly) y leen `/api/demo-dashboard` + `/api/demo-pos`
-en vez de Prisma sin sesión. Pendiente: push a `main` y redeploy Vercel.
+Deploy demo en Vercel. Panel/estadísticas cargan en ~1–2s (cache Redis); el POS se
+refresca en background cada 4s. Pendiente: redeploy tras push a `main`.
 
 ## 🗂️ Registro de cambios
+
+### 2026-06-30 — Panel/estadísticas: carga rápida sin bloquear en POS
+
+- **Qué:** `api/demo-dashboard/route.ts`, `lib/dashboard-pos-refresh.ts` (NUEVO), `lib/demo-pos/store.ts` (`listAllTablesCached`), `PanelDashboard.tsx`, `StatisticsDashboard.tsx`, `mesas/page.tsx`, `owner-data-source.ts`, `next.config.js`, `admin/restaurants/route.ts` (fallback demo).
+- **Por qué:** Panel y estadísticas tardaban ~60s: cada GET hacía dos rondas de pull al POS (5 mesas × timeout 12s) y el browser apilaba fetches cada 3s.
+- **Qué hace:** Respuesta inmediata desde Redis; refresh POS en background (máx. cada 4s). Sin requests solapados; poll cada 5s.
 
 ### 2026-06-30 — Accesos: enlace al admin de plataforma
 

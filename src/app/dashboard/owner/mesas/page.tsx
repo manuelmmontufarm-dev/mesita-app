@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { isOwnerDemoMode } from "@/lib/owner-data-source";
+import { isOwnerDemoMode, demoTablePayUrl } from "@/lib/owner-data-source";
 import { isOwnerReadOnlyClient } from "@/lib/owner-mode";
 
 interface ProdTable {
@@ -64,13 +64,17 @@ export default function MesasPage() {
       setDemoMode(isDemo);
 
       if (isDemo) {
-        const res = await fetch("/api/demo-pos?view=tables", {
+        const res = await fetch("/api/demo-dashboard", {
           credentials: "include",
           cache: "no-store",
         });
         if (!res.ok) throw new Error("tables");
         const json = await res.json();
-        const rows: DemoTableRow[] = json.data?.tables ?? [];
+        const rows: DemoTableRow[] = (json.data?.tables ?? []).map((t: DemoTableRow) => ({
+          ...t,
+          token: t.id,
+          payUrl: demoTablePayUrl(t.id),
+        }));
         setDemoTables(rows.filter((t) => t.live !== false));
         return;
       }
