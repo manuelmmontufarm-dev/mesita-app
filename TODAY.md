@@ -59,6 +59,12 @@ con dos teléfonos + POS abierto.
 
 ## 🗂️ Registro de cambios
 
+### 2026-06-30 — Admin: revalidación antes de deploy selectivo
+
+- **Qué:** verificación del bloque admin contra el `main` actualizado y corrección del estado en `HANDOFF.md`.
+- **Por qué:** Claude publicó cambios guest/POS en paralelo; había que confirmar que el admin siguiera compilando sin incluir su archivo local `scripts/e2e-pos-sync.mjs`.
+- **Qué hace:** Deja `tsc`, build y test de permisos verdes sobre el último `main`, y documenta que el deploy se hará con staging explícito solo del admin.
+
 ### 2026-06-30 — UX guest: mesa cerrada con confeti + auto-entrada (mesas 1–4)
 
 - **Qué:** `lib/demo-table-store.ts` (nuevo `sessionPhase`/`closedAt`, `markDemoTableClosed`, `startFreshDemoSession`, join post-cierre), `lib/pos-mesita/sync.ts` (cierre conserva snapshot, reapertura → sesión fresca), `app/api/demo/table/[token]/route.ts` (pay total → `markDemoTableClosed`), `hooks/useDemoTableSession.ts` (`isRemoteTableReset` respeta fase cerrada, auto-`enterTable` para mesas 1–4, expone `sessionPhase`), `components/guest/GuestPayPage.tsx` + nuevo `WelcomeLoading.tsx` + `app/pay/customer.css`, tests `closed-phase.test.ts` y `reset-detect.test.ts`.

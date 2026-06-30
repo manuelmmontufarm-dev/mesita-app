@@ -22,14 +22,14 @@ export async function GET(
       where: { id },
       include: {
         users: {
-          where: { role: "OWNER" },
-          select: { email: true, name: true },
-          take: 1,
+          select: { id: true, email: true, name: true, role: true, createdAt: true },
+          orderBy: [{ role: "asc" }, { createdAt: "asc" }],
         },
         tables: {
           select: {
             id: true,
             name: true,
+            token: true,
             posExternalId: true,
             bills: {
               where: { status: { in: ["UNPAID", "PARTIALLY_PAID"] } },
@@ -57,6 +57,9 @@ export async function GET(
             amount: true,
             status: true,
             createdAt: true,
+            providerTransactionId: true,
+            posRegisteredAt: true,
+            posRegistrationNote: true,
             bill: { select: { table: { select: { name: true } } } },
           },
         },
@@ -78,38 +81,60 @@ export async function GET(
       _count: { id: true },
       _sum: { amount: true },
     });
-    const paymentsAllTime = await prisma.payment.aggregate({
-      where: { restaurantId: id, status: "COMPLETED" },
-      _count: { id: true },
-      _sum: { amount: true },
-    });
+    const [paymentsAllTime, failedPayments, pendingPosRegistrations] = await Promise.all([
+      prisma.payment.aggregate({
+        where: { restaurantId: id, status: "COMPLETED" },
+        _count: { id: true },
+        _sum: { amount: true },
+      }),
+      prisma.payment.count({ where: { restaurantId: id, status: "FAILED" } }),
+      prisma.payment.count({
+        where: { restaurantId: id, status: "COMPLETED", posRegisteredAt: null },
+      }),
+    ]);
 
-    const { posApiKeyEnc, paymentPrivateKeyEnc, ...safeRestaurant } = restaurant;
+    const {
+      posApiKeyEnc,
+      paymentPrivateKeyEnc,
+      users,
+      tables,
+      bills,
+      payments,
+      ...safeRestaurant
+    } = restaurant;
+    const owner = users.find((user) => user.role === "OWNER");
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
 
     return successResponse({
       ...safeRestaurant,
-      ownerEmail: restaurant.users[0]?.email ?? null,
-      ownerName: restaurant.users[0]?.name ?? null,
+      ownerEmail: owner?.email ?? null,
+      ownerName: owner?.name ?? null,
       posConfigured: !!posApiKeyEnc,
       paymentConfigured: !!paymentPrivateKeyEnc,
-      tables: restaurant.tables.map((t) => ({
+      staff: users,
+      tables: tables.map((t) => ({
         id: t.id,
         name: t.name,
         posExternalId: t.posExternalId,
         openBillCount: t.bills.length,
+        payUrl: `${baseUrl}/pay/${t.token}`,
+        qrApiUrl: `/api/admin/tables/${t.id}/qr`,
       })),
-      openBills: restaurant.bills.map((b) => ({
+      openBills: bills.map((b) => ({
         id: b.id,
         status: b.status,
         createdAt: b.createdAt,
         tableName: b.table.name,
       })),
-      recentPayments: restaurant.payments.map((p) => ({
+      recentPayments: payments.map((p) => ({
         id: p.id,
         amount: Number(p.amount),
         status: p.status,
         createdAt: p.createdAt,
         tableName: p.bill?.table?.name ?? "—",
+        providerTransactionId: p.providerTransactionId,
+        posRegisteredAt: p.posRegisteredAt,
+        posRegistrationNote: p.posRegistrationNote,
       })),
       paymentsThisMonth: {
         count: paymentsThisMonth._count.id,
@@ -118,6 +143,17 @@ export async function GET(
       paymentsAllTime: {
         count: paymentsAllTime._count.id,
         total: Number(paymentsAllTime._sum.amount ?? 0),
+      },
+      averageTicketThisMonth:
+        paymentsThisMonth._count.id > 0
+          ? Number(
+              (Number(paymentsThisMonth._sum.amount ?? 0) / paymentsThisMonth._count.id).toFixed(2),
+            )
+          : 0,
+      operationalAlerts: {
+        failedPayments,
+        pendingPosRegistrations: restaurant.invoiceMode === "POS" ? pendingPosRegistrations : 0,
+        unmappedTables: tables.filter((table) => !table.posExternalId).length,
       },
     });
   } catch (error) {
