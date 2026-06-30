@@ -1,6 +1,7 @@
 import { errorResponse, hasRole, requireAuth, successResponse } from "@/lib/api-utils";
 import { TAX_MULTIPLIER } from "@/lib/constants/ecuador-tax";
 import { prisma } from "@/lib/db";
+import { isOwnerReadOnly, ownerReadOnlyResponse } from "@/lib/owner-mode";
 import { buildPosConfig } from "@/modules/pos/adapters/pos-config";
 import { ContificoAdapter } from "@/modules/pos/adapters/contifico.adapter";
 
@@ -80,6 +81,7 @@ export async function GET(): Promise<Response> {
 }
 
 export async function PATCH(request: Request): Promise<Response> {
+  if (isOwnerReadOnly()) return ownerReadOnlyResponse();
   try {
     const auth = await requireAuth();
     if (auth instanceof Response) return auth;
@@ -112,6 +114,7 @@ export async function PATCH(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  if (isOwnerReadOnly()) return ownerReadOnlyResponse();
   try {
     const auth = await requireAuth();
     if (auth instanceof Response) return auth;

@@ -57,7 +57,9 @@ const DEVICE_ID_KEY = "mesita:device-id";
 
 /** Poll interval: guest ↔ POS sync (session snapshot is one API call). */
 const SYNC_INTERVAL_MS = 800;
-const SYNC_INTERVAL_POS_MS = 1200;
+// Bajado 1200→900ms para que el cliente recoja el cambio del POS más rápido,
+// alineado con el throttle de pull (800ms) tras la optimización del bench.
+const SYNC_INTERVAL_POS_MS = 900;
 
 export interface UseDemoTableSessionResult {
   state: TableSessionState | null;

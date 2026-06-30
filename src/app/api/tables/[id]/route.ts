@@ -1,5 +1,6 @@
 import { requireAuth, errorResponse, successResponse, hasRole } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
+import { isOwnerReadOnly, ownerReadOnlyResponse } from "@/lib/owner-mode";
 import { z } from "zod";
 
 const updateTableSchema = z.object({
@@ -40,6 +41,7 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   const { id } = await context.params;
+  if (isOwnerReadOnly()) return ownerReadOnlyResponse();
   try {
     const authResult = await requireAuth();
     if (authResult instanceof Response) return authResult;
@@ -71,6 +73,7 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   const { id } = await context.params;
+  if (isOwnerReadOnly()) return ownerReadOnlyResponse();
   try {
     // Authenticate request
     const authResult = await requireAuth();

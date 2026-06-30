@@ -1,5 +1,6 @@
 import { requireAuth, errorResponse, successResponse, hasRole } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
+import { isOwnerReadOnly, ownerReadOnlyResponse } from "@/lib/owner-mode";
 import { z } from "zod";
 
 // Validation schema for restaurant updates
@@ -19,6 +20,7 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   const { id } = await context.params;
+  if (isOwnerReadOnly()) return ownerReadOnlyResponse();
   try {
     // Authenticate request
     const authResult = await requireAuth();

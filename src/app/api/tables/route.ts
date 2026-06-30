@@ -1,5 +1,6 @@
 import { requireAuth, errorResponse, successResponse } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
+import { isOwnerReadOnly, ownerReadOnlyResponse } from "@/lib/owner-mode";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 
@@ -32,6 +33,7 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  if (isOwnerReadOnly()) return ownerReadOnlyResponse();
   try {
     // Authenticate request
     const authResult = await requireAuth();

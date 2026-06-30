@@ -1,6 +1,7 @@
 import { requireAuth, errorResponse, successResponse, hasRole } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
 import { encrypt } from "@/lib/encryption";
+import { isOwnerReadOnly, ownerReadOnlyResponse } from "@/lib/owner-mode";
 import { resolvePaymentProvider } from "@/modules/payments/adapters/resolve";
 import { z } from "zod";
 
@@ -95,6 +96,7 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   const { id } = await context.params;
+  if (isOwnerReadOnly()) return ownerReadOnlyResponse();
   try {
     const auth = await requireAuth();
     if (auth instanceof Response) return auth;

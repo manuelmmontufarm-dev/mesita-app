@@ -16,7 +16,10 @@ import {
 } from "./client";
 import { mergePosDetallesIntoItems } from "./merge-from-pos";
 
-const POS_PULL_MIN_MS = 1500;
+// Throttle del pull POS por mesa. Bajado 1500→800ms: el cuello de botella medido
+// en POS→app era este throttle (bench: p50 ~2.2s). 800ms protege el POS API
+// (1 llamada/mesa) y reduce POS→app a ~1.2-1.3s. force:true (join/pay) lo salta.
+const POS_PULL_MIN_MS = 800;
 const lastPosPullAt = new Map<string, number>();
 
 interface OpenOrdenResult {

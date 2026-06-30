@@ -38,6 +38,15 @@ interface DashboardData {
   demoMode?: boolean;
 }
 
+/**
+ * Fuente de datos del panel:
+ * - `/api/demo-dashboard` refleja el POS demo en vivo (mesas 1-4) — usar en modo demo.
+ * - `/api/dashboard` lee Prisma (restaurante real) — modo producción.
+ * Controlado por NEXT_PUBLIC_DEMO_PANEL=1.
+ */
+const DASHBOARD_ENDPOINT =
+  process.env.NEXT_PUBLIC_DEMO_PANEL === "1" ? "/api/demo-dashboard" : "/api/dashboard";
+
 const STATUS = {
   paying: { label: "Pagando con Mesita", bg: "rgba(47,179,126,.14)", color: "#1f6b4c" },
   open:   { label: "Abierta", bg: "rgba(232,106,51,.13)", color: "#c45a1a" },
@@ -211,7 +220,7 @@ export function PanelDashboard() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/dashboard");
+      const res = await fetch(DASHBOARD_ENDPOINT);
       if (!res.ok) throw new Error("failed");
       const json = await res.json();
       if (mountedRef.current) {
@@ -264,7 +273,8 @@ export function PanelDashboard() {
   useEffect(() => {
     mountedRef.current = true;
     load();
-    const id = setInterval(load, 5_000);
+    // 5s→3s: el dato POS→dashboard ya llega en ~450ms; refrescamos la UI más seguido.
+    const id = setInterval(load, 3_000);
     return () => { mountedRef.current = false; clearInterval(id); };
   }, [load]);
 

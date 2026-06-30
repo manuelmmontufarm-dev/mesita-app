@@ -17,6 +17,7 @@ import {
   updateExtraTable,
   updateMenuItem,
 } from "@/lib/demo-pos";
+import { isOwnerReadOnly, ownerReadOnlyResponse } from "@/lib/owner-mode";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -74,6 +75,7 @@ const tableSchema = z.object({
 });
 
 export async function POST(request: Request): Promise<Response> {
+  if (isOwnerReadOnly()) return ownerReadOnlyResponse();
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") return errorResponse("Invalid body", 400);
 
@@ -104,6 +106,7 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 export async function PATCH(request: Request): Promise<Response> {
+  if (isOwnerReadOnly()) return ownerReadOnlyResponse();
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") return errorResponse("Invalid body", 400);
 
@@ -153,6 +156,7 @@ export async function PATCH(request: Request): Promise<Response> {
 }
 
 export async function DELETE(request: Request): Promise<Response> {
+  if (isOwnerReadOnly()) return ownerReadOnlyResponse();
   const url = new URL(request.url);
   const entity = url.searchParams.get("entity");
   const id = url.searchParams.get("id");

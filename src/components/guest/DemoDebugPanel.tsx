@@ -144,7 +144,8 @@ export function DemoDebugPanel({
   const sinceLastSyncMs = latestSyncEntry ? now - latestSyncEntry.ts : null;
   const latestClaimEntry = entries.find((e) => e.event.startsWith("claim"));
   const sinceLastClaimMs = latestClaimEntry ? now - latestClaimEntry.ts : null;
-  const heartbeatLabel = sseConnected ? "800ms" : "500ms";
+  // Cadencia real de poll: demo UX 800ms, mesas POS-linked 900ms (+ SSE check 1500ms server).
+  const heartbeatLabel = sseConnected ? "SSE+~0.9s" : "~0.9s";
   const fmtMs = (ms: number | null) => {
     if (ms == null) return "—";
     if (ms < 1000) return `${ms}ms`;

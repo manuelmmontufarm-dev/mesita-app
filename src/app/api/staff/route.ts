@@ -1,6 +1,7 @@
 import { requireAuth, errorResponse, successResponse, hasRole } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
 import { validateEmail, generateTemporaryPassword, hashPassword } from "@/lib/auth-utils";
+import { isOwnerReadOnly, ownerReadOnlyResponse } from "@/lib/owner-mode";
 import { z } from "zod";
 
 // Validation schema for creating staff
@@ -41,6 +42,7 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  if (isOwnerReadOnly()) return ownerReadOnlyResponse();
   try {
     // Authenticate request
     const authResult = await requireAuth();

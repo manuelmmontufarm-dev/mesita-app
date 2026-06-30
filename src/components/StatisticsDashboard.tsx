@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { formatCurrency, formatRelativeTime } from "@/lib/format";
 import { SkeletonCard } from "@/components/shared/LoadingState";
 
+const DASHBOARD_ENDPOINT =
+  process.env.NEXT_PUBLIC_DEMO_PANEL === "1" ? "/api/demo-dashboard" : "/api/dashboard";
+
 interface Confirmation {
   tableName: string;
   amount: number;
@@ -143,7 +146,7 @@ export function StatisticsDashboard() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/dashboard");
+      const res = await fetch(DASHBOARD_ENDPOINT);
       if (!res.ok) throw new Error("failed");
       const json = await res.json();
       if (mountedRef.current) {

@@ -1,6 +1,7 @@
 import { requireAuth, errorResponse, successResponse, hasRole } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
 import { buildProviderConfig, getPaymentAdapter, resolvePaymentProvider } from "@/modules/payments";
+import { isOwnerReadOnly, ownerReadOnlyResponse } from "@/lib/owner-mode";
 import { z } from "zod";
 
 const refundSchema = z.object({
@@ -13,6 +14,7 @@ export async function POST(
   context: { params: Promise<{ paymentId: string }> }
 ): Promise<Response> {
   const { paymentId } = await context.params;
+  if (isOwnerReadOnly()) return ownerReadOnlyResponse();
 
   try {
     const authResult = await requireAuth();

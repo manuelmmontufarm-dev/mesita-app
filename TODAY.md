@@ -52,12 +52,28 @@ Reglas de oro:
 
 ## 🟢 En qué estamos ahora
 
-Deploy en producción (`mesitademo-two.vercel.app`). Recién terminado el bloque UX:
-fase "mesa cerrada" con confeti (sin wipe inmediato), auto-entrada con pantalla
-de bienvenida para mesas 1–4 (lobby manual solo Mesa 12). Pendiente: deploy y QA
-con dos teléfonos + POS abierto.
+Deploy en producción (`mesitademo-two.vercel.app`). Recién: benchmark de latencia
+(20 iteraciones reales) + dashboard del dueño solo-lectura que refleja el POS demo
++ optimización de tiempos de sync. Baseline medido: POS→app ~2.2s, app→POS ~2.0s,
+POS→dashboard ~0.45s. Optimizado el throttle de pull (1500→800ms) y polls.
 
 ## 🗂️ Registro de cambios
+
+### 2026-06-30 — Benchmark latencia + dashboard solo-lectura + optimización sync
+
+- **Qué:** `scripts/sync-latency-bench.mjs` (NUEVO harness 20+ pruebas reales), `src/lib/owner-mode.ts` (NUEVO helper solo-lectura), guards 403 en rutas de mutación (`demo-pos`, `tables` + `[id]`, `restaurant/[id]` + fiscal/integrations, `staff`, `payments/[paymentId]/refund`, `pos-companion/payments`), `PanelDashboard.tsx` + `StatisticsDashboard.tsx` (leen `/api/demo-dashboard` en modo demo + poll 5s→3s), `DashboardLayout.tsx` (banner solo-lectura), `lib/pos-mesita/sync.ts` (`POS_PULL_MIN_MS` 1500→800), `hooks/useDemoTableSession.ts` (`SYNC_INTERVAL_POS_MS` 1200→900), `DemoDebugPanel.tsx` (labels reales).
+- **Por qué:** Validar contra producción cuánto tarda la sincronización en cada dirección, garantizar consistencia lógica/matemática, y que el panel del dueño SOLO muestre/reporte (sin poder editar menú/config) reflejando el POS.
+- **Qué hace:** El harness mide POS→app / app→POS / POS→dashboard (media/p50/p95) y valida IVA 15%, servicio 10%, saldos y splits. El dashboard del dueño ahora refleja el POS demo en vivo y bloquea toda mutación (UI + 403 en API). El throttle de pull bajó para acelerar POS→app de ~2.2s hacia ~1.2-1.3s. Hallazgo: `/api/demo-dashboard` exige cookie `mesita-demo-mode=1` (middleware).
+
+### 2026-06-30 — Admin panel: fix Tailwind purge, remover poll 30s, chart 7 días
+
+- **Qué:** `src/app/admin/page.tsx` (3 cambios), `tailwind.config.ts` (safelist).
+- **Por qué:** (1) `StatusBadge` construía clases CSS con template literals — Tailwind las purgaba en producción y los badges de estado salían sin color. (2) El `useEffect` hacía fetch automático cada 30s a `/api/admin/restaurants` (7 queries Prisma en paralelo), carga innecesaria sin beneficio real. (3) El gráfico de barras iteraba los 14 días del trend sin `overflow-x-auto`, perdiendo etiquetas en mobile.
+- **Qué hace:**
+  1. **StatusBadge**: las clases de color se mueven a un objeto estático `STATUS_BADGE_CLASS` — Tailwind las detecta en build time. Se agrega `safelist` en `tailwind.config.ts` como red de seguridad adicional para estas 6 clases de estado.
+  2. **Poll**: se elimina el `setInterval(30 000ms)`. El panel carga al montar y solo refresca al pulsar el botón "Actualizar" ya existente.
+  3. **Trend chart**: `trendSlice` recorta a los últimos 7 días (`.slice(-7)`); el contenedor del gráfico pasa a `overflow-x-auto` con `min-w-[280px]` — etiquetas visibles en cualquier ancho.
+  - `tsc --noEmit`: sin errores. `npm run build`: verde (42/42 páginas).
 
 ### 2026-06-30 — Admin: revalidación antes de deploy selectivo
 
