@@ -213,6 +213,10 @@ export async function registerPaymentInPosMesita(input: {
   tableName: string;
   guestName: string;
   amount: number;
+  subtotal?: number;
+  iva?: number;
+  servicio?: number;
+  propina?: number;
   ref: string;
   method?: string;
   items?: Array<{ name: string; qty: number; unitPrice: number }>;
@@ -253,20 +257,29 @@ export async function registerPaymentInPosMesita(input: {
           }))
         : undefined;
 
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const propina = round2(Math.max(0, input.propina ?? 0));
+
+    // Prefer the authoritative breakdown from the payment (subtotal/iva/service);
+    // fall back to deriving from items or the tip-excluded amount.
     const subtotalFromItems = detalles
       ? detalles.reduce((s, d) => s + d.cantidad * d.precio, 0)
-      : input.amount / 1.15;
-    const subtotal15 = Math.round(subtotalFromItems * 100) / 100;
-    const iva = Math.round(subtotal15 * 0.15 * 100) / 100;
-    const servicio = 0;
-    const docTotal =
-      input.amount > 0.009
-        ? input.amount
-        : Math.round((subtotal15 + iva + servicio) * 100) / 100;
+      : undefined;
+    const subtotal15 = round2(
+      input.subtotal ?? subtotalFromItems ?? Math.max(0, input.amount - propina) / 1.15,
+    );
+    const iva = round2(input.iva ?? subtotal15 * 0.15);
+    const servicio = round2(input.servicio ?? 0);
+
+    // The document total is the BILL (subtotal + iva + servicio) and excludes the
+    // tip. The tip travels on the cobro as `propina` — this mirrors Contifico and
+    // makes the POS "cuenta cerrada" reconcile (total == sum of cobro montos).
+    const docTotal = round2(subtotal15 + iva + servicio);
 
     const cobro = {
       forma_cobro: input.method === "EF" ? "EF" : "TC",
-      monto: input.amount,
+      monto: docTotal,
+      propina,
       referencia: `MESITAQR:${input.ref}`,
       procesador: "MesitaQR",
       detalle: input.guestName,

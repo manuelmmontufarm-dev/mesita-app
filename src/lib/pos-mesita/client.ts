@@ -329,6 +329,10 @@ export async function registerPaymentInPosMesita(input: {
   tableName: string;
   guestName: string;
   amount: number;
+  subtotal?: number;
+  iva?: number;
+  servicio?: number;
+  propina?: number;
   ref: string;
   method?: string;
   items?: Array<{ name: string; qty: number; unitPrice: number }>;
