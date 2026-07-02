@@ -7,7 +7,7 @@ Baseline evidence + per-phase detail: [01-manuel-baseline.md](01-manuel-baseline
 
 | Repo | Branch | Start | End |
 |------|--------|-------|-----|
-| mesita-app | `fable/01-manuel-foundation` | `81f0b3ef24a72559ec996472330290369f7a8d23` | ``c8eebf81050650020bfac6232992548961955521` (`feat(foundation): Relay 01 …`)` |
+| mesita-app | `fable/01-manuel-foundation` | `81f0b3ef24a72559ec996472330290369f7a8d23` | `8240e77a38b9a79571f3c8f85d6e8e4961822b89` (`feat(foundation): Relay 01 …`) + a follow-up docs commit for this file (branch tip) |
 | Mesita-POS | `fable/01-manuel-contifico-v2` | `bec7c188aed9b118a274d15d2af49a4594366958` | `be1ed3d` (`feat(v2): Contífico v2-compatible façade per frozen Relay-01 contract`) |
 
 Neither branch touches `main`. Merge order proposal at the end.
