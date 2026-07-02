@@ -6,7 +6,13 @@
 
 import { execSync } from "child_process";
 
-const API_KEY = process.env.CONTIFICO_API_KEY ?? "FrguR1kDpFHaXHLQwplZ2CwTX3p8p9XHVTnukL98V5U";
+// SECURITY: never hardcode credentials here. The key that previously lived in
+// this file is flagged for rotation (Relay 01, Phase 5) — treat it as burned.
+const API_KEY = process.env.CONTIFICO_API_KEY;
+if (!API_KEY) {
+  console.error("CONTIFICO_API_KEY environment variable is required. Aborting.");
+  process.exit(1);
+}
 const TABLE_FIELD = process.env.CONTIFICO_TABLE_FIELD ?? "adicional1";
 const BASE_URL =
   process.env.CONTIFICO_BASE_URL ?? "https://integracionapi.contifico.com/sistema/api/v2";

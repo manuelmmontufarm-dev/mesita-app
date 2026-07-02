@@ -1,6 +1,15 @@
 /**
- * Client for POS Mesita Demo API (Railway).
- * https://pos-mesita-demo-production.up.railway.app/sistema/api/v1/docs
+ * ⚠️ QUARANTINED — DEMO-ONLY (Relay 01, one-adapter rule).
+ *
+ * Client for the Mesita POS simulator's INTERNAL v1 API (mesa/session/reset/
+ * nested-cobro endpoints that real Contífico does not have). Only the Table 12
+ * demo experience (src/lib/demo-table-store.ts, src/lib/demo-pos/,
+ * /api/demo/*) may import from src/lib/pos-mesita/.
+ *
+ * Production POS integration MUST go through the single Contífico v2 adapter
+ * (src/modules/pos/adapters/contifico.adapter.ts) against the frozen contract
+ * (contracts/contifico-v2/README.md). Do NOT add imports of this directory in
+ * production code paths.
  */
 
 const DEFAULT_BASE =

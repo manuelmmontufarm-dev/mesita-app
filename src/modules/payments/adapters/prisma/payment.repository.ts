@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { computeFallbackTotal } from "@/lib/money";
 import { Decimal } from "@prisma/client/runtime/library";
 import type { BillItem, BillStatus, Prisma, SplitMode as PrismaSplitMode } from "@prisma/client";
 import type {
@@ -36,6 +37,41 @@ export class PrismaPaymentRepository implements PaymentRepository {
     let thisPaymentIsRecipient = false;
 
     const updatedBill = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Serialize payments per bill: lock the bill row for the whole
+      // transaction so the balance check below cannot race a concurrent
+      // payment on the same bill. Schema-qualified: raw SQL through the
+      // Supabase transaction pooler does not inherit Prisma's search_path.
+      await tx.$queryRaw`SELECT id FROM "public"."bills" WHERE id = ${billId} FOR UPDATE`;
+
+      // Authoritative remaining-balance guard (exact integer cents):
+      // Σ(settled net) + this payment's net may never exceed the bill total.
+      // Net = amount − voluntaryTip (tips settle nothing against the bill).
+      // Total = posTotal when POS-authoritative, else the item-derived fallback.
+      const currentBill = await tx.bill.findUniqueOrThrow({
+        where: { id: billId },
+        include: { items: true, payments: { where: { status: "COMPLETED" } } },
+      });
+      const toCents = (n: number | Decimal | null | undefined): number =>
+        n == null ? 0 : Math.round(Number(n) * 100);
+      const totalCents =
+        currentBill.posTotal != null
+          ? toCents(currentBill.posTotal)
+          : toCents(computeFallbackTotal(currentBill.items));
+      const settledCents = currentBill.payments.reduce(
+        (sum: number, p: { amount: Decimal; voluntaryTip: Decimal | null }) =>
+          sum + toCents(p.amount) - toCents(p.voluntaryTip),
+        0
+      );
+      const thisNetCents = toCents(amount) - toCents(voluntaryTip);
+      if (thisNetCents <= 0) {
+        throw new Error("Payment net amount must be positive");
+      }
+      if (settledCents + thisNetCents > totalCents) {
+        throw new Error(
+          `Payment would exceed remaining balance: settled ${settledCents}¢ + ${thisNetCents}¢ > total ${totalCents}¢`
+        );
+      }
+
       await tx.payment.create({
         data: {
           id: paymentId,
@@ -56,10 +92,6 @@ export class PrismaPaymentRepository implements PaymentRepository {
         },
       });
 
-      const currentBill = await tx.bill.findUniqueOrThrow({
-        where: { id: billId },
-        include: { items: true },
-      });
       const recipientExistedBefore = currentBill.invoiceRecipientPaymentId !== null;
       let newStatus: BillStatus = currentBill.status;
 
@@ -128,10 +160,16 @@ export class PrismaPaymentRepository implements PaymentRepository {
       } else {
         // FULL: same guarded mindset — `isPaid: false` ensures we only flip items
         // that are still unpaid (idempotent against concurrent BY_ITEM claims).
-        await tx.billItem.updateMany({
+        const claimed = await tx.billItem.updateMany({
           where: { billId, restaurantId, isPaid: false },
           data: { isPaid: true, paidAt: new Date() },
         });
+        // A second concurrent FULL payment would flip zero rows — reject it
+        // instead of recording a duplicate full-amount payment (the bill-row
+        // lock + balance guard above also block this; defense in depth).
+        if (claimed.count === 0 && currentBill.items.length > 0) {
+          throw new Error("Concurrent full payment detected: no unpaid items remain");
+        }
         await createPaymentItemSnapshots(tx, {
           paymentId,
           items: currentBill.items.filter((item) => !item.isPaid),
@@ -183,6 +221,11 @@ export class PrismaPaymentRepository implements PaymentRepository {
         data: billUpdateData,
         select: { status: true },
       });
+    }, {
+      // Payments on the same bill queue on the FOR UPDATE lock — generous
+      // limits so a burst of retries fails by GUARD, not by timeout.
+      maxWait: 30_000,
+      timeout: 60_000,
     });
 
     return {

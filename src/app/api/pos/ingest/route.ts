@@ -1,15 +1,21 @@
+import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { buildPosConfig } from "@/modules/pos/adapters/pos-config";
 import { ContificoAdapter } from "@/modules/pos/adapters/contifico.adapter";
 import { ingestRestaurantOrders } from "@/modules/pos/application/ingest-orders";
 import { PrismaPosOrderRepository } from "@/modules/pos/adapters/prisma/pos-order.repository";
 
-/** Vercel Cron — polls open POS orders for every POS-enabled restaurant (D-03, D-12). */
-export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
+function cronAuthOk(authHeader: string | null, cronSecret: string | undefined): boolean {
+  if (!cronSecret || !authHeader) return false;
+  const expected = Buffer.from(`Bearer ${cronSecret}`);
+  const provided = Buffer.from(authHeader);
+  if (expected.length !== provided.length) return false;
+  return timingSafeEqual(expected, provided);
+}
 
-  if (!cronSecret || !authHeader || authHeader !== `Bearer ${cronSecret}`) {
+/** Vercel Cron — recovery backstop only (live sync is the Phase 4 lease path). */
+export async function GET(request: NextRequest) {
+  if (!cronAuthOk(request.headers.get("authorization"), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

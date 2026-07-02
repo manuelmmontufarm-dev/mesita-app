@@ -6,7 +6,8 @@
 
 const POS = (process.env.POS_URL ?? "https://mesita-pos.vercel.app").replace(/\/$/, "");
 const APP = (process.env.SMOKE_URL ?? "https://mesitademo-two.vercel.app").replace(/\/$/, "");
-const POS_KEY = process.env.POS_API_KEY ?? "mesita2024secret";
+const POS_KEY = process.env.POS_API_KEY;
+if (!POS_KEY) { console.error("POS_API_KEY env var is required."); process.exit(1); }
 const TOKEN = "demo-mesa-1";
 const MESA = "mesa-01";
 

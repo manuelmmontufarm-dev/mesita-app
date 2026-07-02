@@ -8,7 +8,8 @@
 
 export const BASE_URL = (process.env.SMOKE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 export const POS_URL = (process.env.POS_URL ?? "https://mesita-pos.vercel.app").replace(/\/$/, "");
-export const POS_API_KEY = process.env.POS_API_KEY ?? "mesita2024secret";
+export const POS_API_KEY = process.env.POS_API_KEY ?? "";
+if (!POS_API_KEY) console.warn("POS_API_KEY env var not set — POS calls will fail auth.");
 const isRemote =
   !BASE_URL.includes("localhost") && !BASE_URL.includes("127.0.0.1");
 export const LATENCY_MS = Number(

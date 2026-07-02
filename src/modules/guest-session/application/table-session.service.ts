@@ -180,10 +180,49 @@ export async function getTableSessionState(token: string) {
   };
 }
 
-export async function joinTableSession(token: string, guestSessionId?: string) {
+function isUniqueViolation(error: unknown): boolean {
+  if (error && typeof error === "object" && "code" in error) {
+    if (String((error as { code: unknown }).code) === "P2002") return true;
+  }
+  return (
+    error instanceof Error && /Unique constraint|UniqueConstraint|P2002/i.test(error.message)
+  );
+}
+
+/**
+ * Join (or rejoin) the active bill on a table.
+ *
+ * Identity rules (invariant: a reconnect NEVER mints a duplicate guest):
+ * 1. `clientToken` (opaque, minted client-side, survives reloads) is the
+ *    primary identity: same token + same bill ⇒ the same guest, enforced by
+ *    the (billId, clientToken) unique constraint even under concurrent joins.
+ * 2. `guestSessionId` remains supported for clients that kept their id.
+ * 3. Otherwise a new guest is created with the next free label; label
+ *    collisions under concurrency are resolved by the (billId, label) unique
+ *    constraint + retry.
+ */
+export async function joinTableSession(
+  token: string,
+  guestSessionId?: string,
+  clientToken?: string
+) {
   const active = await findActiveBillByToken(token);
   if (!active) return null;
   const billId = active.bill.id;
+  const normalizedClientToken = clientToken?.trim() || undefined;
+
+  if (normalizedClientToken) {
+    const byClient = await prisma.billGuestSession.findUnique({
+      where: { billId_clientToken: { billId, clientToken: normalizedClientToken } },
+    });
+    if (byClient) {
+      const guest = await prisma.billGuestSession.update({
+        where: { id: byClient.id },
+        data: { lastSeenAt: new Date() },
+      });
+      return { state: await getTableSessionState(token), guest };
+    }
+  }
 
   if (guestSessionId) {
     const existing = await prisma.billGuestSession.findFirst({
@@ -192,33 +231,57 @@ export async function joinTableSession(token: string, guestSessionId?: string) {
     if (existing) {
       const guest = await prisma.billGuestSession.update({
         where: { id: existing.id },
-        data: { lastSeenAt: new Date() },
+        // Adopt the client identity on legacy sessions that predate clientToken
+        data: {
+          lastSeenAt: new Date(),
+          ...(normalizedClientToken && !existing.clientToken
+            ? { clientToken: normalizedClientToken }
+            : {}),
+        },
       });
       return { state: await getTableSessionState(token), guest };
     }
   }
 
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const count = await prisma.billGuestSession.count({ where: { billId } });
-    const ordinal = count + 1 + attempt;
-    const label = labelFor(ordinal);
+  for (let attempt = 0; attempt < 8; attempt += 1) {
     try {
-      const guest = await prisma.billGuestSession.create({
-        data: {
-          billId,
-          label,
-          displayName: label,
-          colorHue: guestHue(ordinal),
+      // Serialize label allocation per bill: lock the bill row, then
+      // count + insert atomically. Concurrent joiners queue on the lock and
+      // each sees the previous joiner's row — no label-collision storms.
+      // (Schema-qualified: raw SQL through the Supabase transaction pooler
+      // does not inherit Prisma's search_path.)
+      const guest = await prisma.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`SELECT id FROM "public"."bills" WHERE id = ${billId} FOR UPDATE`;
+          const count = await tx.billGuestSession.count({ where: { billId } });
+          const ordinal = count + 1;
+          const label = labelFor(ordinal);
+          return tx.billGuestSession.create({
+            data: {
+              billId,
+              label,
+              displayName: label,
+              colorHue: guestHue(ordinal),
+              clientToken: normalizedClientToken ?? null,
+            },
+          });
         },
-      });
+        { maxWait: 30_000, timeout: 60_000 }
+      );
       return { state: await getTableSessionState(token), guest };
     } catch (error) {
-      if (
-        error instanceof Error &&
-        !/Unique constraint|UniqueConstraint|P2002/i.test(error.message)
-      ) {
-        throw error;
+      if (!isUniqueViolation(error)) throw error;
+      // (billId, clientToken) collision ⇒ a concurrent join with OUR token
+      // won the race — return that guest instead of retrying labels.
+      if (normalizedClientToken) {
+        const winner = await prisma.billGuestSession.findUnique({
+          where: { billId_clientToken: { billId, clientToken: normalizedClientToken } },
+        });
+        if (winner) {
+          return { state: await getTableSessionState(token), guest: winner };
+        }
       }
+      // Otherwise it was a label collision — loop and try the next ordinal.
     }
   }
 
@@ -263,6 +326,17 @@ export async function setGuestSessionStatus(
   return getTableSessionState(token);
 }
 
+/**
+ * Claim units of a bill item — transactionally safe.
+ *
+ * The pre-relay implementation was a read-check-write OUTSIDE any transaction:
+ * two guests racing for the last unit both passed the check and both created a
+ * claim (over-claim). Now the bill-item row is locked (SELECT … FOR UPDATE)
+ * inside a transaction, so validation and write are atomic. Invariants:
+ * - sum of ACTIVE + PAID units never exceeds item quantity;
+ * - a lost race surfaces as an explicit 409 conflict, never a silent erase;
+ * - one claim row per (billItemId, guestSessionId) — DB unique constraint.
+ */
 export async function claimBillItem(
   token: string,
   guestSessionId: string,
@@ -274,39 +348,60 @@ export async function claimBillItem(
   }
 
   const { active, guest } = await requireGuestForToken(token, guestSessionId);
-  const billItem = active.bill.items.find((item) => item.id === billItemId);
-  if (!billItem || billItem.isPaid) {
-    throw new GuestSessionValidationError("Bill item is not claimable");
-  }
+  const billId = active.bill.id;
 
-  const claims = await prisma.billItemClaim.findMany({
-    where: { billItemId, status: "ACTIVE" },
-  });
-  const existing = claims.find((claim) => claim.guestSessionId === guest.id);
+  await prisma.$transaction(async (tx) => {
+    // Serialize all claim mutations for this item. (Schema-qualified: raw SQL
+    // through the Supabase transaction pooler does not inherit search_path.)
+    await tx.$queryRaw`SELECT id FROM "public"."bill_items" WHERE id = ${billItemId} FOR UPDATE`;
 
-  if (existing) {
-    await prisma.billItemClaim.update({
-      where: { id: existing.id },
-      data: { units: new Decimal(units), status: "ACTIVE" as BillItemClaimStatus },
+    const billItem = await tx.billItem.findFirst({
+      where: { id: billItemId, billId },
     });
-  } else {
-    const claimedUnits = claims.reduce((sum, claim) => sum + Number(claim.units), 0);
-    if (claimedUnits + units > billItem.quantity) {
-      throw new GuestSessionValidationError("No free units remain for this item");
+    if (!billItem || billItem.isPaid) {
+      throw new GuestSessionValidationError("Bill item is not claimable");
     }
-    await prisma.billItemClaim.create({
-      data: {
-        billId: active.bill.id,
-        billItemId,
-        guestSessionId: guest.id,
-        units: new Decimal(units),
-      },
-    });
-  }
 
-  await prisma.billGuestSession.update({
-    where: { id: guest.id },
-    data: { status: "REVIEWING", lastSeenAt: new Date() },
+    // ACTIVE + PAID units both consume capacity; only RELEASED frees it.
+    const claims = await tx.billItemClaim.findMany({
+      where: { billItemId, status: { in: ["ACTIVE", "PAID"] } },
+    });
+    const mine = claims.find((claim) => claim.guestSessionId === guest.id);
+    if (mine?.status === "PAID") {
+      throw new GuestSessionValidationError("Claim already paid");
+    }
+    const othersUnits = claims
+      .filter((claim) => claim.guestSessionId !== guest.id)
+      .reduce((sum, claim) => sum + Number(claim.units), 0);
+    if (othersUnits + units > billItem.quantity) {
+      throw new GuestSessionConflictError("No free units remain for this item");
+    }
+
+    if (mine) {
+      await tx.billItemClaim.update({
+        where: { id: mine.id },
+        data: { units: new Decimal(units), status: "ACTIVE" as BillItemClaimStatus },
+      });
+    } else {
+      await tx.billItemClaim.create({
+        data: {
+          billId,
+          billItemId,
+          guestSessionId: guest.id,
+          units: new Decimal(units),
+        },
+      });
+    }
+
+    await tx.billGuestSession.update({
+      where: { id: guest.id },
+      data: { status: "REVIEWING", lastSeenAt: new Date() },
+    });
+  }, {
+    // Claims on a hot item queue on the FOR UPDATE lock — losers must reach
+    // the guard (explicit conflict), not die on a transaction timeout.
+    maxWait: 30_000,
+    timeout: 60_000,
   });
 
   return getTableSessionState(token);

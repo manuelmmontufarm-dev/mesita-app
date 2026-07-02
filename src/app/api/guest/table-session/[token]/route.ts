@@ -10,12 +10,15 @@ import {
   GuestSessionNotFoundError,
   GuestSessionValidationError,
 } from "@/modules/guest-session";
+import { syncForTableToken } from "@/modules/pos/application/sync-if-stale";
 import { z } from "zod";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("join"),
     guestSessionId: z.string().uuid().optional(),
+    // Opaque client identity for reconnects — same token + same bill ⇒ same guest
+    clientToken: z.string().min(8).max(80).optional(),
   }),
   z.object({
     action: z.literal("rename"),
@@ -71,14 +74,34 @@ function mapGuestSessionError(error: unknown): Response {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ token: string }> }
 ): Promise<Response> {
   const { token } = await context.params;
   try {
+    // ?sync=1 — sync-if-stale (Phase 4): the Supabase lease elects at most one
+    // upstream fetcher per freshness window; every other caller reads the
+    // latest committed snapshot immediately. Failures surface as explicit
+    // staleness metadata — never a fabricated state, never a broken read.
+    let posSync: Awaited<ReturnType<typeof syncForTableToken>> = null;
+    if (new URL(request.url).searchParams.get("sync") === "1") {
+      posSync = await syncForTableToken(token);
+    }
     const state = await getTableSessionState(token);
     if (!state) return errorResponse("No active table session", 404);
-    return successResponse(state, 200);
+    return successResponse(
+      posSync
+        ? {
+            ...state,
+            posSync: {
+              fresh: posSync.fresh,
+              upstreamAvailable: posSync.upstreamAvailable,
+              lastSuccessAt: posSync.lastSuccessAt,
+            },
+          }
+        : state,
+      200
+    );
   } catch (error) {
     return mapGuestSessionError(error);
   }
@@ -96,7 +119,7 @@ export async function POST(
 
     const body = parsed.data;
     if (body.action === "join") {
-      const joined = await joinTableSession(token, body.guestSessionId);
+      const joined = await joinTableSession(token, body.guestSessionId, body.clientToken);
       if (!joined) return errorResponse("No active table session", 404);
       return successResponse(joined, 200);
     }

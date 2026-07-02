@@ -150,7 +150,8 @@ export function DemoConfiguracionPanel() {
                   <p className="text-amber-700 mt-2">
                     En Vercel (mesitademo) → <strong>POS_MESITA_API_KEY</strong> debe coincidir con{" "}
                     <strong>API_KEY</strong> del proyecto <strong>Mesita-POS</strong> en Vercel.
-                    Clave demo documentada: <code className="font-mono">mesita2024secret</code>
+                    Consulta el valor en las variables de entorno del proyecto — nunca se
+                    muestra aquí.
                   </p>
                 </div>
               )}

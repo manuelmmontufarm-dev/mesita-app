@@ -2,7 +2,12 @@ import type { POSPulledOrderItem } from "./pos.port";
 
 export interface PosIngestBill {
   id: string;
-  items: Array<{ id: string; name: string }>;
+  posDocumentId: string;
+  /** local bill lifecycle — ingest uses it to make closure idempotent */
+  status: string;
+  closedAt: Date | null;
+  posTotal: number | null;
+  items: Array<{ id: string; name: string; price: number; quantity: number }>;
 }
 
 /** POS-authoritative document totals (D-07) — mirrored verbatim, never recomputed. */
@@ -51,8 +56,19 @@ export interface PosEnabledRestaurant {
 
 export interface PosOrderRepository {
   findPosEnabledRestaurants(): Promise<PosEnabledRestaurant[]>;
-  findTableByPosExternalId(restaurantId: string, posExternalId: string): Promise<{ id: string } | null>;
-  findBillByPosDocumentId(posDocumentId: string): Promise<PosIngestBill | null>;
+  /** Batch: one round trip for every table referenced by a pull (perf: the
+   *  ingest loop must not issue one query per document). */
+  findTablesByPosExternalIds(
+    restaurantId: string,
+    posExternalIds: string[]
+  ): Promise<Array<{ id: string; posExternalId: string | null }>>;
+  /** Batch: one round trip for every bill referenced by a pull. */
+  findBillsByPosDocumentIds(posDocumentIds: string[]): Promise<PosIngestBill[]>;
   syncBillItems(input: SyncBillItemsInput): Promise<void>;
   createBillWithItems(input: CreateBillInput): Promise<void>;
+  /**
+   * Reflect a POS-side closure (estado C/G/A/F) onto the local bill.
+   * Conditional: only flips bills still in UNPAID/PARTIALLY_PAID (idempotent).
+   */
+  markBillClosedFromPos(billId: string): Promise<void>;
 }

@@ -151,15 +151,17 @@ export async function processPayment(
           throw err;
         }
         console.error(
-          JSON.stringify({
-            event: "POS_PRECHECK_FAILED_FAIL_OPEN",
-            severity: "HIGH",
-            billId,
-            restaurantId,
-            posDocumentId: billSnapshot.posDocumentId,
-            error: err instanceof Error ? err.message : String(err),
-            ts: new Date().toISOString(),
-          })
+          JSON.stringify(
+            redact({
+              event: "POS_PRECHECK_FAILED_FAIL_OPEN",
+              severity: "HIGH",
+              billId: hashForLog(billId),
+              restaurantId: hashForLog(restaurantId),
+              posDocumentId: hashForLog(billSnapshot.posDocumentId),
+              error: err instanceof Error ? err.message : String(err),
+              ts: new Date().toISOString(),
+            })
+          )
         );
       }
     }
@@ -301,6 +303,46 @@ export async function processPayment(
       alreadyProcessed: false,
     };
   } catch (error) {
+    // Concurrent duplicate idempotency key: another request with the SAME key
+    // won the race (unique-constraint violation, balance guard, or claim
+    // guard — the trigger doesn't matter). That request's payment IS this
+    // payment — return it as already-processed instead of failing (invariant:
+    // N identical retries produce exactly one completed payment).
+    {
+      const winner = await repos.payment
+        .findByIdempotencyKey(idempotencyKey)
+        .catch(() => null);
+      if (winner && winner.billId === billId) {
+        // Best-effort void of OUR duplicate charge — the winner's charge stands.
+        if (!isStubPaymentToken(chargeToken)) {
+          try {
+            await paymentAdapter.refund(
+              { transactionId: chargeResponse.transactionId ?? "", amount },
+              providerConfig
+            );
+          } catch {
+            // logged below via PAYMENT_COMPENSATION_FAILED path semantics
+            console.error(
+              JSON.stringify(
+                redact({
+                  event: "PAYMENT_DUPLICATE_VOID_FAILED",
+                  severity: "CRITICAL",
+                  billId: hashForLog(billId),
+                  transactionId: hashForLog(chargeResponse.transactionId ?? ""),
+                  ts: new Date().toISOString(),
+                })
+              )
+            );
+          }
+        }
+        return {
+          paymentId: winner.id,
+          billStatus: "UNPAID" as BillStatus,
+          alreadyProcessed: true,
+        };
+      }
+    }
+
     console.error("Transaction error — attempting void:", error);
     if (!isStubPaymentToken(chargeToken)) {
       try {

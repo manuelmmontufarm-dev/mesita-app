@@ -1,4 +1,16 @@
 # MesitaQR — Integration Plan
+
+> ## ⚠️ SUPERSEDED (2026-07-02 — Fable Relay 01)
+> This plan is **no longer the source of truth**. It predates the Relay 01
+> foundation and contains superseded assumptions: Contífico **v1** (now v2 —
+> frozen contract in `contracts/contifico-v2/README.md`), **Kushki** (payment
+> milestone is **STUB-only** with a DINERS placeholder), **Redis as guest/state
+> store** (durable state now lives in **Supabase via Prisma**; Redis remains
+> demo-table + rate-limiting only), and **multiple public demo tables** (only
+> **Table 12** stays public).
+> Current truth: `contracts/contifico-v2/README.md` + `docs/handoffs/01-manuel-*.md`.
+> Kept for historical context only — do not implement from this document.
+
 ## From Demo to Production: Architecture, Data Flows, and Implementation Phases
 
 > **Purpose of this document:** Single source of truth for what we are building, how every piece communicates, and what to implement in each phase. Each phase ends with a concrete functionality check before moving on. The prompts at the end of each section are ready to paste into Claude Code or a similar assistant.

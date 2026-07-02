@@ -21,6 +21,16 @@ vi.mock("@/modules/payments/adapters/resolve", () => ({
   resolvePaymentProvider: vi.fn().mockReturnValue("STUB"),
 }));
 
+const demoFlags = vi.hoisted(() => ({ isDemo: false }));
+vi.mock("@/lib/demo-restaurant", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/demo-restaurant")>();
+  return {
+    ...actual,
+    isDemoTableToken: vi.fn(() => demoFlags.isDemo),
+    isDemoRestaurant: vi.fn(() => demoFlags.isDemo),
+  };
+});
+
 import { Decimal } from "@prisma/client/runtime/library";
 import { POST } from "../route";
 import { prisma } from "@/lib/db";
@@ -94,15 +104,33 @@ const validBody = {
   guestData: { email: "test@example.com" },
 };
 
-describe("POST /api/bills/[billId]/pay", () => {
+describe("POST /api/bills/[billId]/pay — provider boundary (Relay 01)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    demoFlags.isDemo = false;
     vi.mocked(prisma.table.findUnique).mockResolvedValue(mockTable as any);
     vi.mocked(prisma.bill.findUnique).mockResolvedValue(mockBill as any);
   });
 
-  it("accepts stub payment token when PAYMENT_PROVIDER is STUB", async () => {
+  it("demo tenant: STUB accepted (Table 12 experience proceeds past the provider gate)", async () => {
+    demoFlags.isDemo = true;
     const res = await POST(makeRequest(validBody), { params: Promise.resolve({ billId: BILL_ID }) });
     expect(res.status).not.toBe(503);
+  });
+
+  it("real restaurant without payments enabled: explicit 503 unavailable — a stub token is NOT a bypass", async () => {
+    const res = await POST(makeRequest(validBody), { params: Promise.resolve({ billId: BILL_ID }) });
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error).toMatch(/no disponibles/i);
+  });
+
+  it("real restaurant with payments enabled but STUB provider: explicit 503 (misconfiguration, not fallback)", async () => {
+    vi.mocked(prisma.bill.findUnique).mockResolvedValue({
+      ...mockBill,
+      restaurant: { ...mockRestaurant, paymentsEnabled: true, paymentProvider: "STUB" },
+    } as any);
+    const res = await POST(makeRequest(validBody), { params: Promise.resolve({ billId: BILL_ID }) });
+    expect(res.status).toBe(503);
   });
 });

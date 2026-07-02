@@ -12,14 +12,15 @@
  * Uso:
  *   POS_URL=https://mesita-pos.vercel.app \
  *   SMOKE_URL=https://mesitademo-two.vercel.app \
- *   POS_API_KEY=mesita2024secret \
+ *   POS_API_KEY=<pos-api-key> \
  *   ITERATIONS=20 node scripts/sync-latency-bench.mjs
  */
 
 const POS = (process.env.POS_URL ?? "https://mesita-pos.vercel.app").replace(/\/$/, "");
 const APP = (process.env.SMOKE_URL ?? "https://mesitademo-two.vercel.app").replace(/\/$/, "");
 // POS espera el header `Authorization: Token <API_KEY>`; default = demo key desplegada.
-const POS_KEY = process.env.POS_API_KEY ?? process.env.API_KEY ?? "mesita2024secret";
+const POS_KEY = process.env.POS_API_KEY ?? process.env.API_KEY;
+if (!POS_KEY) { console.error("POS_API_KEY env var is required."); process.exit(1); }
 const ITERATIONS = Math.max(20, Number(process.env.ITERATIONS ?? 20));
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS ?? 150);
 const POLL_TIMEOUT_MS = Number(process.env.POLL_TIMEOUT_MS ?? 30000);

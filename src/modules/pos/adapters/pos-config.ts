@@ -1,4 +1,5 @@
 import { decrypt } from "@/lib/encryption";
+import { resolveTableField } from "../contract/table-mapping";
 
 // v2 API — confirmed working by live testing 2026-06-02
 // Sandbox credentials use integracionapi.contifico.com
@@ -21,6 +22,10 @@ export interface PosConfig {
   /** Required when paymentMethod = "TC". Contífico card-terminal network code.
    *  "D" = Datafast (confirmed working). Diners code TBD — pending Contífico support answer. */
   tipoPing?: string;
+  /** Contract O5/O6 — persona create + documento cliente attach are UNVERIFIED
+   *  against the real sandbox, so they are opt-in (CONTIFICO_ATTACH_CLIENTE=1).
+   *  Off ⇒ the cobro is registered against the document's existing cliente. */
+  attachClienteEnabled: boolean;
 }
 
 export function buildPosConfig(restaurant: {
@@ -45,9 +50,25 @@ export function buildPosConfig(restaurant: {
     provider: restaurant.posProvider,
     apiKey: decrypt(restaurant.posApiKeyEnc),
     environment: restaurant.posEnvironment,
-    tableField: restaurant.posTableField ?? "descripcion",
-    baseUrl: CONTIFICO_BASE_URLS[restaurant.posEnvironment] ?? CONTIFICO_BASE_URLS.production,
+    // Frozen table-mapping rule: default adicional1, restricted to documented
+    // free-text fields (adicional1 | adicional2 | descripcion).
+    tableField: resolveTableField(restaurant.posTableField),
+    baseUrl: resolveBaseUrl(restaurant.posEnvironment),
     paymentMethod: restaurant.posPaymentMethod ?? "EF",
     tipoPing: restaurant.posTipoPing ?? undefined,
+    attachClienteEnabled: process.env.CONTIFICO_ATTACH_CLIENTE === "1",
   };
+}
+
+/**
+ * Base URL is pure configuration (contract rule: simulator vs real Contífico
+ * differ ONLY by base URL + credentials). CONTIFICO_BASE_URL overrides the
+ * environment presets — point it at a Mesita POS deployment's /sistema/api/v2
+ * to run against the simulator. No code path may inspect this URL to change
+ * payload semantics.
+ */
+function resolveBaseUrl(environment: string): string {
+  const override = process.env.CONTIFICO_BASE_URL;
+  if (override) return override.replace(/\/$/, "");
+  return CONTIFICO_BASE_URLS[environment] ?? CONTIFICO_BASE_URLS.production;
 }

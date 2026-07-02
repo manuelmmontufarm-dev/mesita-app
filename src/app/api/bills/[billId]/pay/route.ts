@@ -131,22 +131,39 @@ export async function POST(
 
     const effectiveSplitMode: SplitMode = splitMode;
 
+    // Provider boundary (Relay 01): STUB is valid ONLY for the demo tenant
+    // (public Table 12 experience). A stub/demo charge token on a real
+    // restaurant is NOT a bypass — real restaurants without a configured,
+    // implemented provider get an explicit unavailable state. DINERS exists
+    // as enum/config placeholder only; its adapter declines every charge
+    // until a real integration lands (no invented endpoints/tokens).
     const isDemo =
       isDemoTableToken(tableToken) || isDemoRestaurant(bill.restaurantId);
-    const isStubPayment = isDemo || isStubPaymentToken(chargeToken);
-    const platformStub = resolvePaymentProvider(bill.restaurant.paymentProvider) === "STUB";
-
-    if (!isStubPayment && !platformStub && !bill.restaurant.paymentsEnabled) {
-      return errorResponse("Payments not enabled for this restaurant", 503);
-    }
 
     let providerConfig: ProviderConfig;
-    if (isStubPayment || platformStub) {
+    if (isDemo) {
       providerConfig = {
         provider: "STUB",
         environment: "SANDBOX",
       };
     } else {
+      if (!bill.restaurant.paymentsEnabled) {
+        return errorResponse(
+          "Pagos no disponibles: este restaurante aún no tiene pagos habilitados.",
+          503
+        );
+      }
+      const provider = resolvePaymentProvider(bill.restaurant.paymentProvider);
+      if (provider === "STUB") {
+        // STUB outside the demo tenant is a misconfiguration, not a fallback.
+        return errorResponse(
+          "Pagos no disponibles: este restaurante no tiene un proveedor de pagos configurado.",
+          503
+        );
+      }
+      if (isStubPaymentToken(chargeToken)) {
+        return errorResponse("Invalid payment token for this restaurant", 400);
+      }
       providerConfig = buildProviderConfig(bill.restaurant);
     }
 

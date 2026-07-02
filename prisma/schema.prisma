@@ -135,6 +135,11 @@ model Table {
   restaurantId  String
   restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   posExternalId String? // POS table identifier for ingestion mapping (D-05)
+  // QR lifecycle state + audit metadata (foundation for the owner UI — Relay 02).
+  // Data/session layer only here; do NOT build UI on this in Relay 01.
+  qrEnabled          Boolean   @default(true)
+  qrStatusChangedAt  DateTime?
+  qrStatusChangedBy  String? // User.id or "system"
   bills         Bill[]
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
@@ -142,6 +147,23 @@ model Table {
   @@index([restaurantId])
   @@index([restaurantId, posExternalId])
   @@map("tables")
+}
+
+// PosSyncState: per-restaurant sync lease/cursor — atomically elects at most
+// one upstream fetcher during the freshness window (Phase 4 active sync).
+model PosSyncState {
+  id            String    @id @default(uuid())
+  restaurantId  String    @unique
+  leaseOwner    String? // instance id of the elected fetcher
+  leaseUntil    DateTime? // lease expiry; expired leases are re-electable
+  lastSyncAt    DateTime? // last attempt (success or failure)
+  lastSuccessAt DateTime? // last committed snapshot
+  lastError     String?   @db.Text
+  cursor        String? // reserved: fecha_modificacion / pagination cursor
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("pos_sync_state")
 }
 
 // Bill: Restaurant bills with status tracking and split modes
@@ -273,6 +295,10 @@ model BillGuestSession {
   label       String             // P1, P2, P3... assigned per bill/table session
   displayName String
   colorHue    Int
+  // Opaque client identity (random token minted client-side). A reconnect with
+  // the same clientToken on the same bill returns the SAME guest instead of
+  // minting a new one. Nullable for legacy rows; Postgres unique ignores NULLs.
+  clientToken String?
   status      GuestSessionStatus @default(SELECTING)
   joinedAt    DateTime           @default(now())
   lastSeenAt  DateTime           @default(now())
@@ -283,6 +309,7 @@ model BillGuestSession {
   payments Payment[]
 
   @@unique([billId, label])
+  @@unique([billId, clientToken])
   @@index([billId, status])
   @@map("bill_guest_sessions")
 }

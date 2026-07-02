@@ -39,26 +39,45 @@ export class PrismaPosOrderRepository implements PosOrderRepository {
     });
   }
 
-  async findTableByPosExternalId(
+  async findTablesByPosExternalIds(
     restaurantId: string,
-    posExternalId: string
-  ): Promise<{ id: string } | null> {
-    return prisma.table.findFirst({
-      where: { restaurantId, posExternalId },
-      select: { id: true },
+    posExternalIds: string[]
+  ): Promise<Array<{ id: string; posExternalId: string | null }>> {
+    if (posExternalIds.length === 0) return [];
+    return prisma.table.findMany({
+      where: { restaurantId, posExternalId: { in: posExternalIds } },
+      select: { id: true, posExternalId: true },
     });
   }
 
-  async findBillByPosDocumentId(posDocumentId: string): Promise<PosIngestBill | null> {
-    const bill = await prisma.bill.findUnique({
-      where: { posDocumentId },
+  async findBillsByPosDocumentIds(posDocumentIds: string[]): Promise<PosIngestBill[]> {
+    if (posDocumentIds.length === 0) return [];
+    const bills = await prisma.bill.findMany({
+      where: { posDocumentId: { in: posDocumentIds } },
       include: { items: true },
     });
-    if (!bill) return null;
-    return {
+    return bills.map((bill) => ({
       id: bill.id,
-      items: bill.items.map((i) => ({ id: i.id, name: i.name })),
-    };
+      posDocumentId: bill.posDocumentId as string,
+      status: bill.status,
+      closedAt: bill.closedAt,
+      posTotal: bill.posTotal == null ? null : Number(bill.posTotal),
+      items: bill.items.map((i) => ({
+        id: i.id,
+        name: i.name,
+        price: Number(i.price),
+        quantity: i.quantity,
+      })),
+    }));
+  }
+
+  async markBillClosedFromPos(billId: string): Promise<void> {
+    // POS is authoritative: the document no longer accepts cobros, so the
+    // local bill leaves the active set. Conditional ⇒ idempotent.
+    await prisma.bill.updateMany({
+      where: { id: billId, status: { in: ["UNPAID", "PARTIALLY_PAID"] } },
+      data: { status: "FULLY_PAID", closedAt: new Date() },
+    });
   }
 
   async syncBillItems(input: SyncBillItemsInput): Promise<void> {
@@ -94,28 +113,25 @@ export class PrismaPosOrderRepository implements PosOrderRepository {
 
   async createBillWithItems(input: CreateBillInput): Promise<void> {
     const { tableId, restaurantId, posDocumentId, posToken, items, totals } = input;
-    await prisma.$transaction(async (tx) => {
-      const bill = await tx.bill.create({
-        data: {
-          tableId,
-          restaurantId,
-          posDocumentId,
-          posToken,
-          status: "UNPAID",
-          ...posTotalsData(totals),
-        },
-      });
-      for (const item of items) {
-        await tx.billItem.create({
-          data: {
-            billId: bill.id,
+    // Single statement (nested create) — atomic without an interactive
+    // transaction, and one DB round trip instead of items.length + 1.
+    await prisma.bill.create({
+      data: {
+        tableId,
+        restaurantId,
+        posDocumentId,
+        posToken,
+        status: "UNPAID",
+        ...posTotalsData(totals),
+        items: {
+          create: items.map((item) => ({
             restaurantId,
             name: item.name,
             price: new Decimal(item.unitPrice),
             quantity: item.quantity,
-          },
-        });
-      }
+          })),
+        },
+      },
     });
   }
 }
