@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -43,4 +45,21 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+// Wraps the config to enable source-map upload and auto-instrumentation.
+// SENTRY_AUTH_TOKEN is only needed at build time for source-map upload — set
+// it in Vercel (build-time secret), never commit it. Without it, builds still
+// succeed; source maps are just not uploaded (Sentry stack traces stay
+// minified until the token is configured).
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: true,
+  widenClientFileUpload: true,
+  // Route Sentry's tunnel through our own domain to avoid ad-blockers
+  // dropping client-side events. Adds one rewrite; safe no-op if unused.
+  tunnelRoute: "/monitoring",
+  webpack: {
+    removeDebugLogging: true,
+    automaticVercelMonitors: true,
+  },
+});
